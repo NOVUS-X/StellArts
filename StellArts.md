@@ -1,102 +1,280 @@
-# Stellarts  
+# Stellarts Backend
 
-![Stellarts Logo](Stellarts.png)  
+A scalable, production-ready FastAPI backend for the Stellarts platform - connecting artisans with clients through a robust API layer.
 
-> **Uber for Artisans — Built on Stellar**  
+## Features
 
-Stellarts is a decentralized marketplace platform designed to seamlessly connect artisans with clients within their geographical location. Leveraging the **Stellar blockchain**, Stellarts enables trusted, transparent, and fast transactions between service providers (artisans) and seekers (clients).  
+- **FastAPI Framework**: Modern, fast web framework for building APIs
+- **Modular Architecture**: Clean separation of concerns with organized directory structure
+- **Database Integration**: PostgreSQL with SQLAlchemy ORM
+- **Authentication**: JWT-based authentication system
+- **API Versioning**: Versioned API endpoints for smooth upgrades
+- **Containerized**: Docker and docker-compose for easy deployment
+- **CI/CD Pipeline**: GitHub Actions for automated testing and deployment
+- **Comprehensive Testing**: Pytest with coverage reporting
+- **Code Quality**: Linting and formatting with flake8, ruff, and black
 
----
+## 📁 Project Structure
 
-## 🚀 Vision  
+```
+app/
+├── api/
+│   └── v1/
+│       ├── endpoints/          # API route handlers
+│       │   └── health.py      # Health check endpoint
+│       └── api.py             # API router configuration
+├── core/
+│   ├── config.py              # Application configuration
+│   └── security.py            # Security utilities
+├── db/
+│   ├── base.py                # Database base configuration
+│   └── session.py             # Database session management
+├── models/                    # SQLAlchemy models
+├── schemas/                   # Pydantic schemas
+├── services/                  # Business logic
+├── tests/                     # Test files
+└── main.py                    # FastAPI application entry point
+```
 
-In many communities, finding skilled and reliable artisans — plumbers, carpenters, electricians, tailors, mechanics, painters, etc. — is still based on word of mouth or scattered directories. Clients struggle to discover verified artisans nearby, and artisans often lack visibility to potential customers.  
+## 🛠️ Quick Start
 
-Stellarts bridges this gap by:  
-- Providing **location-based matching** between artisans and clients.  
-- Enabling **secure escrow payments** powered by Stellar smart contracts.  
-- Building **trust** through a decentralized reputation system.  
+### Prerequisites
 
----
+- Docker and Docker Compose
+- Make (optional, for convenience commands)
 
-## 🛠️ Key Features  
+### 1. Clone and Setup
 
-- **Artisan Discovery**: Clients can search and book artisans within their area, filtered by skills, ratings, and availability.  
-- **Geolocation Matching**: An Uber-like system that maps clients to artisans nearby.  
-- **Secure Payments on Stellar**:  
-  - Clients deposit payments into escrow.  
-  - Funds are released automatically once the work is confirmed.  
-- **Reputation & Reviews**: Ratings and feedback stored immutably to help build trust.  
-- **Multi-currency Support**: Thanks to Stellar’s built-in DEX, clients and artisans can transact in their preferred local currency or stablecoin.  
-- **Low Fees & Fast Settlement**: Stellar ensures near-instant payments with minimal transaction costs.  
+```bash
+git clone <repository-url>
+cd StellArts
+```
 
----
+### 2. Environment Configuration
 
-## 🌍 Use Cases  
+```bash
+# Copy environment template
+make dev-setup
+# OR manually:
+cp env.example .env
+```
 
-- **Urban Communities**: Quick discovery of trusted artisans for emergency home repairs.  
-- **Small Towns**: Artisans gain visibility beyond personal networks.  
-- **Cross-border Work**: Migrant artisans can get verified and receive fair payments securely.  
+Edit `.env` file with your configuration:
 
----
+```env
+DATABASE_URL=postgresql://stellarts:stellarts_dev@db:5432/stellarts_db
+SECRET_KEY=your-secret-key-here
+DEBUG=True
+```
 
-## 🔗 Why Stellar?  
+### 3. Start the Application
 
-- **Escrow & Smart Contracts**: Enables trustless transactions between strangers.  
-- **Low Transaction Costs**: Affordable even for micro-payments.  
-- **Fast Settlement**: Near-instant confirmation of bookings and payments.  
-- **Financial Inclusion**: Accessible via mobile wallets, especially in emerging markets.  
+```bash
+# Start all services
+make up
 
----
+# OR using docker-compose directly:
+docker-compose up -d
+```
 
-## 🏗️ System Architecture (High-Level)  
+### 4. Verify Installation
 
-1. **Client App (Mobile/Web)**  
-   - Browse artisans, book services, confirm completion.  
+- API Health Check: http://localhost:8000/api/v1/health
+- API Documentation: http://localhost:8000/docs
+- API Root: http://localhost:8000/
 
-2. **Artisan App (Mobile/Web)**  
-   - Set availability, accept requests, receive payments.  
+## 🔧 Development
 
-3. **Backend (API Layer)**  
-   - Matching engine, booking system, rating system.  
+### Available Commands
 
-4. **Stellar Integration**  
-   - Payment rails, escrow smart contracts, reputation storage.  
+```bash
+# Development
+make up              # Start all services
+make down            # Stop all services
+make logs            # View logs
+make shell           # Open shell in API container
 
----
+# Testing
+make test            # Run tests
+make test-cov        # Run tests with coverage
 
-## 📦 Tech Stack (Proposed)  
+# Code Quality
+make lint            # Run linting
+make format          # Format code
 
-- **Frontend**: React Native / Flutter (mobile), React (web).  
-- **Backend**: FastAPI / NestJS.  
-- **Database**: PostgreSQL + Redis.  
-- **Blockchain**: Stellar (escrow, payments, reputation).  
-- **Hosting**: AWS / Render / DigitalOcean.  
+# Database
+make db-shell        # Open PostgreSQL shell
+make migrate         # Run database migrations
+make migration m="description"  # Create new migration
 
----
+# Cleanup
+make clean           # Clean containers and volumes
+```
 
-## 💡 Future Roadmap  
+### Development Workflow
 
-- ✅ MVP: Location-based artisan discovery + Stellar payments.  
-- 🔜 Advanced Booking & Scheduling.  
-- 🔜 Reputation Score (on-chain).  
-- 🔜 Integration with Stellar Soroban smart contracts.  
-- 🔜 AI-based skill verification & job-matching.  
+1. **Make Changes**: Edit code in your favorite editor
+2. **Test**: Run `make test` to ensure tests pass
+3. **Lint**: Run `make lint` to check code quality
+4. **Format**: Run `make format` to format code
+5. **Commit**: Commit your changes
 
----
+### Database Migrations
 
-## 👥 Target Audience  
+```bash
+# Create a new migration
+make migration m="add user table"
 
-- **Clients**: Anyone in need of skilled, trusted artisans quickly.  
-- **Artisans**: Skilled workers seeking visibility, fair pay, and verified reputation.  
+# Apply migrations
+make migrate
+```
 
----
+## Testing
 
-## 🤝 Contributing  
+The project uses pytest for testing with comprehensive coverage:
 
-We welcome contributions from developers, designers, and blockchain enthusiasts.  
+```bash
+# Run all tests
+make test
 
-1. Fork the repo  
-2. Create a feature branch  
-3. Submit a pull request  
+# Run tests with coverage
+make test-cov
 
+# Run specific test file
+docker-compose exec api pytest app/tests/test_main.py -v
+
+# Run tests with specific marker
+docker-compose exec api pytest -m "not slow" -v
+```
+
+## 🏗️ CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration:
+
+- **Linting**: Automated code quality checks with flake8 and ruff
+- **Testing**: Automated test execution with pytest
+- **Docker**: Automated Docker image building and testing
+- **Coverage**: Code coverage reporting with codecov
+
+### Branch Protection
+
+- All code must pass CI checks before merging
+- Pull requests require review
+- Main branch is protected
+
+## 🐳 Docker
+
+### Development Environment
+
+```bash
+# Start development services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f api
+
+# Rebuild after dependency changes
+docker-compose build --no-cache
+```
+
+### Production Environment
+
+```bash
+# Start production services
+make prod
+# OR
+docker-compose up -d api-prod db
+```
+
+## 📊 API Documentation
+
+- **Interactive Docs**: http://localhost:8000/docs (Swagger UI)
+- **ReDoc**: http://localhost:8000/redoc
+- **OpenAPI Schema**: http://localhost:8000/api/v1/openapi.json
+
+### Key Endpoints
+
+- `GET /` - Root endpoint with API information
+- `GET /api/v1/health` - Health check with database status
+- `GET /docs` - Interactive API documentation
+
+## Security
+
+- JWT-based authentication
+- Password hashing with bcrypt
+- CORS configuration
+- Environment-based configuration
+- Secure defaults in production
+
+## Deployment
+
+### Environment Variables
+
+Required environment variables for production:
+
+```env
+DATABASE_URL=postgresql://user:pass@host:port/db
+SECRET_KEY=secure-random-key
+DEBUG=False
+BACKEND_CORS_ORIGINS=["https://yourdomain.com"]
+```
+
+### Production Checklist
+
+- [ ] Set strong `SECRET_KEY`
+- [ ] Configure production database
+- [ ] Set `DEBUG=False`
+- [ ] Configure CORS origins
+- [ ] Set up SSL/TLS
+- [ ] Configure logging
+- [ ] Set up monitoring
+
+##  Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Guidelines
+
+- Follow PEP 8 style guide
+- Write tests for new features
+- Update documentation as needed
+- Ensure all CI checks pass
+
+## 📝 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Troubleshooting
+
+### Common Issues
+
+**Database Connection Issues**
+```bash
+# Check if database is running
+docker-compose ps
+
+# Check database logs
+docker-compose logs db
+
+# Reset database
+make clean && make up
+```
+
+**Port Already in Use**
+```bash
+# Stop conflicting services
+sudo lsof -i :8000
+sudo kill -9 <PID>
+
+# Or change port in docker-compose.yml
+```
+
+**Permission Issues**
+```bash
+# Fix file permissions
+sudo chown -R $USER:$USER .
+```
