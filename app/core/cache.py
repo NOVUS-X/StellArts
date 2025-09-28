@@ -1,72 +1,63 @@
-import aioredis
+import redis.asyncio as redis
+from typing import Optional, Any
 import json
-from typing import Any, Optional
 from app.core.config import settings
 
-class RedisCache:
+class RedisClient:
     def __init__(self):
-        self.redis = None
+        self.redis: Optional[redis.Redis] = None
     
-    async def connect(self):
-        """Connect to Redis"""
-        self.redis = await aioredis.from_url(
-            settings.REDIS_URL,
-            encoding="utf-8",
-            decode_responses=True
-        )
+    async def initialize(self):
+        """Initialize Redis connection"""
+        self.redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        # Test connection
+        await self.redis.ping()
     
-    async def disconnect(self):
-        """Disconnect from Redis"""
+    async def close(self):
+        """Close Redis connection"""
         if self.redis:
-            await self.redis.close()
+            await self.redis.aclose()
     
-    async def set(self, key: str, value: Any, expire: Optional[int] = None) -> bool:
-        """Set a key-value pair in Redis"""
-        try:
-            if isinstance(value, (dict, list)):
-                value = json.dumps(value)
-            elif not isinstance(value, str):
-                value = str(value)
-            
-            if expire:
-                return await self.redis.setex(key, expire, value)
-            else:
-                return await self.redis.set(key, value)
-        except Exception as e:
-            print(f"Redis SET error: {e}")
+    async def set(self, key: str, value: Any, expire: int = 3600) -> bool:
+        """Set a value in Redis with optional expiration"""
+        if not self.redis:
             return False
+        
+        if isinstance(value, (dict, list)):
+            value = json.dumps(value)
+        
+        await self.redis.set(key, value, ex=expire)
+        return True
     
     async def get(self, key: str) -> Optional[Any]:
         """Get a value from Redis"""
-        try:
-            value = await self.redis.get(key)
-            if value is None:
-                return None
-            
-            # Try to parse as JSON first
-            try:
-                return json.loads(value)
-            except json.JSONDecodeError:
-                return value
-        except Exception as e:
-            print(f"Redis GET error: {e}")
+        if not self.redis:
             return None
+        
+        value = await self.redis.get(key)
+        if value is None:
+            return None
+        
+        # Try to parse as JSON, return as string if it fails
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return value
     
-    async def set_session(self, session_id: str, data: dict, expire: int = 3600):
-        """Set session data with expiration (default 1 hour)"""
-        return await self.set(f"session:{session_id}", data, expire)
+    async def delete(self, key: str) -> bool:
+        """Delete a key from Redis"""
+        if not self.redis:
+            return False
+        
+        result = await self.redis.delete(key)
+        return bool(result)
     
-    async def get_session(self, session_id: str) -> Optional[dict]:
-        """Get session data"""
-        return await self.get(f"session:{session_id}")
-    
-    async def cache_geolocation(self, location_key: str, artisan_ids: list, expire: int = 300):
-        """Cache artisan IDs for a geolocation query (default 5 minutes)"""
-        return await self.set(f"geo:{location_key}", artisan_ids, expire)
-    
-    async def get_cached_geolocation(self, location_key: str) -> Optional[list]:
-        """Get cached artisan IDs for a geolocation"""
-        return await self.get(f"geo:{location_key}")
+    async def exists(self, key: str) -> bool:
+        """Check if key exists in Redis"""
+        if not self.redis:
+            return False
+        
+        return bool(await self.redis.exists(key))
 
-# Global cache instance
-cache = RedisCache()
+# Global Redis client instance
+cache = RedisClient()

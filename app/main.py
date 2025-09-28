@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.api.v1.api import api_router
 from app.core.config import settings
@@ -11,10 +12,10 @@ from app.db.session import get_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await cache.connect()
+    await cache.initialize()  # Cambio: connect() -> initialize()
     yield
     # Shutdown
-    await cache.disconnect()
+    await cache.close()  # Cambio: disconnect() -> close()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -74,8 +75,8 @@ async def test_redis():
 async def test_database(db: Session = Depends(get_db)):
     """Test database connection"""
     try:
-        # Test basic query
-        result = db.execute("SELECT 1 as test")
+        # Test basic query (usar text() para SQL directo)
+        result = db.execute(text("SELECT 1 as test"))
         test_value = result.fetchone()[0]
         
         return {
