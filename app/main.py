@@ -1,13 +1,26 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+from sqlalchemy.orm import Session
 
 from app.api.v1.api import api_router
 from app.core.config import settings
+from app.core.cache import cache
+from app.db.session import get_db
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await cache.connect()
+    yield
+    # Shutdown
+    await cache.disconnect()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    debug=settings.DEBUG
+    debug=settings.DEBUG,
+    lifespan=lifespan
 )
 
 # Set all CORS enabled origins
@@ -23,7 +36,6 @@ if settings.BACKEND_CORS_ORIGINS:
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-
 @app.get("/")
 def root():
     """
@@ -35,3 +47,44 @@ def root():
         "docs": "/docs",
         "health": f"{settings.API_V1_STR}/health"
     }
+
+@app.get("/test-redis")
+async def test_redis():
+    """Test Redis connection and basic operations"""
+    try:
+        # Test SET
+        await cache.set("test_key", "test_value", expire=60)
+        
+        # Test GET
+        value = await cache.get("test_key")
+        
+        return {
+            "redis_status": "connected",
+            "set_get_test": value == "test_value",
+            "test_value": value,
+            "message": "Redis is working correctly!"
+        }
+    except Exception as e:
+        return {
+            "redis_status": "error",
+            "error": str(e)
+        }
+
+@app.get("/test-db")
+async def test_database(db: Session = Depends(get_db)):
+    """Test database connection"""
+    try:
+        # Test basic query
+        result = db.execute("SELECT 1 as test")
+        test_value = result.fetchone()[0]
+        
+        return {
+            "database_status": "connected",
+            "test_query": test_value == 1,
+            "message": "Database is working correctly!"
+        }
+    except Exception as e:
+        return {
+            "database_status": "error",
+            "error": str(e)
+        }
