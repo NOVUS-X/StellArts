@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_USER: stellarts
       POSTGRES_PASSWORD: stellarts_dev
-      POSTGRES_DB: stellarts_db
+      POSTGRES_DB: stellarts
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -14,7 +14,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
   redis:
     image: redis:7-alpine
     ports:
@@ -31,7 +30,7 @@ services:
   api:
     build: .
     environment:
-      DATABASE_URL: postgresql://stellarts:stellarts_dev@db:5432/stellarts_db
+      DATABASE_URL: postgresql://stellarts:stellarts_dev@db:5434/stellarts
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: dev-secret-key-change-in-production
       DEBUG: "True"
@@ -51,7 +50,7 @@ services:
   api-prod:
     build: .
     environment:
-      DATABASE_URL: postgresql://stellarts:stellarts_dev@db:5432/stellarts_db
+      DATABASE_URL: postgresql://stellarts:stellarts_dev@db:5434/stellarts
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: dev-secret-key-change-in-production
       DEBUG: "False"
@@ -64,7 +63,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4
 
 volumes:
   postgres_data:
