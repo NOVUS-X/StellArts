@@ -6,6 +6,7 @@ import re
 class RoleEnum(str, Enum):
     client = "client"
     artisan = "artisan"
+    admin = "admin"
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -18,8 +19,8 @@ class RegisterRequest(BaseModel):
     @field_validator('role')
     @classmethod
     def validate_role(cls, value):
-        if value not in ['client', 'artisan']:
-            raise ValueError("Role must be 'client' or 'artisan'")
+        if value not in ['client', 'artisan', 'admin']:
+            raise ValueError("Role must be 'client', 'artisan', or 'admin'")
         return value
 
     @field_validator('password')
