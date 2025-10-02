@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.schemas.user import RegisterRequest, RegisterResponse, TokenResponse, LoginRequest
 from app.models.user import User
-from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token
+from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token, blacklist_token
+from app.core.auth import get_current_active_user
 from app.db.session import get_db
 from jose import JWTError
-from app.core.security import blacklist_token
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 router = APIRouter(prefix='/auth')
@@ -56,7 +56,11 @@ def refresh_token(refresh_token: str):
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 @router.post("/logout")
-def logout(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Logout user by blacklisting their current token"""
     token = credentials.credentials
     decoded = decode_token(token)
     if not decoded:
@@ -68,7 +72,10 @@ def logout(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
         raise HTTPException(status_code=400, detail="Malformed token")
 
     blacklist_token(jti, exp)
-    return {"message": "Successfully logged out"}
+    return {
+        "message": "Successfully logged out",
+        "user": current_user.email
+    }
 
 def get_user_by_email(email: str,  db: Session) -> User | None:
     return db.query(User).filter(User.email == email).first()
