@@ -1,28 +1,75 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-
+from app.db.database import get_db
+from app.core.auth import get_current_active_user, require_artisan, require_admin_or_self
 from app.models.user import User
-from app.models.artisan import Artisan
-from app.core.auth import get_current_active_user, require_artisan, require_admin, require_artisan_or_admin
-from app.db.session import get_db
+from app.schemas.artisan import (
+    ArtisanProfileCreate, 
+    ArtisanProfileUpdate, 
+    ArtisanOut,
+    ArtisanLocationUpdate,
+    NearbyArtisansRequest,
+    NearbyArtisansResponse,
+    GeolocationRequest,
+    GeolocationResponse
+)
+from app.services.artisan import ArtisanService
+from app.services.geolocation import geolocation_service
 
 router = APIRouter(prefix="/artisans")
 
-@router.put("/update-profile")
-def update_artisan_profile(
-    profile_data: dict,  # You would create a proper ArtisanProfileUpdate schema
+@router.post("/profile", response_model=ArtisanOut)
+async def create_artisan_profile(
+    profile_data: ArtisanProfileCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_artisan)
+):
+    """Create artisan profile - artisan only"""
+    service = ArtisanService(db)
+    
+    # Check if artisan profile already exists
+    existing = service.get_artisan_by_user_id(current_user.id)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Artisan profile already exists"
+        )
+    
+    artisan = await service.create_artisan_profile(current_user.id, profile_data)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create artisan profile"
+        )
+    
+    return artisan
+
+@router.put("/profile", response_model=ArtisanOut)
+async def update_artisan_profile(
+    profile_data: ArtisanProfileUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_artisan)
 ):
     """Update artisan profile - artisan only"""
-    # This is a placeholder implementation
-    # In a real app, you'd have proper profile update logic
-    return {
-        "message": "Artisan profile updated successfully",
-        "artisan_id": current_user.id,
-        "updated_data": profile_data
-    }
+    service = ArtisanService(db)
+    
+    # Get current artisan profile
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Artisan profile not found"
+        )
+    
+    updated_artisan = await service.update_artisan_profile(artisan.id, profile_data)
+    if not updated_artisan:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update artisan profile"
+        )
+    
+    return updated_artisan
 
 @router.post("/portfolio/add")
 def add_portfolio_item(
@@ -74,18 +121,96 @@ def update_availability(
         "availability": availability_data
     }
 
-@router.get("/")
+@router.post("/nearby", response_model=NearbyArtisansResponse)
+async def find_nearby_artisans(
+    request: NearbyArtisansRequest,
+    db: Session = Depends(get_db)
+):
+    """Find nearby artisans - public endpoint"""
+    service = ArtisanService(db)
+    result = await service.find_nearby_artisans(request)
+    return result
+
+@router.post("/geocode", response_model=GeolocationResponse)
+async def geocode_address(
+    request: GeolocationRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Convert address to coordinates - authenticated users only"""
+    geo_result = await geolocation_service.geocode_address(request.address)
+    if not geo_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Address not found or geocoding failed"
+        )
+    return geo_result
+
+@router.put("/location", response_model=ArtisanOut)
+async def update_artisan_location(
+    location_data: ArtisanLocationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_artisan)
+):
+    """Update artisan location with optional geocoding - artisan only"""
+    service = ArtisanService(db)
+    
+    # Get current artisan profile
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Artisan profile not found"
+        )
+    
+    # If only address is provided, geocode it
+    if location_data.location and not (location_data.latitude and location_data.longitude):
+        updated_artisan = await service.geocode_and_update_location(
+            artisan.id, location_data.location
+        )
+        if not updated_artisan:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to geocode address"
+            )
+        return updated_artisan
+    
+    # Otherwise, update with provided data
+    profile_update = ArtisanProfileUpdate(
+        location=location_data.location,
+        latitude=location_data.latitude,
+        longitude=location_data.longitude
+    )
+    
+    updated_artisan = await service.update_artisan_profile(artisan.id, profile_update)
+    if not updated_artisan:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update location"
+        )
+    
+    return updated_artisan
+
+@router.get("/", response_model=List[ArtisanOut])
 def list_artisans(
     db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    specialties: Optional[List[str]] = Query(None),
+    min_rating: Optional[float] = Query(None, ge=0, le=5),
+    is_available: Optional[bool] = Query(None),
+    has_location: Optional[bool] = Query(None)
 ):
-    """List all artisans - public endpoint"""
-    # This would typically be public to allow clients to browse artisans
-    return {
-        "message": "Public artisan listing",
-        "artisans": []  # Would fetch artisan profiles from DB
-    }
+    """List all artisans with optional filters - public endpoint"""
+    service = ArtisanService(db)
+    artisans = service.list_artisans(
+        skip=skip,
+        limit=limit,
+        specialties=specialties,
+        min_rating=min_rating,
+        is_available=is_available,
+        has_location=has_location
+    )
+    return artisans
 
 @router.get("/{artisan_id}/profile")
 def get_artisan_profile(
