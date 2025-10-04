@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, DECIMAL, ForeignKey, Enum
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
-from app.db.base import Base
+import uuid
+from sqlalchemy import Column, String, Numeric, DateTime, func, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from app.db.base import Base 
 import enum
 
 class PaymentStatus(enum.Enum):
@@ -13,15 +13,18 @@ class PaymentStatus(enum.Enum):
 
 class Payment(Base):
     __tablename__ = "payments"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=False)
-    amount = Column(DECIMAL(10, 2), nullable=False)
-    currency = Column(String(3), default="USD")
-    payment_method = Column(String(50))
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=False)
+    amount = Column(Numeric(18, 7), nullable=False)
+
+     # Stellar fields
+    from_account = Column(String(56), nullable=True)
+    to_account = Column(String(56), nullable=True)
+    memo = Column(String, nullable=True)
+    transaction_hash = Column(String, unique=True, index=True, nullable=True)
+
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
-    transaction_id = Column(String(255))
-    processed_at = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+    created_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column( DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     booking = relationship("Booking", backref="payments")
