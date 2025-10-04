@@ -16,3 +16,4 @@ black==23.11.0
 flake8==6.1.0
 ruff==0.1.6
 redis==5.0.1
+stellar-sdk==13.1.0

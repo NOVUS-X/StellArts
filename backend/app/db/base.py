@@ -8,3 +8,6 @@ engine = create_engine(settings.DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
+from app.models.payment import Payment
+from app.models.booking import Booking
