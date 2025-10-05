@@ -19,6 +19,8 @@ services:
 
   api:
     build: .
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://stellarts:stellarts_dev@db:5432/stellarts_db
       SECRET_KEY: dev-secret-key-change-in-production
@@ -36,6 +38,8 @@ services:
 
   api-prod:
     build: .
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://stellarts:stellarts_dev@db:5432/stellarts_db
       SECRET_KEY: dev-secret-key-change-in-production
