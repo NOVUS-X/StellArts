@@ -1,55 +1,86 @@
-# Stellarts  
+# Stellarts
 
-![Stellarts Logo](Stellarts.png)  
+![Stellarts Logo](./Stellarts.png)
 
-> **Uber for Artisans — Built on Stellar**  
+> **Uber for Artisans — Built on Stellar**
 
-Stellarts is a decentralized marketplace platform designed to seamlessly connect artisans with clients within their geographical location. Leveraging the **Stellar blockchain**, Stellarts enables trusted, transparent, and fast transactions between service providers (artisans) and seekers (clients).  
-
----
-
-## 🚀 Vision  
-
-In many communities, finding skilled and reliable artisans — plumbers, carpenters, electricians, tailors, mechanics, painters, etc. — is still based on word of mouth or scattered directories. Clients struggle to discover verified artisans nearby, and artisans often lack visibility to potential customers.  
-
-Stellarts bridges this gap by:  
-- Providing **location-based matching** between artisans and clients.  
-- Enabling **secure escrow payments** powered by Stellar smart contracts.  
-- Building **trust** through a decentralized reputation system.  
+Stellarts is a decentralized, location-based marketplace that connects skilled artisans with nearby clients, enabling **fast discovery**, **trusted engagement**, and **secure payments** powered by the **Stellar blockchain**.
 
 ---
 
-## 🛠️ Key Features  
+## 🚀 Overview
 
-- **Artisan Discovery**: Clients can search and book artisans within their area, filtered by skills, ratings, and availability.  
-- **Geolocation Matching**: An Uber-like system that maps clients to artisans nearby.  
-- **Secure Payments on Stellar**:  
-  - Clients deposit payments into escrow.  
-  - Funds are released automatically once the work is confirmed.  
-- **Reputation & Reviews**: Ratings and feedback stored immutably to help build trust.  
-- **Multi-currency Support**: Thanks to Stellar’s built-in DEX, clients and artisans can transact in their preferred local currency or stablecoin.  
-- **Low Fees & Fast Settlement**: Stellar ensures near-instant payments with minimal transaction costs.  
+In many regions—especially emerging markets—finding reliable artisans such as plumbers, electricians, carpenters, mechanics, or tailors still relies heavily on word of mouth. This leads to:
 
----
+- Difficulty discovering trusted service providers  
+- Limited visibility and income opportunities for artisans  
+- Payment disputes and lack of accountability  
 
-## 🌍 Use Cases  
-
-- **Urban Communities**: Quick discovery of trusted artisans for emergency home repairs.  
-- **Small Towns**: Artisans gain visibility beyond personal networks.  
-- **Cross-border Work**: Migrant artisans can get verified and receive fair payments securely.  
+**Stellarts solves this problem** by combining geolocation, reputation, and Stellar-based escrow payments into a single transparent platform.
 
 ---
 
-## 🔗 Why Stellar?  
+## 🎯 Vision
 
-- **Escrow & Smart Contracts**: Enables trustless transactions between strangers.  
-- **Low Transaction Costs**: Affordable even for micro-payments.  
-- **Fast Settlement**: Near-instant confirmation of bookings and payments.  
-- **Financial Inclusion**: Accessible via mobile wallets, especially in emerging markets.  
+To become the **go-to decentralized infrastructure** for local service discovery and payments—starting with artisans and expanding to other skill-based services—while promoting **financial inclusion**, **trust**, and **fair compensation**.
 
 ---
 
-## 🏗️ System Architecture (High-Level)  
+## 🛠️ Core Features
+
+### Artisan Discovery
+- Search artisans by **location**, **skill**, **rating**, and **availability**
+- Profile pages with verified skills and work history
+
+### Location-Based Matching
+- Uber-like proximity matching between clients and artisans
+- Reduces response time and improves service efficiency
+
+### Secure Payments (Stellar-Powered)
+
+- Clients lock payments in **escrow**
+- Funds are released only after job completion confirmation
+- Eliminates payment disputes and fraud
+
+### Reputation & Reviews
+
+- Transparent rating and review system
+- Reputation data designed to be **tamper-resistant**
+- Encourages quality service and accountability
+
+### Multi-Currency Support
+
+- Pay using stablecoins or supported local assets
+- Powered by Stellar’s native multi-asset and DEX capabilities
+
+### Fast & Low-Cost Transactions
+
+- Near-instant settlement
+- Extremely low transaction fees, suitable for micro-payments
+
+---
+
+## 🌍 Use Cases
+
+- **Urban Areas**: Emergency plumbing, electrical repairs, home services  
+- **Semi-Urban & Rural Communities**: Visibility for skilled artisans beyond word-of-mouth  
+- **Cross-Border Artisans**: Migrant workers receive secure payments without traditional banking barriers  
+
+---
+
+## 🔗 Why Stellar?
+
+Stellar is an ideal foundation for Stellarts because it offers:
+
+- **Low Fees**: Affordable transactions for everyday users  
+- **Fast Settlement**: Seconds, not minutes or hours  
+- **Multi-Asset Support**: Stablecoins and local currencies  
+- **Escrow Logic**: Trust-minimized payments without intermediaries  
+- **Financial Inclusion**: Accessible through mobile-friendly wallets  
+
+---
+
+## System Architecture (High-Level)
 
 1. **Client App (Mobile/Web)**  
    - Browse artisans, book services, confirm completion.  
@@ -67,8 +98,8 @@ Stellarts bridges this gap by:
 
 ## 📦 Tech Stack (Proposed)  
 
-- **Frontend**: React Native / Flutter (mobile), React (web).  
-- **Backend**: FastAPI 
+- **Frontend**:  Next JS(web).  
+- **Backend**: FastAPI.
 - **Database**: PostgreSQL + Redis.  
 - **Blockchain**: Stellar (escrow, payments, reputation).  
 - **Hosting**: AWS / Render / DigitalOcean.  
