@@ -19,7 +19,7 @@ from app.schemas.artisan import (
 )
 from app.services.artisan import ArtisanService
 from app.services.geolocation import geolocation_service
-from app.services.artisan_service import find_nearby_artisans_cached  # from Discovery&Filtering branch
+# from app.services.artisan_service import find_nearby_artisans_cached  # Broken import removed
 
 router = APIRouter(prefix="/artisans")
 
@@ -41,18 +41,31 @@ async def get_nearby_artisans(
     Discover artisans nearby with optional filters for skill, minimum rating, and availability.
     Results are paginated and sorted by distance (asc) then rating (desc).
     """
-    result = await find_nearby_artisans_cached(
-        db,
-        lat=lat,
-        lon=lon,
+    service = ArtisanService(db)
+    request = NearbyArtisansRequest(
+        latitude=lat,
+        longitude=lon,
         radius_km=radius_km,
-        skill=skill,
+        specialties=[skill] if skill else None,
         min_rating=min_rating,
-        available=available,
-        page=page,
-        page_size=page_size,
+        is_available=available if available is not None else True,
+        limit=page_size * page # Fetch enough for pagination
     )
-    return result
+    
+    result = await service.find_nearby_artisans(request)
+    
+    # Manual pagination since service returns all matches within limit
+    all_items = result.get('artisans', [])
+    start = (page - 1) * page_size
+    end = start + page_size
+    paginated_items = all_items[start:end]
+    
+    return {
+        "items": paginated_items,
+        "total": result.get('total_found', 0),
+        "page": page,
+        "page_size": page_size
+    }
 
 # ✅ POST-based nearby artisans search (from main)
 @router.post("/nearby", response_model=NearbyArtisansResponse)
@@ -154,10 +167,12 @@ def get_my_portfolio(
     current_user: User = Depends(require_artisan)
 ):
     """Get current artisan's portfolio"""
+    # TODO: Implement Portfolio model and DB table
+    # For now, return empty list as functionality is not yet supported in DB
     return {
         "message": f"Portfolio for artisan {current_user.id}",
         "artisan_name": current_user.full_name,
-        "portfolio_items": []  # TODO: Implement DB fetch
+        "portfolio_items": [] 
     }
 
 @router.post("/portfolio/add")
@@ -167,8 +182,9 @@ def add_portfolio_item(
     current_user: User = Depends(require_artisan)
 ):
     """Add portfolio item - artisan only"""
+    # TODO: Implement Portfolio model and DB table
     return {
-        "message": "Portfolio item added successfully",
+        "message": "Portfolio item added successfully (simulation)",
         "artisan_id": current_user.id,
         "portfolio_item": portfolio_item
     }
@@ -179,10 +195,18 @@ def get_artisan_bookings(
     current_user: User = Depends(require_artisan)
 ):
     """Get bookings assigned to current artisan"""
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(status_code=404, detail="Artisan profile not found")
+        
+    from app.models.booking import Booking
+    bookings = db.query(Booking).filter(Booking.artisan_id == artisan.id).all()
+    
     return {
         "message": f"Bookings for artisan {current_user.id}",
         "artisan_name": current_user.full_name,
-        "bookings": []  # TODO: Implement DB fetch
+        "bookings": bookings
     }
 
 @router.get("/", response_model=List[ArtisanOut])
@@ -213,9 +237,14 @@ def get_artisan_profile(
     db: Session = Depends(get_db)
 ):
     """Get specific artisan profile - public endpoint"""
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_id(artisan_id)
+    if not artisan:
+         raise HTTPException(status_code=404, detail="Artisan not found")
+         
     return {
         "message": f"Profile for artisan {artisan_id}",
-        "profile": {}  # TODO: Implement DB fetch
+        "profile": artisan
     }
 
 @router.delete("/{artisan_id}")

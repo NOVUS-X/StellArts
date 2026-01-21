@@ -102,6 +102,17 @@ class ArtisanOut(BaseModel):
     class Config:
         from_attributes = True
 
+    @field_validator('specialties', mode='before')
+    @classmethod
+    def parse_specialties(cls, v):
+        if isinstance(v, str):
+            import json
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return []
+        return v
+
 
 class ArtisanWithDistance(ArtisanOut):
     distance_km: Optional[float] = Field(None, description="Distance in kilometers from search point")

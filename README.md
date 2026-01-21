@@ -65,7 +65,7 @@ Stellarts bridges this gap by:
 
 ---
 
-## 📦 Tech Stack (Proposed)  
+## 📦 Tech Stack  
 
 - **Frontend**: React Native / Flutter (mobile), React (web).  
 - **Backend**: FastAPI 
