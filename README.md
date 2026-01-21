@@ -1,101 +1,195 @@
-# Stellarts  
+# StellArts 🌟
 
-![Stellarts Logo](Stellarts.png)  
+![StellArts Logo](./Stellarts.png)
 
-> **Uber for Artisans — Built on Stellar**  
+> **Uber for Artisans — Built on Stellar**
 
-Stellarts is a decentralized marketplace platform designed to seamlessly connect artisans with clients within their geographical location. Leveraging the **Stellar blockchain**, Stellarts enables trusted, transparent, and fast transactions between service providers (artisans) and seekers (clients).  
+StellArts is a decentralized, location-based marketplace that connects skilled artisans with nearby clients. We combine **fast discovery**, **trusted engagement**, and **secure payments** powered by the **Stellar blockchain** to create a transparent platform for local services.
 
----
-
-## 🚀 Vision  
-
-In many communities, finding skilled and reliable artisans — plumbers, carpenters, electricians, tailors, mechanics, painters, etc. — is still based on word of mouth or scattered directories. Clients struggle to discover verified artisans nearby, and artisans often lack visibility to potential customers.  
-
-Stellarts bridges this gap by:  
-- Providing **location-based matching** between artisans and clients.  
-- Enabling **secure escrow payments** powered by Stellar smart contracts.  
-- Building **trust** through a decentralized reputation system.  
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Stellar](https://img.shields.io/badge/Stellar-Soroban-blue)](https://stellar.org/soroban)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-13.5.1-black)](https://nextjs.org/)
 
 ---
 
-## 🛠️ Key Features  
+## 📑 Table of Contents
 
-- **Artisan Discovery**: Clients can search and book artisans within their area, filtered by skills, ratings, and availability.  
-- **Geolocation Matching**: An Uber-like system that maps clients to artisans nearby.  
-- **Secure Payments on Stellar**:  
-  - Clients deposit payments into escrow.  
-  - Funds are released automatically once the work is confirmed.  
-- **Reputation & Reviews**: Ratings and feedback stored immutably to help build trust.  
-- **Multi-currency Support**: Thanks to Stellar’s built-in DEX, clients and artisans can transact in their preferred local currency or stablecoin.  
-- **Low Fees & Fast Settlement**: Stellar ensures near-instant payments with minimal transaction costs.  
-
----
-
-## 🌍 Use Cases  
-
-- **Urban Communities**: Quick discovery of trusted artisans for emergency home repairs.  
-- **Small Towns**: Artisans gain visibility beyond personal networks.  
-- **Cross-border Work**: Migrant artisans can get verified and receive fair payments securely.  
+- [Overview](#-overview)
+- [Core Features](#-core-features)
+- [Getting Started](#-getting-started)
+- [Tech Stack](#-tech-stack)
+- [Project Structure](#-project-structure)
+- [Smart Contracts](#-smart-contracts)
+- [Roadmap](#-roadmap)
+- [Contributing](#-contributing)
+- [License](#-license)
 
 ---
 
-## 🔗 Why Stellar?  
+## 🚀 Overview
 
-- **Escrow & Smart Contracts**: Enables trustless transactions between strangers.  
-- **Low Transaction Costs**: Affordable even for micro-payments.  
-- **Fast Settlement**: Near-instant confirmation of bookings and payments.  
-- **Financial Inclusion**: Accessible via mobile wallets, especially in emerging markets.  
+In many regions, finding reliable artisans (plumbers, electricians, carpenters) relies heavily on word-of-mouth, leading to limited visibility for workers and lack of trust for clients.
 
----
+**StellArts** solves this by offering:
+- **For Clients**: Easy discovery of verified artisans, transparent reviews, and secure escrow payments.
+- **For Artisans**: Broader market access, fair compensation, and a reputation system that they own.
 
-## 🏗️ System Architecture (High-Level)  
-
-1. **Client App (Mobile/Web)**  
-   - Browse artisans, book services, confirm completion.  
-
-2. **Artisan App (Mobile/Web)**  
-   - Set availability, accept requests, receive payments.  
-
-3. **Backend (API Layer)**  
-   - Matching engine, booking system, rating system.  
-
-4. **Stellar Integration**  
-   - Payment rails, escrow smart contracts, reputation storage.  
+Our vision is to become the trusted decentralized infrastructure for the gig economy, promoting financial inclusion through Stellar's low-cost, high-speed network.
 
 ---
 
-## 📦 Tech Stack  
+## 🛠️ Core Features
 
-- **Frontend**: React Native / Flutter (mobile), React (web).  
-- **Backend**: FastAPI 
-- **Database**: PostgreSQL + Redis.  
-- **Blockchain**: Stellar (escrow, payments, reputation).  
-- **Hosting**: AWS / Render / DigitalOcean.  
+### 🔎 Discovery & Matching
+- **Geolocation-Based**: Uber-like proximity matching to find the nearest available artisan.
+- **Rich Profiles**: Verified skills, work history, and real-time availability.
 
----
+### 💳 Secure & Efficient Payments
+- **Escrow Smart Contracts**: Funds are locked exclusively until job completion is confirmed, eliminating fraud.
+- **Stellar-Powered**: 
+    - **Low Fees**: Transactions cost < $0.01 (micropayment friendly).
+    - **Fast Settlement**: Payments settle in 3-5 seconds.
+    - **Multi-Currency**: Support for USDC and local assets.
 
-## 💡 Future Roadmap  
-
-- ✅ MVP: Location-based artisan discovery + Stellar payments.  
-- 🔜 Advanced Booking & Scheduling.  
-- 🔜 Reputation Score (on-chain).  
-- 🔜 Integration with Stellar Soroban smart contracts.  
-- 🔜 AI-based skill verification & job-matching.  
-
----
-
-## 👥 Target Audience  
-
-- **Clients**: Anyone in need of skilled, trusted artisans quickly.  
-- **Artisans**: Skilled workers seeking visibility, fair pay, and verified reputation.  
+### ⭐ Trust & Reputation
+- **Transparent Reviews**: Rating system designed to be tamper-resistant.
+- **Owned Reputation**: Future plans for on-chain reputation storage.
 
 ---
 
-## 🤝 Contributing  
+## 🚀 Getting Started
 
-We welcome contributions from developers, designers, and blockchain enthusiasts.  
+Follow these steps to set up the development environment.
 
-1. Fork the repo  
-2. Create a feature branch  
-3. Submit a pull request  
+### Prerequisites
+- **Docker & Docker Compose** (for Backend)
+- **Node.js 18+** (for Frontend)
+- **Rust & Soroban CLI** (for Smart Contracts)
+
+### Backend (FastAPI)
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+2. Set up environment variables:
+   ```bash
+   cp env.example .env
+   # Edit .env with your configuration if needed
+   ```
+3. Start the services:
+   ```bash
+   make up
+   # Or: docker-compose up -d
+   ```
+   The API will be available at `http://localhost:8000`. Interact with the docs at `http://localhost:8000/docs`.
+
+### Frontend (Next.js)
+
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+   Open `http://localhost:3000` in your browser.
+
+### Smart Contracts (Soroban)
+
+For detailed contract development, see [contracts/README.md](./contracts/README.md).
+
+```bash
+cd contracts
+cargo test
+```
+
+---
+
+## 📦 Tech Stack
+
+- **Frontend**: Next.js 13 (App Router), TypeScript, Tailwind CSS, Radix UI.
+- **Backend**: FastAPI, Python 3.11, SQLAlchemy, PostgreSQL, Redis.
+- **Blockchain**: Stellar Network, Soroban Smart Contracts (Rust).
+- **Infrastructure**: Docker, GitHub Actions, AWS (planned).
+
+---
+
+## 📁 Project Structure
+
+```
+StellArts/
+├── frontend/              # Next.js web application
+├── backend/               # FastAPI backend & database
+│   ├── app/               # Application code
+│   └── alembic/           # Database migrations
+├── contracts/             # Stellar Soroban smart contracts
+│   ├── escrow/            # Payment holding logic
+│   └── reputation/        # Review logic
+└── README.md              # this file
+```
+
+---
+
+## 🔐 Smart Contracts
+
+We use **Soroban** to handle trustless logic:
+- **Escrow**: Locks funds and handles release/refunds based on job status.
+- **Reputation**: Stores rating hashes and scores to prevent manipulation.
+
+> See [contracts/README.md](./contracts/README.md) for deployment and invocation guides.
+
+---
+
+## 💡 Roadmap
+
+### Phase 1: MVP (Current) ✅
+- [x] User auth & Artisan profiles
+- [x] Location-based search & Booking
+- [x] Stellar payment integration (Testnet)
+- [x] Basic Review system
+
+### Phase 2: Smart Contract Hardening 🚧
+- [ ] Automated payment release flows
+- [ ] Dispute resolution mechanism (Arbitration)
+- [ ] Multi-sig wallet support
+
+### Phase 3: Enhanced Platform 🔜
+- [ ] On-chain reputation data
+- [ ] In-app chat & Push notifications
+- [ ] Mobile Apps (iOS/Android)
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions!
+
+1. **Fork** the repo and **Clone** it.
+2. Create a **Feature Branch** (`git checkout -b feature/cool-feature`).
+3. **Commit** your changes.
+4. **Test** your code:
+   - Backend: `make test` (inside `/backend`)
+   - Frontend: `npm test` (inside `/frontend`)
+   - Contracts: `cargo test` (inside `/contracts`)
+5. **Push** and open a **Pull Request**.
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) first.
+
+---
+
+## 📄 License & Contact
+
+This project is licensed under the **MIT License**.
+
+- **Website**: [stellarts.io](https://stellarts.io)
+- **Twitter**: [@StellArts](https://twitter.com/stellarts)
+- **Issues**: [GitHub Issues](https://github.com/yourusername/StellArts/issues)
+
+<p align="center">Made with ❤️ by the StellArts Team</p>
