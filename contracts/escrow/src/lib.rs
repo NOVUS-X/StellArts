@@ -1,17 +1,29 @@
 // Escrow contract for StellArts
 // TODO: Implement escrow contract logic
+use soroban_sdk::{contracttype, Address, Env};
 
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Escrow {
+    pub client: Address,
+    pub artisan: Address,
+    pub amount: i128,
+    pub status: Status,
+    pub deadline: u64
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Status {
+    Pending,
+    Funded,
+    Released,
+    Disputed
 }
+
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    Escrow(u64)
+}
+
