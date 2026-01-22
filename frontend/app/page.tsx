@@ -1,102 +1,44 @@
-'use client';
+"use client";
 
-import Navbar from '../components/ui/Navbar';
-import Footer from '../components/ui/Footer';
-import { Button } from '../components/ui/button';
-import { Card, CardContent } from '../components/ui/card';
+import Navbar from "../components/ui/Navbar";
+import Footer from "../components/ui/Footer";
+import { Button } from "../components/ui/button";
+import { Card, CardContent } from "../components/ui/card";
+import FeatureGrid from "../components/home/FeatureGrid";
+import UseCases from "../components/home/UseCases";
+
 import {
-  MapPin,
   Shield,
   Zap,
   Star,
-  Globe,
   DollarSign,
   Users,
   Wrench,
   ArrowRight,
-} from 'lucide-react';
+} from "lucide-react";
 
 export default function Home() {
-  const features = [
-    {
-      icon: MapPin,
-      title: 'Artisan Discovery',
-      description:
-        'Search and book artisans within your area, filtered by skills, ratings, and availability.',
-    },
-    {
-      icon: Users,
-      title: 'Geolocation Matching',
-      description:
-        'Uber-like system that intelligently maps clients to nearby artisans.',
-    },
-    {
-      icon: Shield,
-      title: 'Secure Escrow Payments',
-      description:
-        'Clients deposit payments into escrow. Funds are released automatically once work is confirmed.',
-    },
-    {
-      icon: Star,
-      title: 'Reputation & Reviews',
-      description:
-        'Ratings and feedback stored immutably to help build trust in the community.',
-    },
-    {
-      icon: Globe,
-      title: 'Multi-currency Support',
-      description:
-        "Transact in your preferred local currency or stablecoin using Stellar's built-in DEX.",
-    },
-    {
-      icon: Zap,
-      title: 'Low Fees & Fast Settlement',
-      description:
-        'Near-instant payments with minimal transaction costs powered by Stellar.',
-    },
-  ];
-
-  const useCases = [
-    {
-      icon: Wrench,
-      title: 'Urban Communities',
-      description:
-        'Quick discovery of trusted artisans for emergency home repairs.',
-    },
-    {
-      icon: MapPin,
-      title: 'Small Towns',
-      description: 'Artisans gain visibility beyond personal networks.',
-    },
-    {
-      icon: Globe,
-      title: 'Cross-border Work',
-      description:
-        'Migrant artisans can get verified and receive fair payments securely.',
-    },
-  ];
-
   const whyStellar = [
     {
       icon: Shield,
-      title: 'Escrow & Smart Contracts',
-      description: 'Enables trustless transactions between strangers.',
+      title: "Escrow & Smart Contracts",
+      description: "Enables trustless transactions between strangers.",
     },
     {
       icon: DollarSign,
-      title: 'Low Transaction Costs',
-      description: 'Affordable even for micro-payments.',
+      title: "Low Transaction Costs",
+      description: "Affordable even for micro-payments.",
     },
     {
       icon: Zap,
-      title: 'Fast Settlement',
-      description: 'Near-instant confirmation of bookings and payments.',
+      title: "Fast Settlement",
+      description: "Near-instant confirmation of bookings and payments.",
     },
     {
       icon: Users,
-      title: 'Financial Inclusion',
+      title: "Financial Inclusion",
       description:
-        'Accessible via mobile wallets, especially in emerging markets.',
+        "Accessible via mobile wallets, especially in emerging markets.",
     },
   ];
 
@@ -149,9 +91,7 @@ export default function Home() {
                   </div>
                   <div>
                     <div className="text-3xl font-bold text-gray-900">50K+</div>
-                    <div className="text-sm text-gray-600">
-                      Jobs Completed
-                    </div>
+                    <div className="text-sm text-gray-600">Jobs Completed</div>
                   </div>
                   <div>
                     <div className="text-3xl font-bold text-gray-900">4.8★</div>
@@ -168,7 +108,9 @@ export default function Home() {
                         <div className="text-sm font-medium text-gray-900">
                           Plumbers
                         </div>
-                        <div className="text-xs text-gray-500">2,345 available</div>
+                        <div className="text-xs text-gray-500">
+                          2,345 available
+                        </div>
                       </CardContent>
                     </Card>
                     <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow mt-8">
@@ -177,7 +119,9 @@ export default function Home() {
                         <div className="text-sm font-medium text-gray-900">
                           Electricians
                         </div>
-                        <div className="text-xs text-gray-500">1,892 available</div>
+                        <div className="text-xs text-gray-500">
+                          1,892 available
+                        </div>
                       </CardContent>
                     </Card>
                     <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow">
@@ -186,7 +130,9 @@ export default function Home() {
                         <div className="text-sm font-medium text-gray-900">
                           Carpenters
                         </div>
-                        <div className="text-xs text-gray-500">1,567 available</div>
+                        <div className="text-xs text-gray-500">
+                          1,567 available
+                        </div>
                       </CardContent>
                     </Card>
                     <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow mt-8">
@@ -195,7 +141,9 @@ export default function Home() {
                         <div className="text-sm font-medium text-gray-900">
                           Painters
                         </div>
-                        <div className="text-xs text-gray-500">1,234 available</div>
+                        <div className="text-xs text-gray-500">
+                          1,234 available
+                        </div>
                       </CardContent>
                     </Card>
                   </div>
@@ -204,79 +152,8 @@ export default function Home() {
             </div>
           </div>
         </section>
-
-        <section className="py-20 bg-gray-50" id="features">
-          <div className="container mx-auto px-6 max-w-6xl">
-            <div className="text-center mb-16">
-              <span className="text-blue-600 font-semibold text-sm uppercase tracking-wide">
-                Features
-              </span>
-              <h2 className="text-4xl font-bold text-gray-900 mt-4">
-                Everything You Need
-              </h2>
-              <p className="text-xl text-gray-600 mt-4 max-w-2xl mx-auto">
-                Powerful features designed to create trust, transparency, and
-                seamless transactions
-              </p>
-            </div>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {features.map((feature, index) => (
-                <Card
-                  key={index}
-                  className="bg-white border-none shadow-lg hover:shadow-xl transition-all hover:-translate-y-1"
-                >
-                  <CardContent className="p-8">
-                    <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mb-6">
-                      <feature.icon className="w-7 h-7 text-blue-600" />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-3">
-                      {feature.title}
-                    </h3>
-                    <p className="text-gray-600 leading-relaxed">
-                      {feature.description}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="py-20 bg-blue-600" id="use-cases">
-          <div className="container mx-auto px-6 max-w-6xl">
-            <div className="text-center mb-16">
-              <span className="text-blue-200 font-semibold text-sm uppercase tracking-wide">
-                Use Cases
-              </span>
-              <h2 className="text-4xl font-bold text-white mt-4">
-                Who Benefits from Stellarts?
-              </h2>
-              <p className="text-xl text-blue-100 mt-4 max-w-2xl mx-auto">
-                Empowering communities across different settings
-              </p>
-            </div>
-            <div className="grid md:grid-cols-3 gap-8">
-              {useCases.map((useCase, index) => (
-                <Card
-                  key={index}
-                  className="bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/20 transition-all"
-                >
-                  <CardContent className="p-8">
-                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center mb-6">
-                      <useCase.icon className="w-7 h-7 text-blue-600" />
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-3">
-                      {useCase.title}
-                    </h3>
-                    <p className="text-blue-100 leading-relaxed">
-                      {useCase.description}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
+        <FeatureGrid />
+        <UseCases />
 
         <section className="py-20 bg-white" id="why-stellar">
           <div className="container mx-auto px-6 max-w-6xl">
