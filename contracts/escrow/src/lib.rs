@@ -24,7 +24,15 @@ pub enum Status {
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
-    Escrow(u64)
+    Escrow(u64),
+    NextId,
+}
+
+#[contracttype]
+pub struct EngagementInitializedEvent {
+    pub id: u64,
+    pub client: Address,
+    pub artisan: Address,
 }
 
 #[contract]
@@ -60,6 +68,66 @@ impl EscrowContract {
 
         // Save the updated escrow
         env.storage().instance().set(&key, &escrow);
+    }
+
+    /// Initialize a new escrow engagement
+    /// Creates a new escrow record with Pending status
+    pub fn initialize(
+        env: Env,
+        client: Address,
+        artisan: Address,
+        amount: i128,
+        deadline: u64,
+    ) -> u64 {
+        // Validation: client cannot be the same as artisan
+        if client == artisan {
+            panic!("Client and artisan cannot be the same address");
+        }
+
+        // Validation: amount must be positive
+        if amount <= 0 {
+            panic!("Amount must be greater than zero");
+        }
+
+        // Generate unique engagement ID
+        let next_id = env
+            .storage()
+            .instance()
+            .get(&DataKey::NextId)
+            .unwrap_or(1u64);
+
+        let engagement_id = next_id;
+
+        // Update next ID for future engagements
+        env.storage()
+            .instance()
+            .set(&DataKey::NextId, &(next_id + 1));
+
+        // Create new escrow record
+        let escrow = Escrow {
+            client: client.clone(),
+            artisan: artisan.clone(),
+            amount,
+            status: Status::Pending,
+            deadline,
+        };
+
+        // Store the escrow in persistent storage
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(engagement_id), &escrow);
+
+        // Emit event
+        env.events().publish(
+            (),
+            EngagementInitializedEvent {
+                id: engagement_id,
+                client,
+                artisan,
+            },
+        );
+
+        engagement_id
     }
 }
 
@@ -267,5 +335,88 @@ mod test {
         }]);
 
         client.deposit(&engagement_id, &token_address);
+    }
+
+    #[test]
+    fn test_initialize_engagement() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, EscrowContract);
+        let client = EscrowContractClient::new(&env, &contract_id);
+
+        // Create test addresses
+        let client_address = Address::generate(&env);
+        let artisan_address = Address::generate(&env);
+        let amount: i128 = 1000;
+        let deadline = env.ledger().timestamp() + 86400; // 24 hours from now
+
+        // Initialize engagement
+        let engagement_id = client.initialize(&client_address, &artisan_address, &amount, &deadline);
+
+        // Verify the returned ID is valid (should be 1 for first engagement)
+        assert_eq!(engagement_id, 1);
+
+        // Verify the escrow was stored correctly
+        let stored_escrow: Escrow = env.as_contract(&contract_id, || {
+            env.storage().persistent().get(&DataKey::Escrow(engagement_id)).unwrap()
+        });
+
+        assert_eq!(stored_escrow.client, client_address);
+        assert_eq!(stored_escrow.artisan, artisan_address);
+        assert_eq!(stored_escrow.amount, amount);
+        assert_eq!(stored_escrow.status, Status::Pending);
+        assert_eq!(stored_escrow.deadline, deadline);
+
+        // Verify next ID was updated
+        let next_id: u64 = env.as_contract(&contract_id, || {
+            env.storage().instance().get(&DataKey::NextId).unwrap_or(1)
+        });
+        assert_eq!(next_id, 2); // Should be incremented to 2
+    }
+
+    #[test]
+    #[should_panic(expected = "Client and artisan cannot be the same address")]
+    fn test_initialize_same_client_artisan() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, EscrowContract);
+        let client = EscrowContractClient::new(&env, &contract_id);
+
+        let same_address = Address::generate(&env);
+        let amount: i128 = 1000;
+        let deadline = env.ledger().timestamp() + 86400;
+
+        // This should panic because client == artisan
+        client.initialize(&same_address, &same_address, &amount, &deadline);
+    }
+
+    #[test]
+    #[should_panic(expected = "Amount must be greater than zero")]
+    fn test_initialize_zero_amount() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, EscrowContract);
+        let client = EscrowContractClient::new(&env, &contract_id);
+
+        let client_address = Address::generate(&env);
+        let artisan_address = Address::generate(&env);
+        let zero_amount: i128 = 0;
+        let deadline = env.ledger().timestamp() + 86400;
+
+        // This should panic because amount is zero
+        client.initialize(&client_address, &artisan_address, &zero_amount, &deadline);
+    }
+
+    #[test]
+    #[should_panic(expected = "Amount must be greater than zero")]
+    fn test_initialize_negative_amount() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, EscrowContract);
+        let client = EscrowContractClient::new(&env, &contract_id);
+
+        let client_address = Address::generate(&env);
+        let artisan_address = Address::generate(&env);
+        let negative_amount: i128 = -100;
+        let deadline = env.ledger().timestamp() + 86400;
+
+        // This should panic because amount is negative
+        client.initialize(&client_address, &artisan_address, &negative_amount, &deadline);
     }
 }
