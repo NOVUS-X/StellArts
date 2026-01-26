@@ -144,8 +144,10 @@ mod test {
     #[test]
     fn test_deposit_funds() {
         let env = Env::default();
+        // Allow non-root auth for token transfer invoked by the escrow contract.
+        env.mock_all_auths_allowing_non_root_auth();
         let contract_id = env.register_contract(None, EscrowContract);
-        let client = EscrowContractClient::new(&env, &contract_id);
+        let _client = EscrowContractClient::new(&env, &contract_id);
 
         // Create test addresses
         let client_address = Address::generate(&env);
@@ -160,17 +162,6 @@ mod test {
         // Mint some tokens to the client using the token contract's mint function
         let initial_amount: i128 = 1000;
         let token_contract_client = soroban_sdk::token::StellarAssetClient::new(&env, &token_address);
-
-        // Mock auth for the token admin to mint
-        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
-            address: &token_admin,
-            invoke: &soroban_sdk::testutils::MockAuthInvoke {
-                contract: &token_address,
-                fn_name: "mint",
-                args: (client_address.clone(), initial_amount).into_val(&env),
-                sub_invokes: &[],
-            },
-        }]);
 
         token_contract_client.mint(&client_address, &initial_amount);
 
@@ -196,35 +187,8 @@ mod test {
         let initial_contract_balance = token_client.balance(&contract_id);
         assert_eq!(initial_contract_balance, 0);
 
-        // Authorize the escrow contract to spend client's tokens
-        let expiration_ledger = env.ledger().sequence() + 1000;
-
-        // Mock auth for the client to approve
-        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
-            address: &client_address,
-            invoke: &soroban_sdk::testutils::MockAuthInvoke {
-                contract: &token_address,
-                fn_name: "approve",
-                args: (contract_id.clone(), escrow_amount, expiration_ledger).into_val(&env),
-                sub_invokes: &[],
-            },
-        }]);
-
-        token_client.approve(&client_address, &contract_id, &escrow_amount, &expiration_ledger);
-
-        // Mock auth for the client
-        env.mock_auths(&[soroban_sdk::testutils::MockAuth {
-            address: &client_address,
-            invoke: &soroban_sdk::testutils::MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "deposit",
-                args: (engagement_id, token_address.clone()).into_val(&env),
-                sub_invokes: &[],
-            },
-        }]);
-
         // Call deposit function as the client
-        client.deposit(&engagement_id, &token_address);
+        EscrowContractClient::new(&env, &contract_id).deposit(&engagement_id, &token_address);
 
         // Verify contract's token balance increased
         let final_contract_balance = token_client.balance(&contract_id);
@@ -248,7 +212,7 @@ mod test {
         // This test exists for completeness but doesn't enforce authorization
         let env = Env::default();
         let contract_id = env.register_contract(None, EscrowContract);
-        let client = EscrowContractClient::new(&env, &contract_id);
+        let _client = EscrowContractClient::new(&env, &contract_id);
 
         // Create test addresses
         let client_address = Address::generate(&env);
@@ -299,7 +263,7 @@ mod test {
     fn test_deposit_already_funded() {
         let env = Env::default();
         let contract_id = env.register_contract(None, EscrowContract);
-        let client = EscrowContractClient::new(&env, &contract_id);
+        let _client = EscrowContractClient::new(&env, &contract_id);
 
         // Create test addresses
         let client_address = Address::generate(&env);
@@ -339,7 +303,7 @@ mod test {
             },
         }]);
 
-        client.deposit(&engagement_id, &token_address);
+        _client.deposit(&engagement_id, &token_address);
     }
 
     #[test]
