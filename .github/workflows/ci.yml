@@ -3,8 +3,14 @@ name: CI
 on:
   push:
     branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci.yml'
 
 env:
   PYTHON_VERSION: 3.11
