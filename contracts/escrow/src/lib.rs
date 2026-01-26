@@ -1,6 +1,8 @@
+#![no_std]
+
 // Escrow contract for StellArts
 // TODO: Implement escrow contract logic
-use soroban_sdk::{contracttype, Address, Env};
+use soroban_sdk::{contracttype, Address};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
