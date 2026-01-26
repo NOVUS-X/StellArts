@@ -188,8 +188,6 @@ Please read our [Code of Conduct](CODE_OF_CONDUCT.md) first.
 
 This project is licensed under the **MIT License**.
 
-- **Website**: [stellarts.io](https://stellarts.io)
-- **Twitter**: [@StellArts](https://twitter.com/stellarts)
 - **Issues**: [GitHub Issues](https://github.com/yourusername/StellArts/issues)
 
 <p align="center">Made with ❤️ by the StellArts Team</p>

@@ -1,3 +1,5 @@
+#![no_std]
+
 // Escrow contract for StellArts
 // TODO: Implement escrow contract logic
 use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
