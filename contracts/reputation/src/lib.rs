@@ -1,12 +1,19 @@
 #![no_std]
 
-use soroban_sdk::{Address, Env, contract, contractimpl, contracttype};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
 
 /// Storage key for user reputation data
 #[contracttype]
 #[derive(Clone)]
 enum DataKey {
     Reputation(Address),
+}
+
+#[contracttype]
+pub struct RateArtisanEvent {
+    pub artisan: Address,
+    pub stars: u64,
+    pub timestamp: u64,
 }
 
 /// Public struct containing aggregated review data for a user
@@ -59,16 +66,24 @@ impl ReputationContract {
     }
 
     // update and persist an artisan’s reputation score
-    pub fn rate_artisan(env: Env, artisan: Address, stars: u32) {
+    pub fn rate_artisan(env: Env, artisan: Address, stars: u64) {
         if stars < 1 || stars > 5 {
             panic!("stars not in range");
         }
         let mut artisan_data = Self::get_reputation(env.clone(), artisan.clone());
-        artisan_data.total_stars += stars as u64;
+        artisan_data.total_stars += stars;
         artisan_data.review_count += 1;
 
-        Self::set_reputation(env, artisan, artisan_data);
+        Self::set_reputation(env.clone(), artisan.clone(), artisan_data);
 
+        env.events().publish(
+            (),
+            RateArtisanEvent {
+                artisan,
+                stars,
+                timestamp: env.ledger().timestamp(),
+            },
+        );
     }
 }
 
@@ -178,7 +193,7 @@ mod tests {
         assert_eq!(retrieved.review_count, 12);
     }
 
-     #[test]
+    #[test]
     fn test_rate_artisan() {
         let env = Env::default();
         let contract_id = env.register_contract(None, ReputationContract);
