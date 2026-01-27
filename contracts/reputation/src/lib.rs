@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
+use soroban_sdk::{Address, Env, contract, contractimpl, contracttype};
 
 /// Storage key for user reputation data
 #[contracttype]
@@ -56,6 +56,19 @@ impl ReputationContract {
     /// Set reputation data for a user (for testing/admin purposes)
     pub fn set_reputation(env: Env, user: Address, data: ReputationData) {
         write_reputation(&env, &user, &data);
+    }
+
+    // update and persist an artisan’s reputation score
+    pub fn rate_artisan(env: Env, artisan: Address, stars: u32) {
+        if stars < 1 || stars > 5 {
+            panic!("stars not in range");
+        }
+        let mut artisan_data = Self::get_reputation(env.clone(), artisan.clone());
+        artisan_data.total_stars += stars as u64;
+        artisan_data.review_count += 1;
+
+        Self::set_reputation(env, artisan, artisan_data);
+
     }
 }
 
@@ -163,5 +176,58 @@ mod tests {
         let retrieved = client.get_reputation(&user);
         assert_eq!(retrieved.total_stars, 80);
         assert_eq!(retrieved.review_count, 12);
+    }
+
+     #[test]
+    fn test_rate_artisan() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, ReputationContract);
+        let client = ReputationContractClient::new(&env, &contract_id);
+
+        let artisan = Address::generate(&env);
+        let _ = client.rate_artisan(&artisan, &2);
+        let reputation = client.get_reputation(&artisan);
+
+        // Verifies that read_reputation returns default values (0, 0) when no reputation exists
+        assert_eq!(reputation.total_stars, 2);
+        assert_eq!(reputation.review_count, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "stars not in range")]
+    fn test_rate_artisan_not_in_range() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, ReputationContract);
+        let client = ReputationContractClient::new(&env, &contract_id);
+
+        let artisan = Address::generate(&env);
+        let _ = client.rate_artisan(&artisan, &6);
+    }
+
+    #[test]
+    #[should_panic(expected = "stars not in range")]
+    fn test_rate_artisan_not_in_range_zero() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, ReputationContract);
+        let client = ReputationContractClient::new(&env, &contract_id);
+
+        let artisan = Address::generate(&env);
+        let _ = client.rate_artisan(&artisan, &0);
+    }
+
+    #[test]
+    fn test_rate_artisan_multiple() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, ReputationContract);
+        let client = ReputationContractClient::new(&env, &contract_id);
+
+        let artisan = Address::generate(&env);
+        let _ = client.rate_artisan(&artisan, &2);
+        let _ = client.rate_artisan(&artisan, &5);
+        let _ = client.rate_artisan(&artisan, &1);
+        let reputation = client.get_reputation(&artisan);
+
+        assert_eq!(reputation.total_stars, 8);
+        assert_eq!(reputation.review_count, 3);
     }
 }
