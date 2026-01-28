@@ -139,6 +139,6 @@ jobs:
         
         curl -f http://localhost:8000/api/v1/health || (docker logs test-api && exit 1)
         
-        docker stop test-api test-db
-        docker rm test-api test-db
+        docker stop test-api test-db test-redis
+        docker rm test-api test-db test-redis
         docker network rm test-network
