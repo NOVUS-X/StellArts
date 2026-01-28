@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db  # Or use app.db.database depending on your setup
 from app.core.auth import get_current_active_user, require_artisan, require_admin_or_self, require_admin
 from app.models.user import User
+from app.models.portfolio import PortfolioItem
 from app.schemas.artisan import (
     ArtisanProfileCreate, 
     ArtisanProfileUpdate, 
@@ -16,6 +17,8 @@ from app.schemas.artisan import (
     GeolocationRequest,
     GeolocationResponse,
     PaginatedArtisans,
+    PortfolioItemCreate,
+    PortfolioItemOut,
 )
 from app.services.artisan import ArtisanService
 from app.services.geolocation import geolocation_service
@@ -175,19 +178,34 @@ def get_my_portfolio(
         "portfolio_items": [] 
     }
 
-@router.post("/portfolio/add")
-def add_portfolio_item(
-    portfolio_item: dict,  # Replace with actual schema
+@router.post("/portfolio/add", response_model=PortfolioItemOut)
+async def add_portfolio_item(
+    portfolio_item: PortfolioItemCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_artisan)
 ):
     """Add portfolio item - artisan only"""
-    # TODO: Implement Portfolio model and DB table
-    return {
-        "message": "Portfolio item added successfully (simulation)",
-        "artisan_id": current_user.id,
-        "portfolio_item": portfolio_item
-    }
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found")
+    
+    try:
+        new_portfolio_item = PortfolioItem(
+            artisan_id=artisan.id,
+            title=portfolio_item.title,
+            description=portfolio_item.description,
+            image_url=portfolio_item.image_url
+        )
+        
+        db.add(new_portfolio_item)
+        db.commit()
+        db.refresh(new_portfolio_item)
+        
+        return new_portfolio_item
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create portfolio item")
 
 @router.get("/my-bookings")
 def get_artisan_bookings(

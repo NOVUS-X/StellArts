@@ -154,3 +154,23 @@ class ArtisanLocationStats(BaseModel):
     artisans_with_location: int
     coverage_percentage: float
     top_locations: List[dict]
+
+
+# Portfolio Item Schemas
+class PortfolioItemCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255, description="Portfolio item title")
+    description: Optional[str] = Field(None, description="Portfolio item description")
+    image_url: str = Field(..., max_length=500, description="URL of the portfolio image")
+
+
+class PortfolioItemOut(BaseModel):
+    id: int
+    artisan_id: int
+    title: str
+    description: Optional[str] = None
+    image_url: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

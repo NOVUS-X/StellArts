@@ -11,3 +11,4 @@ Base = declarative_base()
 
 from app.models.payment import Payment
 from app.models.booking import Booking
+from app.models.portfolio import PortfolioItem
