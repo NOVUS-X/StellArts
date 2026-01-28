@@ -15,5 +15,6 @@ from app.models.artisan import Artisan  # noqa: F401, E402
 from app.models.booking import Booking  # noqa: F401, E402
 from app.models.client import Client  # noqa: F401, E402
 from app.models.payment import Payment  # noqa: F401, E402
+from app.models.portfolio import Portfolio  # noqa: F401, E402
 from app.models.review import Review  # noqa: F401, E402
 from app.models.user import User  # noqa: F401, E402
