@@ -1,14 +1,18 @@
+from datetime import datetime
+from typing import List
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
-from datetime import datetime
-from pydantic import BaseModel, Field
-from uuid import UUID
 
-from app.models.user import User
-from app.models.booking import Booking, BookingStatus
-from app.core.auth import get_current_active_user, require_client, require_admin, require_client_or_artisan
+from app.core.auth import (
+    get_current_active_user,
+    require_admin,
+    require_client,
+    require_client_or_artisan,
+)
 from app.db.session import get_db
+from app.models.booking import Booking, BookingStatus
+from app.models.user import User
 from app.schemas.booking import (
     BookingCreate,
     BookingResponse,
@@ -88,16 +92,16 @@ def get_my_bookings(
     - Clients see bookings they created
     - Artisans see bookings assigned to them
     """
-    from app.models.client import Client
     from app.models.artisan import Artisan
-    
+    from app.models.client import Client
+
     bookings = []
-    
+
     if current_user.role == "client":
         client = db.query(Client).filter(Client.user_id == current_user.id).first()
         if client:
             bookings = db.query(Booking).filter(Booking.client_id == client.id).all()
-            
+
     elif current_user.role == "artisan":
         artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
         if artisan:
@@ -190,11 +194,11 @@ def update_booking_status(
         )
     
     # Check permissions based on role
-    from app.models.client import Client
     from app.models.artisan import Artisan
-    
+    from app.models.client import Client
+
     allowed = False
-    
+
     if current_user.role == "admin":
         allowed = True
     elif current_user.role == "artisan":
