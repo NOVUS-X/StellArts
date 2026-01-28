@@ -13,6 +13,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(200), nullable=True)
     phone = Column(String(20), nullable=True)
+    avatar = Column(String(500), nullable=True)
     role = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
