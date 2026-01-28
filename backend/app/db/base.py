@@ -9,5 +9,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
-from app.models.payment import Payment
+from app.models.user import User
+from app.models.artisan import Artisan
+from app.models.client import Client
 from app.models.booking import Booking
+from app.models.payment import Payment
+from app.models.review import Review
+from app.models.portfolio import PortfolioItem
