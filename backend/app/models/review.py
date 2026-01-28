@@ -1,3 +1,4 @@
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -7,7 +8,7 @@ class Review(Base):
     __tablename__ = "reviews"
     
     id = Column(Integer, primary_key=True, index=True)
-    booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=False)
+    booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=False)
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
     artisan_id = Column(Integer, ForeignKey("artisans.id"), nullable=False)
     rating = Column(Integer, nullable=False)  # 1-5 stars
