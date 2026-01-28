@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import (
     get_current_active_user,
@@ -9,6 +9,8 @@ from app.core.auth import (
 
 # Import correct dependencies
 from app.db.session import get_db  # Or use app.db.database depending on your setup
+from app.models.artisan import Artisan
+from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.artisan import (
     ArtisanLocationUpdate,
@@ -20,6 +22,7 @@ from app.schemas.artisan import (
     NearbyArtisansRequest,
     NearbyArtisansResponse,
     PaginatedArtisans,
+    ArtisanProfileResponse,
 )
 from app.services.artisan import ArtisanService
 from app.services.geolocation import geolocation_service
@@ -275,15 +278,56 @@ def list_artisans(
     return artisans
 
 
-@router.get("/{artisan_id}/profile")
+@router.get("/{artisan_id}/profile", response_model=ArtisanProfileResponse)
 def get_artisan_profile(artisan_id: int, db: Session = Depends(get_db)):
     """Get specific artisan profile - public endpoint"""
-    service = ArtisanService(db)
-    artisan = service.get_artisan_by_id(artisan_id)
-    if not artisan:
+    # Fetch artisan with user data eagerly to avoid N+1
+    artisan = (
+        db.query(Artisan)
+        .options(joinedload(Artisan.user))
+        .filter(Artisan.id == artisan_id)
+        .first()
+    )
+    
+    if not artisan or not artisan.user:
         raise HTTPException(status_code=404, detail="Artisan not found")
 
-    return {"message": f"Profile for artisan {artisan_id}", "profile": artisan}
+    # Fetch top 5 most recent portfolio items
+    portfolio_items = (
+        db.query(Portfolio)
+        .filter(Portfolio.artisan_id == artisan_id)
+        .order_by(Portfolio.created_at.desc())
+        .limit(5)
+        .all()
+    )
+
+    # Process specialties JSON
+    specialty_str = None
+    if artisan.specialties:
+        try:
+            import json
+            specs = json.loads(artisan.specialties)
+            if isinstance(specs, list):
+                # Take the first one as primary or join them
+                specialty_str = specs[0] if specs else None
+            else:
+                specialty_str = str(specs)
+        except Exception:
+            # Fallback if text is not JSON
+            specialty_str = artisan.specialties
+
+    # Construct response
+    return {
+        "id": artisan.id,
+        "name": artisan.user.full_name,
+        "avatar": artisan.user.avatar,
+        "specialty": specialty_str,
+        "rate": artisan.hourly_rate,
+        "bio": artisan.description,
+        "portfolio": portfolio_items,
+        "average_rating": artisan.rating,
+        "location": artisan.location,
+    }
 
 
 @router.delete("/{artisan_id}")
