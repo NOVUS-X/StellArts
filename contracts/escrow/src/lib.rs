@@ -84,7 +84,7 @@ impl EscrowContract {
 
         // Store the escrow in persistent storage
         env.storage()
-            .persistent()
+            .instance()
             .set(&DataKey::Escrow(engagement_id), &escrow);
 
         // Emit event
@@ -136,7 +136,7 @@ impl EscrowContract {
         let key = DataKey::Escrow(engagement_id);
         let mut escrow: Escrow = env
             .storage()
-            .persistent()
+            .instance()
             .get(&key)
             .expect("Escrow not found");
 
@@ -154,12 +154,15 @@ impl EscrowContract {
 
         // State: Update the escrow status to Released
         escrow.status = Status::Released;
-        env.storage().persistent().set(&key, &escrow);
+        env.storage().instance().set(&key, &escrow);
     }
 }
 
 #[cfg(test)]
-mod test {
+mod test;
+
+#[cfg(test)]
+mod test_legacy {
     use super::*;
     use soroban_sdk::{testutils::{Address as _}, Address, Env, IntoVal};
 
@@ -183,7 +186,7 @@ mod test {
 
         // Verify the escrow was stored correctly
         let stored_escrow: Escrow = env.as_contract(&contract_id, || {
-            env.storage().persistent().get(&DataKey::Escrow(engagement_id)).unwrap()
+            env.storage().instance().get(&DataKey::Escrow(engagement_id)).unwrap()
         });
 
         assert_eq!(stored_escrow.client, client_address);
@@ -452,7 +455,7 @@ mod test {
 
         // Store the escrow
         env.as_contract(&contract_id, || {
-            env.storage().persistent().set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage().instance().set(&DataKey::Escrow(engagement_id), &escrow);
         });
 
         // Transfer tokens to contract (simulating funded escrow)
@@ -495,7 +498,7 @@ mod test {
         };
 
         env.as_contract(&contract_id, || {
-            env.storage().persistent().set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage().instance().set(&DataKey::Escrow(engagement_id), &escrow);
         });
 
         client.release(&engagement_id, &token_address);
@@ -532,7 +535,7 @@ mod test {
         };
 
         env.as_contract(&contract_id, || {
-            env.storage().persistent().set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage().instance().set(&DataKey::Escrow(engagement_id), &escrow);
         });
 
         token_client.transfer(&client_address, &contract_id, &amount);
