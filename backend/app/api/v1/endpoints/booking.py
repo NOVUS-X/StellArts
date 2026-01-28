@@ -119,7 +119,7 @@ def update_booking_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Update booking status - role-based access control"""
+    """Update booking status - role-based state machine enforcement"""
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -128,40 +128,102 @@ def update_booking_status(
     from app.models.artisan import Artisan
     from app.models.client import Client
 
-    allowed = False
+    # Get the user's associated profile (artisan or client)
+    user_artisan = None
+    user_client = None
+    is_artisan = False
+    is_client = False
 
-    if current_user.role == "admin":
-        allowed = True
-    elif current_user.role == "artisan":
-        # Artisan can update bookings assigned to them
-        artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
-        if artisan and booking.artisan_id == artisan.id:
-            allowed = True
+    if current_user.role == "artisan":
+        user_artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
+        is_artisan = user_artisan and booking.artisan_id == user_artisan.id
     elif current_user.role == "client":
-        # Client can only cancel their own bookings
-        client = db.query(Client).filter(Client.user_id == current_user.id).first()
-        if client and booking.client_id == client.id:
-            if status_data.get("status") == "cancelled":
-                allowed = True
-            else:
-                raise HTTPException(
-                    status_code=403, detail="Clients can only cancel bookings"
-                )
+        user_client = db.query(Client).filter(Client.user_id == current_user.id).first()
+        is_client = user_client and booking.client_id == user_client.id
 
-    if not allowed:
+    # Admin bypass - can do any transition
+    if current_user.role == "admin":
+        new_status = status_data.get("status")
+        if new_status:
+            try:
+                booking.status = BookingStatus(new_status)
+                db.commit()
+                db.refresh(booking)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid status") from None
+        return {
+            "message": f"Booking {booking_id} status updated",
+            "updated_by": current_user.id,
+            "new_status": booking.status.value,
+        }
+
+    # Validate user is associated with this booking
+    if not is_artisan and not is_client:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to update this booking",
+            detail="You are not authorized to update this booking",
         )
 
-    new_status = status_data.get("status")
-    if new_status:
-        try:
-            booking.status = BookingStatus(new_status)
-            db.commit()
-            db.refresh(booking)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid status") from None
+    # Get the requested new status
+    new_status_str = status_data.get("status")
+    if not new_status_str:
+        raise HTTPException(status_code=400, detail="Status is required")
+
+    try:
+        new_status = BookingStatus(new_status_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid status") from None
+
+    current_status = booking.status
+
+    # State Machine Rules
+    # PENDING -> CONFIRMED: Only artisan can perform this transition
+    if new_status == BookingStatus.CONFIRMED:
+        if current_status != BookingStatus.PENDING:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot confirm booking from {current_status.value} status",
+            )
+        if not is_artisan:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the artisan can confirm a booking",
+            )
+
+    # CONFIRMED -> COMPLETED: Only client can perform this transition
+    elif new_status == BookingStatus.COMPLETED:
+        if current_status != BookingStatus.CONFIRMED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot complete booking from {current_status.value} status",
+            )
+        if not is_client:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the client can mark a booking as completed",
+            )
+
+    # Any state -> CANCELLED: Role-based cancellation rules
+    elif new_status == BookingStatus.CANCELLED:
+        if is_client:
+            # Client can cancel only if booking is PENDING
+            if current_status != BookingStatus.PENDING:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Clients can only cancel pending bookings",
+                )
+        elif is_artisan:
+            # Artisan can cancel if booking is PENDING or CONFIRMED
+            if current_status not in (BookingStatus.PENDING, BookingStatus.CONFIRMED):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Artisans can only cancel pending or confirmed bookings",
+                )
+
+    # Apply the status update
+    booking.status = new_status
+    db.commit()
+    db.refresh(booking)
 
     return {
         "message": f"Booking {booking_id} status updated",
