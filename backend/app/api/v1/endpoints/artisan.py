@@ -16,13 +16,13 @@ from app.schemas.artisan import (
     ArtisanLocationUpdate,
     ArtisanOut,
     ArtisanProfileCreate,
+    ArtisanProfileResponse,
     ArtisanProfileUpdate,
     GeolocationRequest,
     GeolocationResponse,
     NearbyArtisansRequest,
     NearbyArtisansResponse,
     PaginatedArtisans,
-    ArtisanProfileResponse,
 )
 from app.services.artisan import ArtisanService
 from app.services.geolocation import geolocation_service
@@ -288,7 +288,7 @@ def get_artisan_profile(artisan_id: int, db: Session = Depends(get_db)):
         .filter(Artisan.id == artisan_id)
         .first()
     )
-    
+
     if not artisan or not artisan.user:
         raise HTTPException(status_code=404, detail="Artisan not found")
 
