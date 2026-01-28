@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import health, auth, user, artisan, payments
-from app.api.v1.endpoints import health, auth, user, booking, artisan, admin
+from app.api.v1.endpoints import admin, artisan, auth, booking, health, payments, user
 
 api_router = APIRouter()
 
