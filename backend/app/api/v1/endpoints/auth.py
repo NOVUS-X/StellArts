@@ -1,12 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session
-from app.schemas.user import RegisterRequest, RegisterResponse, TokenResponse, LoginRequest
-from app.models.user import User
-from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token, blacklist_token
-from app.core.auth import get_current_active_user
-from app.db.session import get_db
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+
+from app.core.auth import get_current_active_user
+from app.core.security import (
+    blacklist_token,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    get_password_hash,
+    verify_password,
+)
+from app.db.session import get_db
+from app.models.user import User
+from app.schemas.user import (
+    LoginRequest,
+    RegisterRequest,
+    RegisterResponse,
+    TokenResponse,
+)
 
 router = APIRouter(prefix='/auth')
 
@@ -17,7 +30,7 @@ def register_user(user_in: RegisterRequest, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user_in.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     hashed_pw = get_password_hash(user_in.password)
 
     user = User(
@@ -53,7 +66,7 @@ def refresh_token(refresh_token: str):
         access_token = create_access_token(user_id)
         return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        raise HTTPException(status_code=401, detail="Invalid refresh token") from None
 
 @router.post("/logout")
 def logout(
@@ -65,7 +78,7 @@ def logout(
     decoded = decode_token(token)
     if not decoded:
         raise HTTPException(status_code=401, detail="Invalid token")
-    
+
     jti = decoded.get("jti")
     exp = decoded.get("exp")
     if not jti or not exp:

@@ -1,10 +1,10 @@
 import os
-from decimal import Decimal, ROUND_DOWN
-from typing import Dict, Any, Optional
+from decimal import ROUND_DOWN, Decimal
+from typing import Any
 
-from stellar_sdk import Server, Keypair, TransactionBuilder, Network, Asset
-from stellar_sdk.exceptions import BadRequestError, BadResponseError
 from sqlalchemy.orm import Session
+from stellar_sdk import Asset, Keypair, Network, Server, TransactionBuilder
+from stellar_sdk.exceptions import BadRequestError, BadResponseError
 
 from app.models.payment import Payment
 
@@ -42,17 +42,17 @@ def _sanitize_amount(amount: Decimal) -> str:
 def _record_payment(
     db: Session,
     booking_id: str,
-    tx_hash: Optional[str],
+    tx_hash: str | None,
     status: str,
     amount: Decimal,
     from_acc: str,
     to_acc: str,
     memo: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Insert payment record into DB and commit."""
     payment = Payment(
         booking_id=booking_id,
-        transaction_hash=tx_hash, 
+        transaction_hash=tx_hash,
         status=status,
         amount=amount,
         from_account=from_acc,
@@ -73,7 +73,7 @@ def _record_payment(
 # Main actions
 # ---------------------------
 
-def hold_payment(db: Session, client_secret: str, booking_id: str, amount: Decimal) -> Dict[str, Any]:
+def hold_payment(db: Session, client_secret: str, booking_id: str, amount: Decimal) -> dict[str, Any]:
     """
     Client sends a signed transaction to move funds to escrow.
     Idempotency: if booking already has a 'held' payment, return that record.
@@ -124,7 +124,7 @@ def hold_payment(db: Session, client_secret: str, booking_id: str, amount: Decim
         return {"status": "error", "message": f"Database error after Stellar success: {e}"}
 
 
-def release_payment(db: Session, booking_id: str, artisan_public: str, amount: Decimal) -> Dict[str, Any]:
+def release_payment(db: Session, booking_id: str, artisan_public: str, amount: Decimal) -> dict[str, Any]:
     """Release funds from escrow to artisan."""
     if not ESCROW_KEYPAIR:
         return {"status": "error", "message": "Escrow key not configured"}
@@ -179,7 +179,7 @@ def release_payment(db: Session, booking_id: str, artisan_public: str, amount: D
         return {"status": "error", "message": f"Database error after Stellar success: {e}"}
 
 
-def refund_payment(db: Session, booking_id: str, client_public: str, amount: Decimal) -> Dict[str, Any]:
+def refund_payment(db: Session, booking_id: str, client_public: str, amount: Decimal) -> dict[str, Any]:
     """Refund funds from escrow back to client."""
     if not ESCROW_KEYPAIR:
         return {"status": "error", "message": "Escrow key not configured"}

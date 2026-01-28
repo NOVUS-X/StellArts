@@ -1,7 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, Literal
-from enum import Enum
 import re
+from enum import Enum
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
 
 class RoleEnum(str, Enum):
     client = "client"
@@ -12,9 +13,9 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=72)
     role: RoleEnum
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
-    username: Optional[str] = None
+    full_name: str | None = None
+    phone: str | None = None
+    username: str | None = None
 
     @field_validator('role')
     @classmethod
@@ -37,9 +38,9 @@ class RegisterRequest(BaseModel):
             raise ValueError("Password must contain at least one digit")
         if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", value):
             raise ValueError("Password must contain at least one special character")
-        
+
         return value
-    
+
 class RegisterResponse(BaseModel):
     id: int
     role: str
@@ -52,9 +53,9 @@ class UserOut(BaseModel):
     id: int
     email: EmailStr
     role: str
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
-    username: Optional[str] = None
+    full_name: str | None = None
+    phone: str | None = None
+    username: str | None = None
 
     class Config:
         from_attributes = True

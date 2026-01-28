@@ -1,29 +1,29 @@
-from typing import List, Optional
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+
 from pydantic import BaseModel, Field, field_validator
 
 
 # Shared/Discovery Models
 class ArtisanItem(BaseModel):
     id: int
-    business_name: Optional[str] = None
-    description: Optional[str] = None
-    specialties: Optional[str] = None
-    experience_years: Optional[int] = None
-    hourly_rate: Optional[float] = None
-    location: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    business_name: str | None = None
+    description: str | None = None
+    specialties: str | None = None
+    experience_years: int | None = None
+    hourly_rate: float | None = None
+    location: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     is_verified: bool = False
     is_available: bool = False
-    rating: Optional[float] = None
+    rating: float | None = None
     total_reviews: int = 0
-    distance_km: Optional[float] = Field(None, description="Great-circle distance in kilometers")
+    distance_km: float | None = Field(None, description="Great-circle distance in kilometers")
 
 
 class PaginatedArtisans(BaseModel):
-    items: List[ArtisanItem]
+    items: list[ArtisanItem]
     total: int
     page: int
     page_size: int
@@ -31,9 +31,9 @@ class PaginatedArtisans(BaseModel):
 
 # Creation/Update/Input Schemas
 class ArtisanLocationUpdate(BaseModel):
-    location: Optional[str] = Field(None, max_length=200, description="Human-readable address")
-    latitude: Optional[Decimal] = Field(None, ge=-90, le=90, description="Latitude coordinate")
-    longitude: Optional[Decimal] = Field(None, ge=-180, le=180, description="Longitude coordinate")
+    location: str | None = Field(None, max_length=200, description="Human-readable address")
+    latitude: Decimal | None = Field(None, ge=-90, le=90, description="Latitude coordinate")
+    longitude: Decimal | None = Field(None, ge=-180, le=180, description="Longitude coordinate")
 
     @field_validator('latitude')
     @classmethod
@@ -51,14 +51,14 @@ class ArtisanLocationUpdate(BaseModel):
 
 
 class ArtisanProfileCreate(BaseModel):
-    business_name: Optional[str] = Field(None, max_length=200)
-    description: Optional[str] = None
-    specialties: Optional[List[str]] = Field(default_factory=list, description="List of specialties")
-    experience_years: Optional[int] = Field(None, ge=0, le=50)
-    hourly_rate: Optional[Decimal] = Field(None, ge=0, description="Hourly rate in currency")
-    location: Optional[str] = Field(None, max_length=200, description="Human-readable address")
-    latitude: Optional[Decimal] = Field(None, ge=-90, le=90, description="Latitude coordinate")
-    longitude: Optional[Decimal] = Field(None, ge=-180, le=180, description="Longitude coordinate")
+    business_name: str | None = Field(None, max_length=200)
+    description: str | None = None
+    specialties: list[str] | None = Field(default_factory=list, description="List of specialties")
+    experience_years: int | None = Field(None, ge=0, le=50)
+    hourly_rate: Decimal | None = Field(None, ge=0, description="Hourly rate in currency")
+    location: str | None = Field(None, max_length=200, description="Human-readable address")
+    latitude: Decimal | None = Field(None, ge=-90, le=90, description="Latitude coordinate")
+    longitude: Decimal | None = Field(None, ge=-180, le=180, description="Longitude coordinate")
 
     @field_validator('specialties')
     @classmethod
@@ -69,32 +69,32 @@ class ArtisanProfileCreate(BaseModel):
 
 
 class ArtisanProfileUpdate(BaseModel):
-    business_name: Optional[str] = Field(None, max_length=200)
-    description: Optional[str] = None
-    specialties: Optional[List[str]] = Field(None, description="List of specialties")
-    experience_years: Optional[int] = Field(None, ge=0, le=50)
-    hourly_rate: Optional[Decimal] = Field(None, ge=0, description="Hourly rate in currency")
-    location: Optional[str] = Field(None, max_length=200, description="Human-readable address")
-    latitude: Optional[Decimal] = Field(None, ge=-90, le=90, description="Latitude coordinate")
-    longitude: Optional[Decimal] = Field(None, ge=-180, le=180, description="Longitude coordinate")
-    is_available: Optional[bool] = None
+    business_name: str | None = Field(None, max_length=200)
+    description: str | None = None
+    specialties: list[str] | None = Field(None, description="List of specialties")
+    experience_years: int | None = Field(None, ge=0, le=50)
+    hourly_rate: Decimal | None = Field(None, ge=0, description="Hourly rate in currency")
+    location: str | None = Field(None, max_length=200, description="Human-readable address")
+    latitude: Decimal | None = Field(None, ge=-90, le=90, description="Latitude coordinate")
+    longitude: Decimal | None = Field(None, ge=-180, le=180, description="Longitude coordinate")
+    is_available: bool | None = None
 
 
 # Output Schema
 class ArtisanOut(BaseModel):
     id: int
     user_id: int
-    business_name: Optional[str] = None
-    description: Optional[str] = None
-    specialties: Optional[List[str]] = None
-    experience_years: Optional[int] = None
-    hourly_rate: Optional[Decimal] = None
-    location: Optional[str] = None
-    latitude: Optional[Decimal] = None
-    longitude: Optional[Decimal] = None
+    business_name: str | None = None
+    description: str | None = None
+    specialties: list[str] | None = None
+    experience_years: int | None = None
+    hourly_rate: Decimal | None = None
+    location: str | None = None
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
     is_verified: bool = False
     is_available: bool = True
-    rating: Optional[Decimal] = None
+    rating: Decimal | None = None
     total_reviews: int = 0
     created_at: datetime
     updated_at: datetime
@@ -115,22 +115,22 @@ class ArtisanOut(BaseModel):
 
 
 class ArtisanWithDistance(ArtisanOut):
-    distance_km: Optional[float] = Field(None, description="Distance in kilometers from search point")
+    distance_km: float | None = Field(None, description="Distance in kilometers from search point")
 
 
 # Search & Filtering
 class NearbyArtisansRequest(BaseModel):
     latitude: Decimal = Field(..., ge=-90, le=90, description="Search center latitude")
     longitude: Decimal = Field(..., ge=-180, le=180, description="Search center longitude")
-    radius_km: Optional[float] = Field(10.0, ge=0.1, le=100, description="Search radius in kilometers")
-    specialties: Optional[List[str]] = Field(None, description="Filter by specialties")
-    min_rating: Optional[float] = Field(None, ge=0, le=5, description="Minimum rating filter")
-    is_available: Optional[bool] = Field(True, description="Filter by availability")
-    limit: Optional[int] = Field(20, ge=1, le=100, description="Maximum number of results")
+    radius_km: float | None = Field(10.0, ge=0.1, le=100, description="Search radius in kilometers")
+    specialties: list[str] | None = Field(None, description="Filter by specialties")
+    min_rating: float | None = Field(None, ge=0, le=5, description="Minimum rating filter")
+    is_available: bool | None = Field(True, description="Filter by availability")
+    limit: int | None = Field(20, ge=1, le=100, description="Maximum number of results")
 
 
 class NearbyArtisansResponse(BaseModel):
-    artisans: List[ArtisanWithDistance]
+    artisans: list[ArtisanWithDistance]
     total_found: int
     search_center: dict = Field(description="Search center coordinates")
     radius_km: float
@@ -145,7 +145,7 @@ class GeolocationResponse(BaseModel):
     latitude: Decimal
     longitude: Decimal
     formatted_address: str
-    confidence: Optional[float] = Field(None, description="Geocoding confidence score")
+    confidence: float | None = Field(None, description="Geocoding confidence score")
 
 
 # Statistics
@@ -153,4 +153,4 @@ class ArtisanLocationStats(BaseModel):
     total_artisans: int
     artisans_with_location: int
     coverage_percentage: float
-    top_locations: List[dict]
+    top_locations: list[dict]

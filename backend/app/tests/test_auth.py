@@ -1,4 +1,3 @@
-import pytest
 
 def test_register_user(client):
     test_user_data = {
@@ -51,4 +50,4 @@ def test_logout_user(client):
     headers = {"Authorization": f"Bearer {tokens['access_token']}"}
     response = client.post("api/v1/auth/logout", headers=headers)
     assert response.status_code == 200
-    assert response.json() == {"message": "Successfully logged out"}
+    assert response.json()["message"] == "Successfully logged out"

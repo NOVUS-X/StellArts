@@ -1,24 +1,30 @@
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+
+from app.core.auth import (
+    get_current_active_user,
+    require_admin,
+    require_artisan,
+)
 
 # Import correct dependencies
 from app.db.session import get_db  # Or use app.db.database depending on your setup
-from app.core.auth import get_current_active_user, require_artisan, require_admin_or_self, require_admin
 from app.models.user import User
 from app.schemas.artisan import (
-    ArtisanProfileCreate, 
-    ArtisanProfileUpdate, 
-    ArtisanOut,
     ArtisanLocationUpdate,
-    NearbyArtisansRequest,
-    NearbyArtisansResponse,
+    ArtisanOut,
+    ArtisanProfileCreate,
+    ArtisanProfileUpdate,
     GeolocationRequest,
     GeolocationResponse,
+    NearbyArtisansRequest,
+    NearbyArtisansResponse,
     PaginatedArtisans,
 )
 from app.services.artisan import ArtisanService
 from app.services.geolocation import geolocation_service
+
 # from app.services.artisan_service import find_nearby_artisans_cached  # Broken import removed
 
 router = APIRouter(prefix="/artisans")
@@ -31,9 +37,9 @@ async def get_nearby_artisans(
     lat: float = Query(..., description="Latitude of the client location"),
     lon: float = Query(..., description="Longitude of the client location"),
     radius_km: float = Query(25.0, ge=0, le=200, description="Search radius in kilometers"),
-    skill: Optional[str] = Query(None, description="Filter by skill keyword (e.g., plumber)"),
-    min_rating: Optional[float] = Query(None, ge=0, le=5, description="Minimum average rating"),
-    available: Optional[bool] = Query(None, description="Filter by current availability"),
+    skill: str | None = Query(None, description="Filter by skill keyword (e.g., plumber)"),
+    min_rating: float | None = Query(None, ge=0, le=5, description="Minimum average rating"),
+    available: bool | None = Query(None, description="Filter by current availability"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
 ):
@@ -51,15 +57,15 @@ async def get_nearby_artisans(
         is_available=available if available is not None else True,
         limit=page_size * page # Fetch enough for pagination
     )
-    
+
     result = await service.find_nearby_artisans(request)
-    
+
     # Manual pagination since service returns all matches within limit
     all_items = result.get('artisans', [])
     start = (page - 1) * page_size
     end = start + page_size
     paginated_items = all_items[start:end]
-    
+
     return {
         "items": paginated_items,
         "total": result.get('total_found', 0),
@@ -172,7 +178,7 @@ def get_my_portfolio(
     return {
         "message": f"Portfolio for artisan {current_user.id}",
         "artisan_name": current_user.full_name,
-        "portfolio_items": [] 
+        "portfolio_items": []
     }
 
 @router.post("/portfolio/add")
@@ -199,25 +205,25 @@ def get_artisan_bookings(
     artisan = service.get_artisan_by_user_id(current_user.id)
     if not artisan:
         raise HTTPException(status_code=404, detail="Artisan profile not found")
-        
+
     from app.models.booking import Booking
     bookings = db.query(Booking).filter(Booking.artisan_id == artisan.id).all()
-    
+
     return {
         "message": f"Bookings for artisan {current_user.id}",
         "artisan_name": current_user.full_name,
         "bookings": bookings
     }
 
-@router.get("/", response_model=List[ArtisanOut])
+@router.get("/", response_model=list[ArtisanOut])
 def list_artisans(
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    specialties: Optional[List[str]] = Query(None),
-    min_rating: Optional[float] = Query(None, ge=0, le=5),
-    is_available: Optional[bool] = Query(None),
-    has_location: Optional[bool] = Query(None)
+    specialties: list[str] | None = Query(None),
+    min_rating: float | None = Query(None, ge=0, le=5),
+    is_available: bool | None = Query(None),
+    has_location: bool | None = Query(None)
 ):
     """List all artisans with optional filters - public endpoint"""
     service = ArtisanService(db)
@@ -241,7 +247,7 @@ def get_artisan_profile(
     artisan = service.get_artisan_by_id(artisan_id)
     if not artisan:
          raise HTTPException(status_code=404, detail="Artisan not found")
-         
+
     return {
         "message": f"Profile for artisan {artisan_id}",
         "profile": artisan

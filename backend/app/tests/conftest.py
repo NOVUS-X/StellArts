@@ -3,9 +3,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.main import app
 from app.db.base import Base
 from app.db.session import get_db
+from app.main import app
 
 # Use SQLite for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
@@ -40,17 +40,17 @@ def db_session():
 def client():
     """Create a test client."""
     from unittest.mock import AsyncMock, patch
-    
+
     app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=engine)
-    
+
     # Mock Redis cache (Async) and Security Redis (Sync) to avoid connection errors
     with patch("app.core.cache.cache.initialize", new_callable=AsyncMock), \
          patch("app.core.cache.cache.redis", new_callable=AsyncMock), \
          patch("app.core.security.redis_client"):
-        
+
         with TestClient(app) as test_client:
             yield test_client
-    
+
     Base.metadata.drop_all(bind=engine)
     app.dependency_overrides.clear()

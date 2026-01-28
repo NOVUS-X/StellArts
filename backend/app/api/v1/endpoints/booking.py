@@ -1,12 +1,18 @@
+from datetime import datetime
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
-from datetime import datetime
 
-from app.models.user import User
-from app.models.booking import Booking, BookingStatus
-from app.core.auth import get_current_active_user, require_client, require_admin, require_client_or_artisan
+from app.core.auth import (
+    get_current_active_user,
+    require_admin,
+    require_client,
+    require_client_or_artisan,
+)
 from app.db.session import get_db
+from app.models.booking import Booking, BookingStatus
+from app.models.user import User
 
 router = APIRouter(prefix="/bookings")
 
@@ -26,7 +32,7 @@ def create_booking(
         db.add(client)
         db.commit()
         db.refresh(client)
-    
+
     # Validate artisan exists
     from app.models.artisan import Artisan
     artisan_id = booking_data.get("artisan_id")
@@ -46,11 +52,11 @@ def create_booking(
         location=booking_data.get("location"),
         notes=booking_data.get("notes")
     )
-    
+
     db.add(new_booking)
     db.commit()
     db.refresh(new_booking)
-    
+
     return {
         "message": "Booking created successfully",
         "booking_id": new_booking.id,
@@ -64,21 +70,21 @@ def get_my_bookings(
     current_user: User = Depends(require_client_or_artisan)
 ):
     """Get current user's bookings - clients and artisans only"""
-    from app.models.client import Client
     from app.models.artisan import Artisan
-    
+    from app.models.client import Client
+
     bookings = []
-    
+
     if current_user.role == "client":
         client = db.query(Client).filter(Client.user_id == current_user.id).first()
         if client:
             bookings = db.query(Booking).filter(Booking.client_id == client.id).all()
-            
+
     elif current_user.role == "artisan":
         artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
         if artisan:
             bookings = db.query(Booking).filter(Booking.artisan_id == artisan.id).all()
-    
+
     return {
         "message": f"Bookings for user {current_user.id}",
         "user_role": current_user.role,
@@ -102,7 +108,7 @@ def get_all_bookings(
 
 @router.put("/{booking_id}/status")
 def update_booking_status(
-    booking_id: int,
+    booking_id: UUID,
     status_data: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -111,13 +117,13 @@ def update_booking_status(
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-        
+
     # Check permissions based on role
-    from app.models.client import Client
     from app.models.artisan import Artisan
-    
+    from app.models.client import Client
+
     allowed = False
-    
+
     if current_user.role == "admin":
         allowed = True
     elif current_user.role == "artisan":
@@ -133,13 +139,13 @@ def update_booking_status(
                 allowed = True
             else:
                 raise HTTPException(status_code=403, detail="Clients can only cancel bookings")
-    
+
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions to update this booking"
         )
-    
+
     new_status = status_data.get("status")
     if new_status:
         try:
@@ -147,8 +153,8 @@ def update_booking_status(
             db.commit()
             db.refresh(booking)
         except ValueError:
-             raise HTTPException(status_code=400, detail="Invalid status")
-    
+             raise HTTPException(status_code=400, detail="Invalid status") from None
+
     return {
         "message": f"Booking {booking_id} status updated",
         "updated_by": current_user.id,

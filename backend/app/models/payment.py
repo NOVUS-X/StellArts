@@ -1,9 +1,11 @@
-import uuid
-from sqlalchemy import Column, String, Numeric, DateTime, func, ForeignKey, Enum
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from app.db.base import Base 
 import enum
+import uuid
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Numeric, String, Uuid, func
+from sqlalchemy.orm import relationship
+
+from app.db.base import Base
+
 
 class PaymentStatus(enum.Enum):
     PENDING = "pending"
@@ -15,8 +17,8 @@ class PaymentStatus(enum.Enum):
 class Payment(Base):
     __tablename__ = "payments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
-    booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=False)
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4, nullable=False)
+    booking_id = Column(Uuid, ForeignKey("bookings.id"), nullable=False)
     amount = Column(Numeric(18, 7), nullable=False)
 
      # Stellar fields

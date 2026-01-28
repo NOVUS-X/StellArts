@@ -1,8 +1,7 @@
-from typing import List, Optional
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
+from sqlalchemy.orm import Session
 
 from app.core.security import decode_token, is_token_blacklisted
 from app.db.session import get_db
@@ -41,8 +40,8 @@ def get_current_user(
         token = credentials.credentials
         payload = decode_token(token)
     except JWTError:
-        raise AuthenticationError("Invalid token format")
-    
+        raise AuthenticationError("Invalid token format") from None
+
     if not payload:
         raise AuthenticationError("Invalid token")
 
@@ -55,11 +54,11 @@ def get_current_user(
     user_id = payload.get("sub")
     if not user_id:
         raise AuthenticationError("Token missing user information")
-    
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise AuthenticationError("User not found")
-    
+
     if not user.is_active:
         raise AuthenticationError("User account is inactive")
 
@@ -73,25 +72,25 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
         raise AuthenticationError("User account is inactive")
     return current_user
 
-def require_roles(allowed_roles: List[RoleEnum]):
+def require_roles(allowed_roles: list[RoleEnum]):
     """
     Create a dependency that requires specific roles.
     Returns a function that can be used as a FastAPI dependency.
     """
     def role_checker(current_user: User = Depends(get_current_active_user)) -> User:
         user_role = current_user.role
-        
+
         # Convert string roles to RoleEnum for comparison
         allowed_role_values = [role.value for role in allowed_roles]
-        
+
         if user_role not in allowed_role_values:
             role_names = ", ".join(allowed_role_values)
             raise AuthorizationError(
                 f"Access denied. Required roles: {role_names}. Your role: {user_role}"
             )
-        
+
         return current_user
-    
+
     return role_checker
 
 # Convenience dependencies for common role requirements
@@ -111,11 +110,11 @@ def require_admin_or_self(target_user_id: int):
     def admin_or_self_checker(current_user: User = Depends(get_current_active_user)) -> User:
         if current_user.role == RoleEnum.admin.value or current_user.id == target_user_id:
             return current_user
-        
+
         raise AuthorizationError(
             "Access denied. You can only access your own resources or need admin privileges."
         )
-    
+
     return admin_or_self_checker
 
 def require_resource_owner_or_admin(resource_user_id: int):
@@ -125,9 +124,9 @@ def require_resource_owner_or_admin(resource_user_id: int):
     def owner_or_admin_checker(current_user: User = Depends(get_current_active_user)) -> User:
         if current_user.role == RoleEnum.admin.value or current_user.id == resource_user_id:
             return current_user
-        
+
         raise AuthorizationError(
             "Access denied. You can only access resources you own or need admin privileges."
         )
-    
+
     return owner_or_admin_checker

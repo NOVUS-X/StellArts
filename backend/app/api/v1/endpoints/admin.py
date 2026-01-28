@@ -1,10 +1,10 @@
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
 
-from app.models.user import User
-from app.core.auth import get_current_active_user, require_admin
+from app.core.auth import require_admin
 from app.db.session import get_db
+from app.models.user import User
 
 router = APIRouter(prefix="/admin")
 
@@ -14,16 +14,16 @@ def get_all_users(
     current_user: User = Depends(require_admin),
     skip: int = 0,
     limit: int = 100,
-    role_filter: Optional[str] = None
+    role_filter: str | None = None
 ):
     """Get all users with optional role filtering - admin only"""
     query = db.query(User)
-    
+
     if role_filter:
         query = query.filter(User.role == role_filter)
-    
+
     users = query.offset(skip).limit(limit).all()
-    
+
     return {
         "message": "Users retrieved successfully",
         "admin_user": current_user.full_name,
@@ -55,20 +55,20 @@ def update_user_role(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid role. Must be 'client', 'artisan', or 'admin'"
         )
-    
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
+
     old_role = user.role
     user.role = new_role
     db.commit()
-    
+
     return {
-        "message": f"User role updated successfully",
+        "message": "User role updated successfully",
         "user_id": user_id,
         "old_role": old_role,
         "new_role": new_role,
@@ -89,20 +89,20 @@ def update_user_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
+
     # Prevent admin from deactivating themselves
     if user.id == current_user.id and not is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot deactivate your own account"
         )
-    
+
     old_status = user.is_active
     user.is_active = is_active
     db.commit()
-    
+
     return {
-        "message": f"User status updated successfully",
+        "message": "User status updated successfully",
         "user_id": user_id,
         "old_status": old_status,
         "new_status": is_active,
@@ -122,24 +122,24 @@ def delete_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
+
     # Prevent admin from deleting themselves
     if user.id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot delete your own account"
         )
-    
+
     deleted_user_info = {
         "id": user.id,
         "email": user.email,
         "role": user.role,
         "full_name": user.full_name
     }
-    
+
     db.delete(user)
     db.commit()
-    
+
     return {
         "message": "User deleted successfully",
         "deleted_user": deleted_user_info,
@@ -153,11 +153,11 @@ def get_system_stats(
 ):
     """Get system statistics - admin only"""
     total_users = db.query(User).count()
-    active_users = db.query(User).filter(User.is_active == True).count()
+    active_users = db.query(User).filter(User.is_active is True).count()
     clients = db.query(User).filter(User.role == "client").count()
     artisans = db.query(User).filter(User.role == "artisan").count()
     admins = db.query(User).filter(User.role == "admin").count()
-    
+
     return {
         "message": "System statistics",
         "requested_by": current_user.full_name,

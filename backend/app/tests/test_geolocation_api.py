@@ -1,5 +1,7 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock
+
 
 # Mock geolocation service to avoid external API calls
 @pytest.mark.asyncio
@@ -24,7 +26,7 @@ async def test_geolocation_api(client):
             "formatted_address": "New York, NY",
             "confidence": 0.9
         }
-        
+
         # Test Geocode Endpoint
         resp = client.post("api/v1/artisans/geocode", json={"address": "New York"}, headers=headers)
         assert resp.status_code == 200
@@ -36,7 +38,7 @@ def test_nearby_artisans_search(client):
     # No auth needed for public search
     # We need to ensure DB has artisans with location
     # But for invalid search handling:
-    
+
     resp = client.post("api/v1/artisans/nearby", json={
         "latitude": 40.0,
         "longitude": -70.0,
@@ -46,6 +48,6 @@ def test_nearby_artisans_search(client):
     # we expect a valid response (empty list) or 500 if redis fails.
     # Ideally should mock redis or handle it gracefully.
     # The code handles redis failure by returning empty list or False, so it shouldn't 500.
-    
+
     if resp.status_code == 200:
         assert "artisans" in resp.json()

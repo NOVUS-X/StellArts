@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.auth import get_current_active_user, require_admin
+from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserOut
-from app.core.auth import get_current_active_user, require_admin, require_admin_or_self
-from app.db.session import get_db
 
 router = APIRouter(prefix="/users")
 
@@ -26,7 +26,7 @@ def get_user_by_id(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied. You can only access your own profile or need admin privileges."
         )
-    
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")

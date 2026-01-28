@@ -1,9 +1,10 @@
+import uuid
 from datetime import datetime, timedelta
-from typing import Any, Union, Optional
+from typing import Any
+
 import redis
 from jose import jwt
 from passlib.context import CryptContext
-import uuid
 
 from app.core.config import settings
 
@@ -20,7 +21,7 @@ def is_token_blacklisted(jti: str) -> bool:
     return redis_client.exists(f"blacklist:{jti}") == 1
 
 def create_access_token(
-    subject: Union[str, Any], expires_delta: timedelta = None
+    subject: str | Any, expires_delta: timedelta = None
 ) -> str:
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -33,7 +34,7 @@ def create_access_token(
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-def create_refresh_token(subject: Union[str,Any], expires_delta: Optional[timedelta] = None):
+def create_refresh_token(subject: str | Any, expires_delta: timedelta | None = None):
     expire = datetime.utcnow() + (expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS))
     jti = str(uuid.uuid4())
     to_encode = {"exp": expire, "sub": str(subject), "jti": jti}
