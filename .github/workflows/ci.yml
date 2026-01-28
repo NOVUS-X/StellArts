@@ -81,6 +81,7 @@ jobs:
         DATABASE_URL: postgresql://stellarts:stellarts_test@localhost:5432/stellarts_test_db
         SECRET_KEY: test-secret-key
         DEBUG: True
+        STELLAR_ESCROW_PUBLIC: "GDUMMY"
       run: |
         pytest ${{ env.WORKING_DIR }}/app/tests/ -v --cov=${{ env.WORKING_DIR }}/app --cov-report=xml
     
@@ -120,6 +121,7 @@ jobs:
         docker run -d --name test-api --network test-network \
           -e DATABASE_URL=postgresql://stellarts:stellarts_test@test-db:5432/stellarts_test_db \
           -e SECRET_KEY=test-secret-key \
+          -e STELLAR_ESCROW_PUBLIC=GDUMMY \
           -e DEBUG=True \
           -p 8000:8000 \
           stellarts-api:test
