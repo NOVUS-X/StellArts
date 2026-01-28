@@ -191,3 +191,25 @@ class ArtisanLocationStats(BaseModel):
     artisans_with_location: int
     coverage_percentage: float
     top_locations: list[dict]
+
+
+# Detailed Profile Models
+class PortfolioItem(BaseModel):
+    id: int
+    title: str | None = None
+    image: str
+
+    class Config:
+        from_attributes = True
+
+
+class ArtisanProfileResponse(BaseModel):
+    id: int
+    name: str | None
+    avatar: str | None = None
+    specialty: str | None = None  # Primary specialty or joined string
+    rate: Decimal | None = None
+    bio: str | None = None
+    portfolio: list[PortfolioItem] = []
+    average_rating: Decimal | None = None
+    location: str | None = None

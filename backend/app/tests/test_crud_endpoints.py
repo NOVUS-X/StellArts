@@ -94,4 +94,5 @@ def test_artisan_profile_crud(client):
     # Get Public Profile
     resp = client.get(f"api/v1/artisans/{art_id}/profile")
     assert resp.status_code == 200
-    assert resp.json()["profile"]["business_name"] == "New Biz"
+    # The new response structure is flat (not wrapped in "profile") and "specialty" is processed
+    assert resp.json()["specialty"] == "painting"  # First item in list

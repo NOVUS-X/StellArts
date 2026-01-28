@@ -37,3 +37,6 @@ class Artisan(Base):
     )
 
     user = relationship("User", backref="artisan_profile")
+    portfolio_items = relationship(
+        "Portfolio", back_populates="artisan", cascade="all, delete-orphan"
+    )
