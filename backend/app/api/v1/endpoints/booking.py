@@ -25,7 +25,7 @@ router = APIRouter(prefix="/bookings")
 def create_booking(
     booking_data: BookingCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_client)
+    current_user: User = Depends(require_client),
 ):
     """
     Create a new booking - client only
@@ -35,6 +35,7 @@ def create_booking(
     """
     # Find or create the client profile for the current user
     from app.models.client import Client
+
     client = db.query(Client).filter(Client.user_id == current_user.id).first()
     
     if not client:
@@ -84,7 +85,7 @@ def create_booking(
 @router.get("/my-bookings", response_model=List[BookingResponse])
 def get_my_bookings(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_client_or_artisan)
+    current_user: User = Depends(require_client_or_artisan),
 ):
     """
     Get current user's bookings - clients and artisans only
@@ -115,7 +116,7 @@ def get_all_bookings(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
     skip: int = 0,
-    limit: int = 100
+    limit: int = 100,
 ):
     """Get all bookings - admin only"""
     bookings = db.query(Booking).offset(skip).limit(limit).all()
@@ -126,7 +127,7 @@ def get_all_bookings(
 def get_booking(
     booking_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Get a specific booking by ID
@@ -147,9 +148,10 @@ def get_booking(
     # Check permissions
     from app.models.client import Client
     from app.models.artisan import Artisan
-    
+    from app.models.client import Client
+
     allowed = False
-    
+
     if current_user.role == "admin":
         allowed = True
     elif current_user.role == "client":
@@ -221,7 +223,7 @@ def update_booking_status(
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to update this booking"
+            detail="Insufficient permissions to update this booking",
         )
     
     # Validate and update status
