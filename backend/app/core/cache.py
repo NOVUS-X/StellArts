@@ -62,5 +62,6 @@ class RedisClient:
 
         return bool(await self.redis.exists(key))
 
+
 # Global Redis client instance
 cache = RedisClient()

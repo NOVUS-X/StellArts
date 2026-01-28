@@ -16,15 +16,17 @@ from app.models.user import User
 
 router = APIRouter(prefix="/bookings")
 
+
 @router.post("/create")
 def create_booking(
     booking_data: dict,  # In a real app, use Pydantic schema
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_client)
+    current_user: User = Depends(require_client),
 ):
     """Create a new booking - client only"""
     # Find the client profile for the current user
     from app.models.client import Client
+
     client = db.query(Client).filter(Client.user_id == current_user.id).first()
     if not client:
         # Create a client profile if it doesn't exist (auto-onboarding)
@@ -35,6 +37,7 @@ def create_booking(
 
     # Validate artisan exists
     from app.models.artisan import Artisan
+
     artisan_id = booking_data.get("artisan_id")
     artisan = db.query(Artisan).filter(Artisan.id == artisan_id).first()
     if not artisan:
@@ -50,7 +53,7 @@ def create_booking(
         status=BookingStatus.PENDING,
         scheduled_date=datetime.fromisoformat(booking_data.get("scheduled_date")),
         location=booking_data.get("location"),
-        notes=booking_data.get("notes")
+        notes=booking_data.get("notes"),
     )
 
     db.add(new_booking)
@@ -61,13 +64,14 @@ def create_booking(
         "message": "Booking created successfully",
         "booking_id": new_booking.id,
         "status": new_booking.status.value,
-        "created_at": new_booking.created_at
+        "created_at": new_booking.created_at,
     }
+
 
 @router.get("/my-bookings")
 def get_my_bookings(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_client_or_artisan)
+    current_user: User = Depends(require_client_or_artisan),
 ):
     """Get current user's bookings - clients and artisans only"""
     from app.models.artisan import Artisan
@@ -88,30 +92,32 @@ def get_my_bookings(
     return {
         "message": f"Bookings for user {current_user.id}",
         "user_role": current_user.role,
-        "bookings": bookings
+        "bookings": bookings,
     }
+
 
 @router.get("/all")
 def get_all_bookings(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
     skip: int = 0,
-    limit: int = 100
+    limit: int = 100,
 ):
     """Get all bookings - admin only"""
     bookings = db.query(Booking).offset(skip).limit(limit).all()
     return {
         "message": "All bookings retrieved",
         "count": len(bookings),
-        "bookings": bookings
+        "bookings": bookings,
     }
+
 
 @router.put("/{booking_id}/status")
 def update_booking_status(
     booking_id: UUID,
     status_data: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Update booking status - role-based access control"""
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
@@ -138,12 +144,14 @@ def update_booking_status(
             if status_data.get("status") == "cancelled":
                 allowed = True
             else:
-                raise HTTPException(status_code=403, detail="Clients can only cancel bookings")
+                raise HTTPException(
+                    status_code=403, detail="Clients can only cancel bookings"
+                )
 
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to update this booking"
+            detail="Insufficient permissions to update this booking",
         )
 
     new_status = status_data.get("status")
@@ -153,10 +161,10 @@ def update_booking_status(
             db.commit()
             db.refresh(booking)
         except ValueError:
-             raise HTTPException(status_code=400, detail="Invalid status") from None
+            raise HTTPException(status_code=400, detail="Invalid status") from None
 
     return {
         "message": f"Booking {booking_id} status updated",
         "updated_by": current_user.id,
-        "new_status": booking.status.value
+        "new_status": booking.status.value,
     }

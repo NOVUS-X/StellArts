@@ -11,8 +11,10 @@ from app.schemas.user import RoleEnum
 # HTTP Bearer scheme for JWT token extraction
 bearer_scheme = HTTPBearer()
 
+
 class AuthenticationError(HTTPException):
     """Custom exception for authentication errors (401)"""
+
     def __init__(self, detail: str = "Could not validate credentials"):
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -20,13 +22,16 @@ class AuthenticationError(HTTPException):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+
 class AuthorizationError(HTTPException):
     """Custom exception for authorization errors (403)"""
+
     def __init__(self, detail: str = "Insufficient permissions"):
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=detail,
         )
+
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
@@ -64,6 +69,7 @@ def get_current_user(
 
     return user
 
+
 def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     """
     Get current user and ensure they are active.
@@ -72,11 +78,13 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
         raise AuthenticationError("User account is inactive")
     return current_user
 
+
 def require_roles(allowed_roles: list[RoleEnum]):
     """
     Create a dependency that requires specific roles.
     Returns a function that can be used as a FastAPI dependency.
     """
+
     def role_checker(current_user: User = Depends(get_current_active_user)) -> User:
         user_role = current_user.role
 
@@ -93,6 +101,7 @@ def require_roles(allowed_roles: list[RoleEnum]):
 
     return role_checker
 
+
 # Convenience dependencies for common role requirements
 require_client = require_roles([RoleEnum.client])
 require_artisan = require_roles([RoleEnum.artisan])
@@ -103,12 +112,19 @@ require_client_or_artisan = require_roles([RoleEnum.client, RoleEnum.artisan])
 require_artisan_or_admin = require_roles([RoleEnum.artisan, RoleEnum.admin])
 require_any_role = require_roles([RoleEnum.client, RoleEnum.artisan, RoleEnum.admin])
 
+
 def require_admin_or_self(target_user_id: int):
     """
     Create a dependency that allows admin users or the user themselves to access a resource.
     """
-    def admin_or_self_checker(current_user: User = Depends(get_current_active_user)) -> User:
-        if current_user.role == RoleEnum.admin.value or current_user.id == target_user_id:
+
+    def admin_or_self_checker(
+        current_user: User = Depends(get_current_active_user),
+    ) -> User:
+        if (
+            current_user.role == RoleEnum.admin.value
+            or current_user.id == target_user_id
+        ):
             return current_user
 
         raise AuthorizationError(
@@ -117,12 +133,19 @@ def require_admin_or_self(target_user_id: int):
 
     return admin_or_self_checker
 
+
 def require_resource_owner_or_admin(resource_user_id: int):
     """
     Create a dependency that allows resource owners or admin users to access a resource.
     """
-    def owner_or_admin_checker(current_user: User = Depends(get_current_active_user)) -> User:
-        if current_user.role == RoleEnum.admin.value or current_user.id == resource_user_id:
+
+    def owner_or_admin_checker(
+        current_user: User = Depends(get_current_active_user),
+    ) -> User:
+        if (
+            current_user.role == RoleEnum.admin.value
+            or current_user.id == resource_user_id
+        ):
             return current_user
 
         raise AuthorizationError(

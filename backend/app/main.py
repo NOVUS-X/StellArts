@@ -19,11 +19,12 @@ async def lifespan(app: FastAPI):
     # Shutdown
     await cache.close()  # Cambio: disconnect() -> close()
 
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     debug=settings.DEBUG,
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Set all CORS enabled origins
@@ -39,6 +40,7 @@ if settings.BACKEND_CORS_ORIGINS:
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+
 @app.get("/")
 def root():
     """
@@ -48,8 +50,9 @@ def root():
         "message": f"Welcome to {settings.PROJECT_NAME} API",
         "version": "1.0.0",
         "docs": "/docs",
-        "health": f"{settings.API_V1_STR}/health"
+        "health": f"{settings.API_V1_STR}/health",
     }
+
 
 @app.get("/test-redis")
 async def test_redis():
@@ -65,13 +68,11 @@ async def test_redis():
             "redis_status": "connected",
             "set_get_test": value == "test_value",
             "test_value": value,
-            "message": "Redis is working correctly!"
+            "message": "Redis is working correctly!",
         }
     except Exception as e:
-        return {
-            "redis_status": "error",
-            "error": str(e)
-        }
+        return {"redis_status": "error", "error": str(e)}
+
 
 @app.get("/test-db")
 async def test_database(db: Session = Depends(get_db)):
@@ -84,10 +85,7 @@ async def test_database(db: Session = Depends(get_db)):
         return {
             "database_status": "connected",
             "test_query": test_value == 1,
-            "message": "Database is working correctly!"
+            "message": "Database is working correctly!",
         }
     except Exception as e:
-        return {
-            "database_status": "error",
-            "error": str(e)
-        }
+        return {"database_status": "error", "error": str(e)}

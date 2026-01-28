@@ -24,5 +24,5 @@ def health_check(db: Session = Depends(get_db)):
         "status": "healthy",
         "project": settings.PROJECT_NAME,
         "database": db_status,
-        "debug": settings.DEBUG
+        "debug": settings.DEBUG,
     }

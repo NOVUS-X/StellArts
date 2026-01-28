@@ -19,14 +19,16 @@ class ArtisanService:
         self.db = db
 
     async def create_artisan_profile(
-        self,
-        user_id: int,
-        profile_data: ArtisanProfileCreate
+        self, user_id: int, profile_data: ArtisanProfileCreate
     ) -> Artisan | None:
         """Create artisan profile with geolocation support"""
         try:
             # Convert specialties list to JSON string
-            specialties_json = json.dumps(profile_data.specialties) if profile_data.specialties else None
+            specialties_json = (
+                json.dumps(profile_data.specialties)
+                if profile_data.specialties
+                else None
+            )
 
             artisan = Artisan(
                 user_id=user_id,
@@ -37,7 +39,7 @@ class ArtisanService:
                 hourly_rate=profile_data.hourly_rate,
                 location=profile_data.location,
                 latitude=profile_data.latitude,
-                longitude=profile_data.longitude
+                longitude=profile_data.longitude,
             )
 
             self.db.add(artisan)
@@ -57,9 +59,7 @@ class ArtisanService:
             return None
 
     async def update_artisan_profile(
-        self,
-        artisan_id: int,
-        profile_data: ArtisanProfileUpdate
+        self, artisan_id: int, profile_data: ArtisanProfileUpdate
     ) -> Artisan | None:
         """Update artisan profile with geolocation support"""
         try:
@@ -71,8 +71,8 @@ class ArtisanService:
             update_data = profile_data.model_dump(exclude_unset=True)
 
             # Handle specialties conversion
-            if 'specialties' in update_data and update_data['specialties'] is not None:
-                update_data['specialties'] = json.dumps(update_data['specialties'])
+            if "specialties" in update_data and update_data["specialties"] is not None:
+                update_data["specialties"] = json.dumps(update_data["specialties"])
 
             for field, value in update_data.items():
                 setattr(artisan, field, value)
@@ -110,7 +110,7 @@ class ArtisanService:
         specialties: list[str] | None = None,
         min_rating: float | None = None,
         is_available: bool | None = None,
-        has_location: bool | None = None
+        has_location: bool | None = None,
     ) -> list[Artisan]:
         """List artisans with optional filters"""
         query = self.db.query(Artisan)
@@ -141,33 +141,27 @@ class ArtisanService:
 
         return query.offset(skip).limit(limit).all()
 
-    async def find_nearby_artisans(
-        self,
-        request: NearbyArtisansRequest
-    ) -> dict:
+    async def find_nearby_artisans(self, request: NearbyArtisansRequest) -> dict:
         """Find nearby artisans using Redis geospatial queries"""
         try:
             # Get nearby artisan IDs from Redis
             nearby_data = await geolocation_service.find_nearby_artisans(
-                request.latitude,
-                request.longitude,
-                request.radius_km,
-                request.limit
+                request.latitude, request.longitude, request.radius_km, request.limit
             )
 
             if not nearby_data:
                 return {
-                    'artisans': [],
-                    'total_found': 0,
-                    'search_center': {
-                        'latitude': float(request.latitude),
-                        'longitude': float(request.longitude)
+                    "artisans": [],
+                    "total_found": 0,
+                    "search_center": {
+                        "latitude": float(request.latitude),
+                        "longitude": float(request.longitude),
                     },
-                    'radius_km': request.radius_km
+                    "radius_km": request.radius_km,
                 }
 
             # Get artisan IDs
-            artisan_ids = [item['artisan_id'] for item in nearby_data]
+            artisan_ids = [item["artisan_id"] for item in nearby_data]
 
             # Query database for artisan details
             query = self.db.query(Artisan).filter(Artisan.id.in_(artisan_ids))
@@ -176,7 +170,9 @@ class ArtisanService:
             if request.specialties:
                 specialty_filters = []
                 for specialty in request.specialties:
-                    specialty_filters.append(Artisan.specialties.contains(f'"{specialty}"'))
+                    specialty_filters.append(
+                        Artisan.specialties.contains(f'"{specialty}"')
+                    )
                 query = query.filter(or_(*specialty_filters))
 
             if request.min_rating is not None:
@@ -188,44 +184,44 @@ class ArtisanService:
             artisans = query.all()
 
             # Create distance mapping
-            distance_map = {item['artisan_id']: item['distance_km'] for item in nearby_data}
+            distance_map = {
+                item["artisan_id"]: item["distance_km"] for item in nearby_data
+            }
 
             # Convert to response format with distances
             artisan_results = []
             for artisan in artisans:
                 artisan_dict = self._artisan_to_dict(artisan)
-                artisan_dict['distance_km'] = distance_map.get(artisan.id, 0.0)
+                artisan_dict["distance_km"] = distance_map.get(artisan.id, 0.0)
                 artisan_results.append(artisan_dict)
 
             # Sort by distance
-            artisan_results.sort(key=lambda x: x['distance_km'])
+            artisan_results.sort(key=lambda x: x["distance_km"])
 
             return {
-                'artisans': artisan_results,
-                'total_found': len(artisan_results),
-                'search_center': {
-                    'latitude': float(request.latitude),
-                    'longitude': float(request.longitude)
+                "artisans": artisan_results,
+                "total_found": len(artisan_results),
+                "search_center": {
+                    "latitude": float(request.latitude),
+                    "longitude": float(request.longitude),
                 },
-                'radius_km': request.radius_km
+                "radius_km": request.radius_km,
             }
 
         except Exception as e:
             print(f"Error finding nearby artisans: {e}")
             return {
-                'artisans': [],
-                'total_found': 0,
-                'search_center': {
-                    'latitude': float(request.latitude),
-                    'longitude': float(request.longitude)
+                "artisans": [],
+                "total_found": 0,
+                "search_center": {
+                    "latitude": float(request.latitude),
+                    "longitude": float(request.longitude),
                 },
-                'radius_km': request.radius_km
+                "radius_km": request.radius_km,
             }
 
     async def geocode_and_update_location(
-        self,
-        artisan_id: int,
-        address: str
+        self, artisan_id: int, address: str
     ) -> Artisan | None:
         """Geocode address and update artisan location"""
         try:
@@ -261,18 +257,24 @@ class ArtisanService:
         """Sync all artisan locations from database to Redis"""
         try:
             # Get all artisans with coordinates
-            artisans = self.db.query(Artisan).filter(
-                and_(Artisan.latitude.isnot(None), Artisan.longitude.isnot(None))
-            ).all()
+            artisans = (
+                self.db.query(Artisan)
+                .filter(
+                    and_(Artisan.latitude.isnot(None), Artisan.longitude.isnot(None))
+                )
+                .all()
+            )
 
             # Prepare bulk update data
             location_data = []
             for artisan in artisans:
-                location_data.append({
-                    'artisan_id': artisan.id,
-                    'latitude': float(artisan.latitude),
-                    'longitude': float(artisan.longitude)
-                })
+                location_data.append(
+                    {
+                        "artisan_id": artisan.id,
+                        "latitude": float(artisan.latitude),
+                        "longitude": float(artisan.longitude),
+                    }
+                )
 
             # Bulk update Redis
             count = await geolocation_service.bulk_update_locations(location_data)
@@ -291,22 +293,22 @@ class ArtisanService:
                 specialties = []
 
         return {
-            'id': artisan.id,
-            'user_id': artisan.user_id,
-            'business_name': artisan.business_name,
-            'description': artisan.description,
-            'specialties': specialties,
-            'experience_years': artisan.experience_years,
-            'hourly_rate': float(artisan.hourly_rate) if artisan.hourly_rate else None,
-            'location': artisan.location,
-            'latitude': float(artisan.latitude) if artisan.latitude else None,
-            'longitude': float(artisan.longitude) if artisan.longitude else None,
-            'is_verified': artisan.is_verified,
-            'is_available': artisan.is_available,
-            'rating': float(artisan.rating) if artisan.rating else None,
-            'total_reviews': artisan.total_reviews,
-            'created_at': artisan.created_at,
-            'updated_at': artisan.updated_at
+            "id": artisan.id,
+            "user_id": artisan.user_id,
+            "business_name": artisan.business_name,
+            "description": artisan.description,
+            "specialties": specialties,
+            "experience_years": artisan.experience_years,
+            "hourly_rate": float(artisan.hourly_rate) if artisan.hourly_rate else None,
+            "location": artisan.location,
+            "latitude": float(artisan.latitude) if artisan.latitude else None,
+            "longitude": float(artisan.longitude) if artisan.longitude else None,
+            "is_verified": artisan.is_verified,
+            "is_available": artisan.is_available,
+            "rating": float(artisan.rating) if artisan.rating else None,
+            "total_reviews": artisan.total_reviews,
+            "created_at": artisan.created_at,
+            "updated_at": artisan.updated_at,
         }
 
     async def delete_artisan(self, artisan_id: int) -> bool:

@@ -26,13 +26,16 @@ ESCROW_PUBLIC = os.getenv("STELLAR_ESCROW_PUBLIC") or (
 )
 
 if not ESCROW_PUBLIC:
-    raise RuntimeError("STELLAR_ESCROW_SECRET or STELLAR_ESCROW_PUBLIC must be configured")
+    raise RuntimeError(
+        "STELLAR_ESCROW_SECRET or STELLAR_ESCROW_PUBLIC must be configured"
+    )
 
 MAX_MEMO_LENGTH = 28
 
 # ---------------------------
 # Utilities
 # ---------------------------
+
 
 def _sanitize_amount(amount: Decimal) -> str:
     """Ensure Stellar-compatible precision (7 decimal places max)."""
@@ -73,7 +76,10 @@ def _record_payment(
 # Main actions
 # ---------------------------
 
-def hold_payment(db: Session, client_secret: str, booking_id: str, amount: Decimal) -> dict[str, Any]:
+
+def hold_payment(
+    db: Session, client_secret: str, booking_id: str, amount: Decimal
+) -> dict[str, Any]:
     """
     Client sends a signed transaction to move funds to escrow.
     Idempotency: if booking already has a 'held' payment, return that record.
@@ -116,15 +122,22 @@ def hold_payment(db: Session, client_secret: str, booking_id: str, amount: Decim
     try:
         resp = server.submit_transaction(tx)
         tx_hash = resp["hash"]
-        return _record_payment(db, booking_id, tx_hash, "held", amount, client_pub, ESCROW_PUBLIC, memo)
+        return _record_payment(
+            db, booking_id, tx_hash, "held", amount, client_pub, ESCROW_PUBLIC, memo
+        )
     except (BadRequestError, BadResponseError) as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
     except Exception as e:
-        return {"status": "error", "message": f"Database error after Stellar success: {e}"}
+        return {
+            "status": "error",
+            "message": f"Database error after Stellar success: {e}",
+        }
 
 
-def release_payment(db: Session, booking_id: str, artisan_public: str, amount: Decimal) -> dict[str, Any]:
+def release_payment(
+    db: Session, booking_id: str, artisan_public: str, amount: Decimal
+) -> dict[str, Any]:
     """Release funds from escrow to artisan."""
     if not ESCROW_KEYPAIR:
         return {"status": "error", "message": "Escrow key not configured"}
@@ -135,7 +148,10 @@ def release_payment(db: Session, booking_id: str, artisan_public: str, amount: D
         .first()
     )
     if not held:
-        return {"status": "error", "message": "No held payment for booking or already released/refunded"}
+        return {
+            "status": "error",
+            "message": "No held payment for booking or already released/refunded",
+        }
 
     already_released = (
         db.query(Payment)
@@ -171,15 +187,29 @@ def release_payment(db: Session, booking_id: str, artisan_public: str, amount: D
     try:
         resp = server.submit_transaction(tx)
         tx_hash = resp["hash"]
-        return _record_payment(db, booking_id, tx_hash, "released", amount, ESCROW_PUBLIC, artisan_public, memo)
+        return _record_payment(
+            db,
+            booking_id,
+            tx_hash,
+            "released",
+            amount,
+            ESCROW_PUBLIC,
+            artisan_public,
+            memo,
+        )
     except (BadRequestError, BadResponseError) as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
     except Exception as e:
-        return {"status": "error", "message": f"Database error after Stellar success: {e}"}
+        return {
+            "status": "error",
+            "message": f"Database error after Stellar success: {e}",
+        }
 
 
-def refund_payment(db: Session, booking_id: str, client_public: str, amount: Decimal) -> dict[str, Any]:
+def refund_payment(
+    db: Session, booking_id: str, client_public: str, amount: Decimal
+) -> dict[str, Any]:
     """Refund funds from escrow back to client."""
     if not ESCROW_KEYPAIR:
         return {"status": "error", "message": "Escrow key not configured"}
@@ -190,7 +220,10 @@ def refund_payment(db: Session, booking_id: str, client_public: str, amount: Dec
         .first()
     )
     if not held:
-        return {"status": "error", "message": "No held payment for booking or already released/refunded"}
+        return {
+            "status": "error",
+            "message": "No held payment for booking or already released/refunded",
+        }
 
     already_refunded = (
         db.query(Payment)
@@ -227,9 +260,21 @@ def refund_payment(db: Session, booking_id: str, client_public: str, amount: Dec
     try:
         resp = server.submit_transaction(tx)
         tx_hash = resp["hash"]
-        return _record_payment(db, booking_id, tx_hash, "refunded", amount, ESCROW_PUBLIC, client_public, memo)
+        return _record_payment(
+            db,
+            booking_id,
+            tx_hash,
+            "refunded",
+            amount,
+            ESCROW_PUBLIC,
+            client_public,
+            memo,
+        )
     except (BadRequestError, BadResponseError) as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
     except Exception as e:
-        return {"status": "error", "message": f"Database error after Stellar success: {e}"}
+        return {
+            "status": "error",
+            "message": f"Database error after Stellar success: {e}",
+        }

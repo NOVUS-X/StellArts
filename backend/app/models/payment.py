@@ -14,6 +14,7 @@ class PaymentStatus(enum.Enum):
     FAILED = "failed"
     REFUNDED = "refunded"
 
+
 class Payment(Base):
     __tablename__ = "payments"
 
@@ -21,13 +22,20 @@ class Payment(Base):
     booking_id = Column(Uuid, ForeignKey("bookings.id"), nullable=False)
     amount = Column(Numeric(18, 7), nullable=False)
 
-     # Stellar fields
+    # Stellar fields
     from_account = Column(String(56), nullable=True)
     to_account = Column(String(56), nullable=True)
     memo = Column(String, nullable=True)
     transaction_hash = Column(String, unique=True, index=True, nullable=True)
 
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
-    created_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column( DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
     booking = relationship("Booking", backref="payments")

@@ -1,4 +1,3 @@
-
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings
 
@@ -48,5 +47,6 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str | None = None
 
     model_config = {"env_file": ".env", "case_sensitive": True}
+
 
 settings = Settings()

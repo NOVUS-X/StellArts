@@ -9,6 +9,7 @@ class RoleEnum(str, Enum):
     artisan = "artisan"
     admin = "admin"
 
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=72)
@@ -17,14 +18,14 @@ class RegisterRequest(BaseModel):
     phone: str | None = None
     username: str | None = None
 
-    @field_validator('role')
+    @field_validator("role")
     @classmethod
     def validate_role(cls, value):
-        if value not in ['client', 'artisan', 'admin']:
+        if value not in ["client", "artisan", "admin"]:
             raise ValueError("Role must be 'client', 'artisan', or 'admin'")
         return value
 
-    @field_validator('password')
+    @field_validator("password")
     @classmethod
     def validate_password_strength(cls, value):
         if len(value) < 8:
@@ -41,13 +42,16 @@ class RegisterRequest(BaseModel):
 
         return value
 
+
 class RegisterResponse(BaseModel):
     id: int
     role: str
 
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
 
 class UserOut(BaseModel):
     id: int
@@ -59,6 +63,7 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class TokenResponse(BaseModel):
     access_token: str

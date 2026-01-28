@@ -21,11 +21,14 @@ from app.schemas.user import (
     TokenResponse,
 )
 
-router = APIRouter(prefix='/auth')
+router = APIRouter(prefix="/auth")
 
 bearer_scheme = HTTPBearer()
 
-@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED
+)
 def register_user(user_in: RegisterRequest, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user_in.email).first()
     if existing_user:
@@ -38,7 +41,7 @@ def register_user(user_in: RegisterRequest, db: Session = Depends(get_db)):
         hashed_password=hashed_pw,
         role=user_in.role,
         full_name=user_in.full_name,
-        phone=user_in.phone
+        phone=user_in.phone,
     )
     db.add(user)
     db.commit()
@@ -46,17 +49,21 @@ def register_user(user_in: RegisterRequest, db: Session = Depends(get_db)):
 
     return {"id": user.id, "role": user.role}
 
+
 @router.post("/login", response_model=TokenResponse)
 async def login(request: LoginRequest, db: Session = Depends(get_db)):
     user = get_user_by_email(request.email, db)
 
     if not user or not verify_password(request.password, user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+        )
 
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
 
     return {"access_token": access_token, "refresh_token": refresh_token}
+
 
 @router.post("/refresh", response_model=TokenResponse)
 def refresh_token(refresh_token: str):
@@ -64,14 +71,19 @@ def refresh_token(refresh_token: str):
         payload = decode_token(refresh_token)
         user_id = payload.get("sub")
         access_token = create_access_token(user_id)
-        return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+        }
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid refresh token") from None
+
 
 @router.post("/logout")
 def logout(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Logout user by blacklisting their current token"""
     token = credentials.credentials
@@ -85,10 +97,8 @@ def logout(
         raise HTTPException(status_code=400, detail="Malformed token")
 
     blacklist_token(jti, exp)
-    return {
-        "message": "Successfully logged out",
-        "user": current_user.email
-    }
+    return {"message": "Successfully logged out", "user": current_user.email}
 
-def get_user_by_email(email: str,  db: Session) -> User | None:
+
+def get_user_by_email(email: str, db: Session) -> User | None:
     return db.query(User).filter(User.email == email).first()
