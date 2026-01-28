@@ -45,9 +45,11 @@ def client():
     Base.metadata.create_all(bind=engine)
 
     # Mock Redis cache (Async) and Security Redis (Sync) to avoid connection errors
-    with patch("app.core.cache.cache.initialize", new_callable=AsyncMock), patch(
-        "app.core.cache.cache.redis", new_callable=AsyncMock
-    ), patch("app.core.security.redis_client"):
+    with (
+        patch("app.core.cache.cache.initialize", new_callable=AsyncMock),
+        patch("app.core.cache.cache.redis", new_callable=AsyncMock),
+        patch("app.core.security.redis_client"),
+    ):
         with TestClient(app) as test_client:
             yield test_client
 
