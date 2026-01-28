@@ -21,6 +21,12 @@ from app.schemas.artisan import (
     NearbyArtisansResponse,
     PaginatedArtisans,
 )
+from app.schemas.portfolio import (
+    PortfolioItemCreate,
+    PortfolioItemOut,
+    PortfolioResponse,
+)
+from app.models.portfolio import PortfolioItem
 from app.services.artisan import ArtisanService
 from app.services.geolocation import geolocation_service
 
@@ -202,33 +208,56 @@ def update_availability(
     }
 
 
-@router.get("/my-portfolio")
+@router.get("/my-portfolio", response_model=PortfolioResponse)
 def get_my_portfolio(
     db: Session = Depends(get_db), current_user: User = Depends(require_artisan)
 ):
     """Get current artisan's portfolio"""
-    # TODO: Implement Portfolio model and DB table
-    # For now, return empty list as functionality is not yet supported in DB
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
+        )
+
+    portfolio_items = (
+        db.query(PortfolioItem)
+        .filter(PortfolioItem.artisan_id == artisan.id)
+        .order_by(PortfolioItem.created_at.desc())
+        .all()
+    )
+
     return {
-        "message": f"Portfolio for artisan {current_user.id}",
+        "artisan_id": artisan.id,
         "artisan_name": current_user.full_name,
-        "portfolio_items": [],
+        "portfolio_items": portfolio_items,
     }
 
 
-@router.post("/portfolio/add")
+@router.post("/portfolio/add", response_model=PortfolioItemOut)
 def add_portfolio_item(
-    portfolio_item: dict,  # Replace with actual schema
+    portfolio_item: PortfolioItemCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_artisan),
 ):
     """Add portfolio item - artisan only"""
-    # TODO: Implement Portfolio model and DB table
-    return {
-        "message": "Portfolio item added successfully (simulation)",
-        "artisan_id": current_user.id,
-        "portfolio_item": portfolio_item,
-    }
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
+        )
+
+    new_item = PortfolioItem(
+        artisan_id=artisan.id,
+        image_url=portfolio_item.image_url,
+        description=portfolio_item.description,
+    )
+    db.add(new_item)
+    db.commit()
+    db.refresh(new_item)
+
+    return new_item
 
 
 @router.get("/my-bookings")

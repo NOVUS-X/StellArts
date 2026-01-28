@@ -2,13 +2,11 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
+import bcrypt
 import redis
 from jose import jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
-
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
 
@@ -55,10 +53,12 @@ def decode_token(token: str) -> dict:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+    )
 
 
 def get_password_hash(password: str) -> str:
     if not password:
         raise ValueError("Password cannot be empty or None")
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
