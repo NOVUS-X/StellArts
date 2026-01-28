@@ -105,7 +105,7 @@ jobs:
     
     - name: Build Docker image
       run: |
-        docker build -t stellarts-api:test .
+        docker build -t stellarts-api:test ./backend
     
     - name: Test Docker image
       run: |
