@@ -66,11 +66,11 @@ def create_booking(
     new_booking = Booking(
         client_id=client.id,
         artisan_id=booking_data.artisan_id,
-        service_description=booking_data.service,
+        service=booking_data.service,
         estimated_hours=booking_data.estimated_hours,
         estimated_cost=booking_data.estimated_cost,
         status=BookingStatus.PENDING,
-        scheduled_date=booking_data.date,
+        date=booking_data.date,
         location=booking_data.location,
         notes=booking_data.notes,
     )

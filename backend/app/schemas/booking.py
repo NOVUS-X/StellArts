@@ -50,8 +50,8 @@ class BookingResponse(BaseModel):
     id: UUID
     client_id: int
     artisan_id: int
-    service_description: str
-    scheduled_date: datetime | None
+    service: str
+    date: datetime | None
     estimated_cost: float | None
     estimated_hours: float | None
     status: str
