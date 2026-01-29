@@ -1,11 +1,22 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, DECIMAL, ForeignKey
-from sqlalchemy.sql import func
+from sqlalchemy import (
+    DECIMAL,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from app.db.base import Base
+
 
 class Artisan(Base):
     __tablename__ = "artisans"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     business_name = Column(String(200))
@@ -21,6 +32,11 @@ class Artisan(Base):
     rating = Column(DECIMAL(3, 2), default=0.0)
     total_reviews = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
     user = relationship("User", backref="artisan_profile")
+    portfolio_items = relationship(
+        "Portfolio", back_populates="artisan", cascade="all, delete-orphan"
+    )

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -14,14 +15,14 @@ def health_check(db: Session = Depends(get_db)):
     """
     try:
         # Test database connection
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db_status = "healthy"
     except Exception:
         db_status = "unhealthy"
-    
+
     return {
         "status": "healthy",
         "project": settings.PROJECT_NAME,
         "database": db_status,
-        "debug": settings.DEBUG
+        "debug": settings.DEBUG,
     }

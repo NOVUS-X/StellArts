@@ -17,7 +17,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
@@ -30,12 +30,14 @@ services:
   api:
     build: .
     environment:
-      DATABASE_URL: postgresql://stellarts:stellarts_dev@db:5434/stellarts
+      DATABASE_URL: postgresql://stellarts:stellarts_dev@db:5432/stellarts
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: dev-secret-key-change-in-production
       DEBUG: "True"
       API_V1_STR: /api/v1
       PROJECT_NAME: Stellarts
+      STELLAR_NETWORK: testnet
+      STELLAR_ESCROW_PUBLIC: GDUMMY000000000000000000000000000000000000000000000000
     ports:
       - "8000:8000"
     depends_on:
@@ -50,12 +52,14 @@ services:
   api-prod:
     build: .
     environment:
-      DATABASE_URL: postgresql://stellarts:stellarts_dev@db:5434/stellarts
+      DATABASE_URL: postgresql://stellarts:stellarts_dev@db:5432/stellarts
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: dev-secret-key-change-in-production
       DEBUG: "False"
       API_V1_STR: /api/v1
       PROJECT_NAME: Stellarts
+      STELLAR_NETWORK: testnet
+      STELLAR_ESCROW_PUBLIC: GDUMMY000000000000000000000000000000000000000000000000
     ports:
       - "8001:8000"
     depends_on:
