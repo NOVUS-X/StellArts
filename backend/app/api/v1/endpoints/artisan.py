@@ -11,7 +11,6 @@ from app.db.session import get_db  # Or use app.db.database depending on your se
 from app.models.artisan import Artisan
 from app.models.portfolio import Portfolio
 from app.models.user import User
-# from app.models.portfolio import PortfolioItem
 from app.schemas.artisan import (
     ArtisanLocationUpdate,
     ArtisanOut,
@@ -23,8 +22,6 @@ from app.schemas.artisan import (
     NearbyArtisansRequest,
     NearbyArtisansResponse,
     PaginatedArtisans,
-    # PortfolioItemCreate,
-    # PortfolioItemOut,
 )
 from app.services.artisan import ArtisanService
 from app.services.geolocation import geolocation_service
