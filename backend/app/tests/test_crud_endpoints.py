@@ -40,10 +40,10 @@ def test_booking_flow(client):
 
     booking_data = {
         "artisan_id": artisan_id,
-        "service_description": "Fix my sink",
+        "service": "Fix my sink",
         "estimated_hours": 2,
         "estimated_cost": 100.0,
-        "scheduled_date": "2024-12-25T10:00:00",
+        "date": "2024-12-25T10:00:00",
         "location": "123 Main St",
         "notes": "Urgent",
     }
