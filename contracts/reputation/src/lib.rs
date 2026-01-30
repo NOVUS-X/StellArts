@@ -60,6 +60,13 @@ impl ReputationContract {
         read_reputation(&env, &user)
     }
 
+    /// Get average rating (stats) for a user
+    /// Returns average as a rational number (total_stars, review_count)
+    pub fn get_stats(env: Env, user: Address) -> (u64, u64) {
+        let reputation = Self::get_reputation(env, user);
+        (reputation.total_stars, reputation.review_count)
+    }
+
     /// Set reputation data for a user (for testing/admin purposes)
     pub fn set_reputation(env: Env, user: Address, data: ReputationData) {
         write_reputation(&env, &user, &data);
@@ -246,3 +253,6 @@ mod tests {
         assert_eq!(reputation.review_count, 3);
     }
 }
+
+#[cfg(test)]
+mod test;
