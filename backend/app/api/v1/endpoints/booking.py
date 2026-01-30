@@ -56,7 +56,7 @@ def create_booking(
         )
 
     # Check if artisan is active (optional validation)
-    if not artisan.is_active:
+    if hasattr(artisan, "is_active") and not artisan.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot book with an inactive artisan",
