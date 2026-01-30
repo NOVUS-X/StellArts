@@ -85,6 +85,18 @@ impl ReputationContract {
             },
         );
     }
+
+    /// Get reputation statistics for a user
+    /// Returns (average_scaled_by_100, count)
+    /// Example: 9 total stars / 2 reviews = 4.5 average → returns (450, 2)
+    pub fn get_stats(env: Env, user: Address) -> (u64, u64) {
+        let data = read_reputation(&env, &user);
+        if data.review_count == 0 {
+            return (0, 0);
+        }
+        let average_scaled = (data.total_stars * 100) / data.review_count;
+        (average_scaled, data.review_count)
+    }
 }
 
 #[cfg(test)]
@@ -244,5 +256,25 @@ mod tests {
 
         assert_eq!(reputation.total_stars, 8);
         assert_eq!(reputation.review_count, 3);
+    }
+
+    #[test]
+    fn test_get_stats() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, ReputationContract);
+        let client = ReputationContractClient::new(&env, &contract_id);
+
+        let artisan = Address::generate(&env);
+        client.set_reputation(
+            &artisan,
+            &ReputationData {
+                total_stars: 9,
+                review_count: 2,
+            },
+        );
+
+        let (average_scaled, count) = client.get_stats(&artisan);
+        assert_eq!(average_scaled, 450);
+        assert_eq!(count, 2);
     }
 }
