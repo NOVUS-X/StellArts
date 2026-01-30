@@ -1,13 +1,17 @@
+# Standard library imports
+import json
+
+# Third-party imports
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
+# Local application imports
 from app.core.auth import (
     get_current_active_user,
     require_admin,
     require_artisan,
 )
-
-from app.db.session import get_db  # Or use app.db.database depending on your setup
+from app.db.session import get_db
 from app.models.artisan import Artisan
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -26,10 +30,10 @@ from app.schemas.artisan import (
 from app.services.artisan import ArtisanService
 from app.services.geolocation import geolocation_service
 
-# from app.services.artisan_service import find_nearby_artisans_cached  # Broken import removed
+# ────────────────────────────────────────────────
 
 router = APIRouter(prefix="/artisans")
-
+# from app.services.artisan_service import find_nearby_artisans_cached  # Broken import removed
 
 # ✅ GET-based nearby artisans search (from Discovery&Filtering)
 @router.get("/nearby", response_model=PaginatedArtisans)
