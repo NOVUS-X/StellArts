@@ -7,8 +7,6 @@ These tests verify:
 3. Cancellation rules based on current state and user role
 """
 
-import pytest
-from uuid import uuid4
 
 
 def get_auth_headers(client, email, password, role):
