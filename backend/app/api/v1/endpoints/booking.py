@@ -80,14 +80,26 @@ def get_my_bookings(
     bookings = []
 
     if current_user.role == "client":
+        # Query bookings where the current user is the client
         client = db.query(Client).filter(Client.user_id == current_user.id).first()
         if client:
-            bookings = db.query(Booking).filter(Booking.client_id == client.id).all()
+            bookings = (
+                db.query(Booking)
+                .filter(Booking.client_id == client.id)
+                .order_by(Booking.created_at.desc())
+                .all()
+            )
 
     elif current_user.role == "artisan":
+        # Query bookings where the current user is the artisan
         artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
         if artisan:
-            bookings = db.query(Booking).filter(Booking.artisan_id == artisan.id).all()
+            bookings = (
+                db.query(Booking)
+                .filter(Booking.artisan_id == artisan.id)
+                .order_by(Booking.created_at.desc())
+                .all()
+            )
 
     return {
         "message": f"Bookings for user {current_user.id}",
