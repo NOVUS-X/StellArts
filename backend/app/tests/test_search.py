@@ -14,7 +14,7 @@ from app.services.artisan import ArtisanService
 class MockRedisGeo:
     def __init__(self):
         self.geo_data = {}  # Format: {key: {member: (lon, lat)}}
-        self.hashes = {}    # Format: {key: value}
+        self.hashes = {}  # Format: {key: value}
 
     async def geoadd(self, key, lon, lat, member):
         if key not in self.geo_data:
@@ -38,14 +38,25 @@ class MockRedisGeo:
             return 1
         return 0
 
-    async def georadius(self, key, lon, lat, radius, unit='m', withdist=False, withcoord=False, sort='ASC', count=None):
+    async def georadius(
+        self,
+        key,
+        lon,
+        lat,
+        radius,
+        unit="m",
+        withdist=False,
+        withcoord=False,
+        sort="ASC",
+        count=None,
+    ):
         if key not in self.geo_data:
             return []
 
         center_lon = float(lon)
         center_lat = float(lat)
         radius_m = float(radius)
-        if unit == 'km':
+        if unit == "km":
             radius_m *= 1000
 
         results = []
@@ -55,10 +66,14 @@ class MockRedisGeo:
 
             # Simplified Haversine for the mock
             # We can use the service's static method if available, or just implement it
-            dist_m = self._calculate_distance_m(center_lat, center_lon, member_lat, member_lon)
+            dist_m = self._calculate_distance_m(
+                center_lat, center_lon, member_lat, member_lon
+            )
 
             if dist_m <= radius_m:
-                result_item = [member.encode('utf-8')] # Redis returns bytes usually, but let's check service usage
+                result_item = [
+                    member.encode("utf-8")
+                ]  # Redis returns bytes usually, but let's check service usage
                 # The service expects: result[0]=id, result[1]=dist, result[2]=coords
                 if withdist:
                     result_item.append(dist_m)
@@ -82,7 +97,10 @@ class MockRedisGeo:
         delta_phi = math.radians(lat2 - lat1)
         delta_lambda = math.radians(lon2 - lon1)
 
-        a = math.sin(delta_phi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2)**2
+        a = (
+            math.sin(delta_phi / 2) ** 2
+            + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+        )
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
         return R * c
@@ -101,6 +119,7 @@ def mock_redis():
     mock.zrem.side_effect = mock_geo.zrem
 
     return mock
+
 
 @pytest.mark.asyncio
 async def test_geolocation_search_filtering(db_session, mock_redis):
@@ -121,7 +140,6 @@ async def test_geolocation_search_filtering(db_session, mock_redis):
 
     # Patch the cache.redis in the geolocation service
     with patch("app.core.cache.cache.redis", mock_redis):
-
         service = ArtisanService(db_session)
 
         # 1. Create Users
@@ -129,13 +147,13 @@ async def test_geolocation_search_filtering(db_session, mock_redis):
             email="artisan_a@test.com",
             hashed_password=get_password_hash("pass"),
             role="artisan",
-            full_name="Artisan A"
+            full_name="Artisan A",
         )
         user_b = User(
             email="artisan_b@test.com",
             hashed_password=get_password_hash("pass"),
             role="artisan",
-            full_name="Artisan B"
+            full_name="Artisan B",
         )
         db_session.add(user_a)
         db_session.add(user_b)
@@ -153,7 +171,7 @@ async def test_geolocation_search_filtering(db_session, mock_redis):
             hourly_rate=Decimal("50.00"),
             location="Center City",
             latitude=Decimal("40.0"),
-            longitude=Decimal("-74.0")
+            longitude=Decimal("-74.0"),
         )
 
         # Artisan B: ~111km away (Lat 41.0, Lon -74.0)
@@ -165,7 +183,7 @@ async def test_geolocation_search_filtering(db_session, mock_redis):
             hourly_rate=Decimal("50.00"),
             location="Far City",
             latitude=Decimal("41.0"),
-            longitude=Decimal("-74.0")
+            longitude=Decimal("-74.0"),
         )
 
         # Creating profiles triggers add_artisan_location which uses our mock_redis
@@ -184,7 +202,7 @@ async def test_geolocation_search_filtering(db_session, mock_redis):
             limit=10,
             specialties=None,
             min_rating=None,
-            is_available=None
+            is_available=None,
         )
 
         response = await service.find_nearby_artisans(search_request)
@@ -199,11 +217,15 @@ async def test_geolocation_search_filtering(db_session, mock_redis):
         assert artisan_a.id in found_ids, "Artisan A (0km) should be found"
 
         # Assertion 2: Artisan B should NOT be in the results (Distance ~111km > 50km)
-        assert artisan_b.id not in found_ids, "Artisan B (~111km) should strictly be excluded from 50km search"
+        assert (
+            artisan_b.id not in found_ids
+        ), "Artisan B (~111km) should strictly be excluded from 50km search"
 
         # Verify specific distance logic
         artisan_a_result = next(a for a in found_artisans if a["id"] == artisan_a.id)
-        assert artisan_a_result["distance_km"] < 1.0, "Artisan A distance should be negligible"
+        assert (
+            artisan_a_result["distance_km"] < 1.0
+        ), "Artisan A distance should be negligible"
 
         # Additional Sanity Check: Ensure B is excluded even at max radius (100km)
         # Artisan B is ~111km away, so it should still be excluded
@@ -211,9 +233,11 @@ async def test_geolocation_search_filtering(db_session, mock_redis):
             latitude=Decimal("40.0"),
             longitude=Decimal("-74.0"),
             radius_km=100.0,
-            limit=10
+            limit=10,
         )
         max_response = await service.find_nearby_artisans(max_search_request)
         max_found_ids = [a["id"] for a in max_response["artisans"]]
 
-        assert artisan_b.id not in max_found_ids, "Artisan B (~111km) should be excluded even at max radius (100km)"
+        assert (
+            artisan_b.id not in max_found_ids
+        ), "Artisan B (~111km) should be excluded even at max radius (100km)"
