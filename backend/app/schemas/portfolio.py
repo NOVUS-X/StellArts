@@ -4,13 +4,21 @@ from pydantic import BaseModel, Field
 
 
 class PortfolioItemCreate(BaseModel):
-    image_url: str = Field(..., max_length=500, description="URL of the portfolio image")
-    description: Optional[str] = Field(None, description="Description of the portfolio item")
+    image_url: str = Field(
+        ..., max_length=500, description="URL of the portfolio image"
+    )
+    description: Optional[str] = Field(
+        None, description="Description of the portfolio item"
+    )
 
 
 class PortfolioItemUpdate(BaseModel):
-    image_url: Optional[str] = Field(None, max_length=500, description="URL of the portfolio image")
-    description: Optional[str] = Field(None, description="Description of the portfolio item")
+    image_url: Optional[str] = Field(
+        None, max_length=500, description="URL of the portfolio image"
+    )
+    description: Optional[str] = Field(
+        None, description="Description of the portfolio item"
+    )
 
 
 class PortfolioItemOut(BaseModel):
