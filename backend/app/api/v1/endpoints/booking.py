@@ -124,10 +124,10 @@ def get_all_bookings(
     return bookings
 
 
-@router.get("/{booking_id}", response_model=BookingResponse)
-def get_booking(
+@router.put("/{booking_id}/status")
+def update_booking_status(
     booking_id: UUID,
-    status_payload: dict,
+    status_payload: BookingStatusUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -177,7 +177,7 @@ def get_booking(
         )
 
     # Get the requested new status
-    new_status_str = status_payload.get("status")
+    new_status_str = status_payload.status
     if not new_status_str:
         raise HTTPException(status_code=400, detail="Status is required")
 
