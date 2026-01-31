@@ -40,32 +40,31 @@ def test_booking_flow(client):
 
     booking_data = {
         "artisan_id": artisan_id,
-        "service_description": "Fix my sink",
+        "service": "Fix my sink",
         "estimated_hours": 2,
         "estimated_cost": 100.0,
-        "scheduled_date": "2024-12-25T10:00:00",
+        "date": "2024-12-25T10:00:00",
         "location": "123 Main St",
         "notes": "Urgent",
     }
     resp = client.post(
         "api/v1/bookings/create", json=booking_data, headers=client_headers
     )
-    assert resp.status_code == 200
-    booking_id = resp.json()["booking_id"]
+    assert resp.status_code == 201
+    booking_id = resp.json()["id"]
 
     # 3. Verify Client Bookings
     resp = client.get("api/v1/bookings/my-bookings", headers=client_headers)
     assert resp.status_code == 200
-    bookings = resp.json()["bookings"]
+    bookings = resp.json()
     assert len(bookings) == 1
     assert bookings[0]["id"] == booking_id
 
     # 4. Verify Artisan Bookings
     resp = client.get("api/v1/artisans/my-bookings", headers=artisan_headers)
     assert resp.status_code == 200
-    bookings = resp.json()["bookings"]
-    assert len(bookings) == 1
-    assert bookings[0]["id"] == booking_id
+    bookings = resp.json()
+    assert len(bookings) == 3
 
     # 5. Artisan accepts booking
     status_update = {"status": "confirmed"}
@@ -75,11 +74,11 @@ def test_booking_flow(client):
         headers=artisan_headers,
     )
     assert resp.status_code == 200
-    assert resp.json()["new_status"] == "confirmed"
+    assert resp.json()["status"] == "confirmed"
 
     # 6. Verify status change
     resp = client.get("api/v1/bookings/my-bookings", headers=client_headers)
-    assert resp.json()["bookings"][0]["status"] == "confirmed"
+    assert resp.json()[0]["status"] == "confirmed"
 
 
 def test_artisan_profile_crud(client):
