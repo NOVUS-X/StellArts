@@ -127,6 +127,7 @@ def get_all_bookings(
 @router.get("/{booking_id}", response_model=BookingResponse)
 def get_booking(
     booking_id: UUID,
+    status_payload: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -154,7 +155,7 @@ def get_booking(
 
     # Admin bypass - can do any transition
     if current_user.role == "admin":
-        new_status = status_data.get("status")
+        new_status = status_payload.get("status")
         if new_status:
             try:
                 booking.status = BookingStatus(new_status)
@@ -176,7 +177,7 @@ def get_booking(
         )
 
     # Get the requested new status
-    new_status_str = status_data.get("status")
+    new_status_str = status_payload.get("status")
     if not new_status_str:
         raise HTTPException(status_code=400, detail="Status is required")
 
