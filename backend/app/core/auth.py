@@ -9,7 +9,7 @@ from app.models.user import User
 from app.schemas.user import RoleEnum
 
 # HTTP Bearer scheme for JWT token extraction
-bearer_scheme = HTTPBearer()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 class AuthenticationError(HTTPException):
@@ -34,13 +34,16 @@ class AuthorizationError(HTTPException):
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     """
     Extract and validate JWT token, return current user.
     Raises 401 for invalid/expired/blacklisted tokens.
     """
+    if credentials is None:
+        raise AuthorizationError("Not authenticated")
+
     try:
         token = credentials.credentials
         payload = decode_token(token)

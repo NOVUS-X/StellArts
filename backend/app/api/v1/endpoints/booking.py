@@ -147,7 +147,9 @@ def update_booking_status(
     is_client = False
 
     if current_user.role == "artisan":
-        user_artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
+        user_artisan = (
+            db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
+        )
         is_artisan = user_artisan and booking.artisan_id == user_artisan.id
     elif current_user.role == "client":
         user_client = db.query(Client).filter(Client.user_id == current_user.id).first()
@@ -155,7 +157,7 @@ def update_booking_status(
 
     # Admin bypass - can do any transition
     if current_user.role == "admin":
-        new_status = status_payload.get("status")
+        new_status = status_payload.status
         if new_status:
             try:
                 booking.status = BookingStatus(new_status)
@@ -167,6 +169,7 @@ def update_booking_status(
             "message": f"Booking {booking_id} status updated",
             "updated_by": current_user.id,
             "new_status": booking.status.value,
+            "status": booking.status.value,
         }
 
     # Validate user is associated with this booking
@@ -241,4 +244,5 @@ def update_booking_status(
         "message": f"Booking {booking_id} status updated",
         "updated_by": current_user.id,
         "new_status": booking.status.value,
+        "status": booking.status.value,
     }

@@ -8,7 +8,6 @@ These tests verify:
 """
 
 
-
 def get_auth_headers(client, email, password, role):
     """Helper to get auth headers for a user."""
     # Register
@@ -33,7 +32,9 @@ def get_auth_headers(client, email, password, role):
 def create_artisan_and_client(client):
     """Helper to create an artisan and client with profiles."""
     # Create artisan
-    artisan_headers = get_auth_headers(client, "artisan@test.com", "Pass123!", "artisan")
+    artisan_headers = get_auth_headers(
+        client, "artisan@test.com", "Pass123!", "artisan"
+    )
     artisan_profile = {
         "business_name": "Artisan Services",
         "description": "Best services",
