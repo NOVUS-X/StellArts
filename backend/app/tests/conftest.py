@@ -1,14 +1,20 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+# Use SQLite for testing
+SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+
+# Ensure required settings exist before app modules import Settings at import time.
+os.environ.setdefault("SECRET_KEY", "test-secret-key")
+os.environ.setdefault("DATABASE_URL", SQLALCHEMY_DATABASE_URL)
+
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
-
-# Use SQLite for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}

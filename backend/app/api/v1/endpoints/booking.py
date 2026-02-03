@@ -136,79 +136,14 @@ def get_all_bookings(
     return bookings
 
 
-@router.get("/{booking_id}", response_model=BookingResponse)
-def get_booking(
-    booking_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    Get a specific booking by ID
-
-    Access control:
-    - Admins can view any booking
-    - Clients can view their own bookings
-    - Artisans can view bookings assigned to them
-    """
-    booking = db.query(Booking).filter(Booking.id == booking_id).first()
-
-    if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Booking with id {booking_id} not found",
-        )
-
-    allowed = False
-
-    if current_user.role == "admin":
-        allowed = True
-    elif current_user.role == "client":
-        client = db.query(Client).filter(Client.user_id == current_user.id).first()
-        if client and booking.client_id == client.id:
-            allowed = True
-    elif current_user.role == "artisan":
-        artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
-        if artisan and booking.artisan_id == artisan.id:
-            allowed = True
-
-    if not allowed:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to view this booking",
-        )
-
-    return booking
-
-
-def can_update_booking(
-    *,
-    db: Session,
-    booking: Booking,
-    user: User,
-    new_status: str,
-) -> bool:
-    if user.role == "admin":
-        return True
-
-    if user.role == "artisan":
-        artisan = db.query(Artisan).filter(Artisan.user_id == user.id).first()
-        return bool(artisan and booking.artisan_id == artisan.id)
-
-    if user.role == "client":
-        client = db.query(Client).filter(Client.user_id == user.id).first()
-        if client and booking.client_id == client.id:
-            return new_status.lower() == "cancelled"
-
-    return False
-
-
-@router.put("/{booking_id}/status", response_model=BookingResponse)
+@router.put("/{booking_id}/status")
 def update_booking_status(
     booking_id: UUID,
-    status_data: BookingStatusUpdate,
+    status_payload: BookingStatusUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
+    """Update booking status - role-based state machine enforcement"""
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
 
     if not booking:
@@ -217,56 +152,109 @@ def update_booking_status(
             detail=f"Booking with id {booking_id} not found",
         )
 
-    allowed = can_update_booking(
-        db=db,
-        booking=booking,
-        user=current_user,
-        new_status=status_data.status,
-    )
+    # Get the user's associated profile (artisan or client)
+    user_artisan = None
+    user_client = None
+    is_artisan = False
+    is_client = False
 
-    if not allowed:
+    if current_user.role == "artisan":
+        user_artisan = (
+            db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
+        )
+        is_artisan = user_artisan and booking.artisan_id == user_artisan.id
+    elif current_user.role == "client":
+        user_client = db.query(Client).filter(Client.user_id == current_user.id).first()
+        is_client = user_client and booking.client_id == user_client.id
+
+    # Admin bypass - can do any transition
+    if current_user.role == "admin":
+        new_status = status_payload.status
+        if new_status:
+            try:
+                booking.status = BookingStatus(new_status)
+                db.commit()
+                db.refresh(booking)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid status") from None
+        return {
+            "message": f"Booking {booking_id} status updated",
+            "updated_by": current_user.id,
+            "new_status": booking.status.value,
+            "status": booking.status.value,
+        }
+
+    # Validate user is associated with this booking
+    if not is_artisan and not is_client:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to update this booking",
+            detail="You are not authorized to update this booking",
         )
+
+    # Get the requested new status
+    new_status_str = status_payload.status
+    if not new_status_str:
+        raise HTTPException(status_code=400, detail="Status is required")
 
     try:
-        booking.status = BookingStatus(status_data.status.lower())
-        db.commit()
-        db.refresh(booking)
+        new_status = BookingStatus(new_status_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid status") from None
 
-    except ValueError as err:
-        valid_statuses = [s.value for s in BookingStatus]
+    current_status = booking.status
 
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=("Invalid status. Valid options are: " + ", ".join(valid_statuses)),
-        ) from err
+    # State Machine Rules
+    # PENDING -> CONFIRMED: Only artisan can perform this transition
+    if new_status == BookingStatus.CONFIRMED:
+        if current_status != BookingStatus.PENDING:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot confirm booking from {current_status.value} status",
+            )
+        if not is_artisan:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the artisan can confirm a booking",
+            )
 
-    return booking
+    # CONFIRMED -> COMPLETED: Only client can perform this transition
+    elif new_status == BookingStatus.COMPLETED:
+        if current_status != BookingStatus.CONFIRMED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot complete booking from {current_status.value} status",
+            )
+        if not is_client:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the client can mark a booking as completed",
+            )
 
+    # Any state -> CANCELLED: Role-based cancellation rules
+    elif new_status == BookingStatus.CANCELLED:
+        if is_client:
+            # Client can cancel only if booking is PENDING
+            if current_status != BookingStatus.PENDING:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Clients can only cancel pending bookings",
+                )
+        elif is_artisan:
+            # Artisan can cancel if booking is PENDING or CONFIRMED
+            if current_status not in (BookingStatus.PENDING, BookingStatus.CONFIRMED):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Artisans can only cancel pending or confirmed bookings",
+                )
 
-@router.delete("/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_booking(
-    booking_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
-):
-    """
-    Delete a booking - admin only
-
-    Note: Consider using soft deletes (status update) instead of hard deletes
-    for audit trail purposes.
-    """
-    booking = db.query(Booking).filter(Booking.id == booking_id).first()
-
-    if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Booking with id {booking_id} not found",
-        )
-
-    db.delete(booking)
+    # Apply the status update
+    booking.status = new_status
     db.commit()
+    db.refresh(booking)
 
-    return None
+    return {
+        "message": f"Booking {booking_id} status updated",
+        "updated_by": current_user.id,
+        "new_status": booking.status.value,
+        "status": booking.status.value,
+    }
