@@ -1,14 +1,20 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.main import app
-from app.db.base import Base
-from app.db.session import get_db
-
 # Use SQLite for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+
+# Ensure required settings exist before app modules import Settings at import time.
+os.environ.setdefault("SECRET_KEY", "test-secret-key")
+os.environ.setdefault("DATABASE_URL", SQLALCHEMY_DATABASE_URL)
+
+from app.db.base import Base
+from app.db.session import get_db
+from app.main import app
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
@@ -40,17 +46,18 @@ def db_session():
 def client():
     """Create a test client."""
     from unittest.mock import AsyncMock, patch
-    
+
     app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=engine)
-    
+
     # Mock Redis cache (Async) and Security Redis (Sync) to avoid connection errors
-    with patch("app.core.cache.cache.initialize", new_callable=AsyncMock), \
-         patch("app.core.cache.cache.redis", new_callable=AsyncMock), \
-         patch("app.core.security.redis_client"):
-        
+    with (
+        patch("app.core.cache.cache.initialize", new_callable=AsyncMock),
+        patch("app.core.cache.cache.redis", new_callable=AsyncMock),
+        patch("app.core.security.redis_client"),
+    ):
         with TestClient(app) as test_client:
             yield test_client
-    
+
     Base.metadata.drop_all(bind=engine)
     app.dependency_overrides.clear()

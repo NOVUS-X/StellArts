@@ -27,6 +27,7 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
     
     - name: Install dependencies
       run: |
@@ -70,6 +71,7 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
     
     - name: Install dependencies
       run: |
@@ -81,6 +83,7 @@ jobs:
         DATABASE_URL: postgresql://stellarts:stellarts_test@localhost:5432/stellarts_test_db
         SECRET_KEY: test-secret-key
         DEBUG: True
+        STELLAR_ESCROW_PUBLIC: "GDUMMY"
       run: |
         pytest ${{ env.WORKING_DIR }}/app/tests/ -v --cov=${{ env.WORKING_DIR }}/app --cov-report=xml
     
@@ -98,12 +101,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+
     
     - name: Build Docker image
       run: |
-        docker build -t stellarts-api:test .
+        docker build -t stellarts-api:test ./backend
     
     - name: Test Docker image
       run: |
@@ -113,21 +115,30 @@ jobs:
           -e POSTGRES_USER=stellarts \
           -e POSTGRES_PASSWORD=stellarts_test \
           -e POSTGRES_DB=stellarts_test_db \
+          -e POSTGRES_DB=stellarts_test_db \
           postgres:15-alpine
+
+        docker run -d --name test-redis --network test-network \
+          -p 6379:6379 \
+          redis:7-alpine
         
         sleep 10
         
         docker run -d --name test-api --network test-network \
           -e DATABASE_URL=postgresql://stellarts:stellarts_test@test-db:5432/stellarts_test_db \
+          -e REDIS_URL=redis://test-redis:6379/0 \
+          -e REDIS_HOST=test-redis \
+          -e REDIS_PORT=6379 \
           -e SECRET_KEY=test-secret-key \
+          -e STELLAR_ESCROW_PUBLIC=GDUMMY \
           -e DEBUG=True \
           -p 8000:8000 \
           stellarts-api:test
         
-        sleep 10
+        sleep 30
         
-        curl -f http://localhost:8000/api/v1/health || exit 1
+        curl -f http://localhost:8000/api/v1/health || (docker logs test-api && exit 1)
         
-        docker stop test-api test-db
-        docker rm test-api test-db
+        docker stop test-api test-db test-redis
+        docker rm test-api test-db test-redis
         docker network rm test-network
