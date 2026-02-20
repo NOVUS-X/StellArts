@@ -50,6 +50,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-target-
 
+      - name: Lint contracts
+        working-directory: contracts
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
       - name: Run tests
         working-directory: contracts
         run: cargo test --verbose
