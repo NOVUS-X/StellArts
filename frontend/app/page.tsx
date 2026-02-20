@@ -8,7 +8,7 @@ import UseCases from "../components/home/UseCases";
 
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
-
+import Link from "next/link";
 import { Shield, Zap, DollarSign, Users, ArrowRight } from "lucide-react";
 
 export default function Home() {
@@ -105,18 +105,28 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
+                asChild
                 size="lg"
                 className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8"
               >
-                Get Started Now
-                <ArrowRight className="ml-2 w-5 h-5" />
+                <Link href="/artisans">
+                  Get Started Now
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Link>
               </Button>
               <Button
+                asChild
                 size="lg"
                 variant="outline"
                 className="border-white text-white hover:bg-white/10 text-lg px-8"
               >
-                View Documentation
+                <Link
+                  href="https://developers.stellar.org/docs"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View Documentation
+                </Link>
               </Button>
             </div>
           </div>
