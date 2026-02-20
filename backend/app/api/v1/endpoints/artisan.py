@@ -32,6 +32,69 @@ from app.services.geolocation import geolocation_service
 router = APIRouter(prefix="/artisans")
 
 
+@router.get("/counts")
+def get_artisan_counts(db: Session = Depends(get_db)):
+    """
+    Return the count of currently available artisans grouped by specialty.
+    Used by the landing page Hero cards. Public endpoint.
+
+    Specialties are stored as JSON arrays in the artisan.specialties column,
+    so we do a LIKE-based match for each known specialty keyword.
+    """
+    SPECIALTIES = {
+        "plumbers": "plumber",
+        "electricians": "electrician",
+        "carpenters": "carpenter",
+        "painters": "painter",
+    }
+
+    result = {}
+    for key, keyword in SPECIALTIES.items():
+        count = (
+            db.query(func.count(Artisan.id))
+            .filter(
+                Artisan.is_available == True,
+                Artisan.specialties.ilike(f"%{keyword}%"),
+            )
+            .scalar()
+        )
+        result[key] = count or 0
+
+    return result
+
+
+@router.get("/stats")
+def get_platform_stats(db: Session = Depends(get_db)):
+    """
+    Return platform-wide aggregate statistics for the landing page Stats bar.
+    Public endpoint.
+
+    Note: average_rating will be null until artisans have received reviews.
+    The frontend handles null gracefully by showing 'New' instead of a number.
+    """
+    from app.models.booking import Booking
+
+    artisan_count = (
+        db.query(func.count(Artisan.id)).filter(Artisan.is_available == True).scalar()
+        or 0
+    )
+
+    completed_bookings = (
+        db.query(func.count(Booking.id)).filter(Booking.status == "completed").scalar()
+        or 0
+    )
+
+    average_rating = (
+        db.query(func.avg(Artisan.rating)).filter(Artisan.rating.isnot(None)).scalar()
+    )
+
+    return {
+        "artisan_count": artisan_count,
+        "completed_bookings": completed_bookings,
+        "average_rating": round(float(average_rating), 1) if average_rating else None,
+    }
+
+
 # ✅ GET-based nearby artisans search (from Discovery&Filtering)
 @router.get("/nearby", response_model=PaginatedArtisans)
 async def get_nearby_artisans(
@@ -42,10 +105,12 @@ async def get_nearby_artisans(
     radius_km: float = Query(
         25.0, ge=0, le=200, description="Search radius in kilometers"
     ),
-    skill: str
-    | None = Query(None, description="Filter by skill keyword (e.g., plumber)"),
-    min_rating: float
-    | None = Query(None, ge=0, le=5, description="Minimum average rating"),
+    skill: str | None = Query(
+        None, description="Filter by skill keyword (e.g., plumber)"
+    ),
+    min_rating: float | None = Query(
+        None, ge=0, le=5, description="Minimum average rating"
+    ),
     available: bool | None = Query(None, description="Filter by current availability"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
