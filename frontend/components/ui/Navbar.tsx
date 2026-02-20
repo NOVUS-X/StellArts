@@ -1,9 +1,41 @@
 'use client';
 
 import { Button } from './button';
-
 import Link from 'next/link';
 import Image from 'next/image';
+import { useWallet } from '../../context/WalletContext';
+
+function WalletButton() {
+  const { address, isConnected, connect, disconnect } = useWallet();
+
+  if (isConnected && address) {
+    const short = `${address.slice(0, 4)}...${address.slice(-4)}`;
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-mono text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+          {short}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={disconnect}
+          className="border-gray-300 text-gray-600"
+        >
+          Disconnect
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      onClick={connect}
+      className="bg-blue-600 hover:bg-blue-700 text-white"
+    >
+      Connect Wallet
+    </Button>
+  );
+}
 
 export default function Navbar() {
   return (
@@ -35,9 +67,7 @@ export default function Navbar() {
             >
               Why Stellar
             </Link>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              Get Started
-            </Button>
+            <WalletButton />
           </div>
         </div>
       </nav>
