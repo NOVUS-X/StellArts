@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_PUBLISHABLE_KEY: str | None = None
 
+        # Soroban Configuration
+    SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
+    ESCROW_CONTRACT_ID: str | None = None
+    REPUTATION_CONTRACT_ID: str | None = None
+
     model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore"}
 
 
