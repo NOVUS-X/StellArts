@@ -128,8 +128,8 @@ class TestConfirmedToCompleted:
             json=status_update,
             headers=client_headers,
         )
-        assert resp.status_code == 200
-        assert resp.json()["new_status"] == "completed"
+        assert resp.status_code == 400
+        assert "cannot complete" in resp.json()["detail"].lower()
 
     def test_artisan_cannot_complete_confirmed_booking(self, client):
         """Artisan should NOT be able to mark a confirmed booking as completed."""
@@ -149,6 +149,131 @@ class TestConfirmedToCompleted:
         resp = client.put(
             f"api/v1/bookings/{booking_id}/status",
             json=status_update,
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 400
+        assert "cannot complete" in resp.json()["detail"].lower()
+
+
+class TestConfirmedToInProgress:
+    """Tests for CONFIRMED -> IN_PROGRESS transition."""
+
+    def test_artisan_can_start_confirmed_booking(self, client):
+        """Artisan should be able to start a confirmed booking."""
+        artisan_headers, artisan_id, client_headers = create_artisan_and_client(client)
+        booking_id = create_booking(client, client_headers, artisan_id)
+
+        # Artisan confirms the booking
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "confirmed"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        # Artisan starts the booking
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "in_progress"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["new_status"] == "in_progress"
+
+    def test_client_cannot_start_confirmed_booking(self, client):
+        """Client should NOT be able to start a confirmed booking."""
+        artisan_headers, artisan_id, client_headers = create_artisan_and_client(client)
+        booking_id = create_booking(client, client_headers, artisan_id)
+
+        # Artisan confirms the booking
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "confirmed"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        # Client tries to start the booking
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "in_progress"},
+            headers=client_headers,
+        )
+        assert resp.status_code == 403
+        assert "only the artisan can start" in resp.json()["detail"].lower()
+
+    def test_cannot_start_pending_booking(self, client):
+        """Should not be able to start a pending booking."""
+        artisan_headers, artisan_id, client_headers = create_artisan_and_client(client)
+        booking_id = create_booking(client, client_headers, artisan_id)
+
+        # Artisan tries to start pending booking
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "in_progress"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 400
+        assert "cannot start" in resp.json()["detail"].lower()
+
+
+class TestInProgressToCompleted:
+    """Tests for IN_PROGRESS -> COMPLETED transition."""
+
+    def test_client_can_complete_in_progress_booking(self, client):
+        """Client should be able to mark an in-progress booking as completed."""
+        artisan_headers, artisan_id, client_headers = create_artisan_and_client(client)
+        booking_id = create_booking(client, client_headers, artisan_id)
+
+        # Artisan confirms
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "confirmed"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        # Artisan starts work
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "in_progress"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        # Client completes
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "completed"},
+            headers=client_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["new_status"] == "completed"
+
+    def test_artisan_cannot_complete_in_progress_booking(self, client):
+        """Artisan should NOT be able to mark an in-progress booking as completed."""
+        artisan_headers, artisan_id, client_headers = create_artisan_and_client(client)
+        booking_id = create_booking(client, client_headers, artisan_id)
+
+        # Artisan confirms and starts
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "confirmed"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "in_progress"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        # Artisan tries to complete
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "completed"},
             headers=artisan_headers,
         )
         assert resp.status_code == 403
@@ -211,6 +336,35 @@ class TestCancellationRules:
         assert resp.status_code == 200
         assert resp.json()["new_status"] == "cancelled"
 
+    def test_artisan_can_cancel_in_progress_booking(self, client):
+        """Artisan should be able to cancel an in-progress booking."""
+        artisan_headers, artisan_id, client_headers = create_artisan_and_client(client)
+        booking_id = create_booking(client, client_headers, artisan_id)
+
+        # Artisan confirms and starts
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "confirmed"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "in_progress"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        # Artisan cancels
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "cancelled"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["new_status"] == "cancelled"
+
     def test_client_cannot_cancel_confirmed_booking(self, client):
         """Client should NOT be able to cancel a confirmed booking."""
         artisan_headers, artisan_id, client_headers = create_artisan_and_client(client)
@@ -229,6 +383,35 @@ class TestCancellationRules:
         resp = client.put(
             f"api/v1/bookings/{booking_id}/status",
             json=status_update,
+            headers=client_headers,
+        )
+        assert resp.status_code == 403
+        assert "clients can only cancel pending" in resp.json()["detail"].lower()
+
+    def test_client_cannot_cancel_in_progress_booking(self, client):
+        """Client should NOT be able to cancel an in-progress booking."""
+        artisan_headers, artisan_id, client_headers = create_artisan_and_client(client)
+        booking_id = create_booking(client, client_headers, artisan_id)
+
+        # Artisan confirms and starts
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "confirmed"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "in_progress"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        # Client tries to cancel
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "cancelled"},
             headers=client_headers,
         )
         assert resp.status_code == 403
@@ -274,8 +457,8 @@ class TestInvalidTransitions:
         assert resp.status_code == 400
         assert "cannot complete" in resp.json()["detail"].lower()
 
-    def test_cannot_complete_already_completed_booking(self, client):
-        """Should not be able to complete an already completed booking."""
+    def test_cannot_complete_confirmed_booking(self, client):
+        """Should not be able to complete a confirmed booking without starting it."""
         artisan_headers, artisan_id, client_headers = create_artisan_and_client(client)
         booking_id = create_booking(client, client_headers, artisan_id)
 
@@ -283,6 +466,35 @@ class TestInvalidTransitions:
         resp = client.put(
             f"api/v1/bookings/{booking_id}/status",
             json={"status": "confirmed"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        # Client tries to complete without in_progress
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "completed"},
+            headers=client_headers,
+        )
+        assert resp.status_code == 400
+        assert "cannot complete" in resp.json()["detail"].lower()
+
+    def test_cannot_complete_already_completed_booking(self, client):
+        """Should not be able to complete an already completed booking."""
+        artisan_headers, artisan_id, client_headers = create_artisan_and_client(client)
+        booking_id = create_booking(client, client_headers, artisan_id)
+
+        # Artisan confirms and starts
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "confirmed"},
+            headers=artisan_headers,
+        )
+        assert resp.status_code == 200
+
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "in_progress"},
             headers=artisan_headers,
         )
         assert resp.status_code == 200
@@ -303,6 +515,20 @@ class TestInvalidTransitions:
         )
         assert resp.status_code == 400
         assert "cannot complete" in resp.json()["detail"].lower()
+
+    def test_invalid_status_rejected(self, client):
+        """Should reject invalid status values."""
+        artisan_headers, artisan_id, client_headers = create_artisan_and_client(client)
+        booking_id = create_booking(client, client_headers, artisan_id)
+
+        # Try invalid status
+        resp = client.put(
+            f"api/v1/bookings/{booking_id}/status",
+            json={"status": "invalid_status"},
+            headers=client_headers,
+        )
+        assert resp.status_code == 400
+        assert "invalid status" in resp.json()["detail"].lower()
 
 
 class TestUnauthorizedAccess:
