@@ -1210,7 +1210,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
@@ -1233,13 +1233,13 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
               "vec": [
                 {
-                  "u64": 43
+                  "u64": 430
                 },
                 {
                   "u64": 10
@@ -10766,7 +10766,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
@@ -10789,13 +10789,13 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
               "vec": [
                 {
-                  "u64": 543
+                  "u64": 493
                 },
                 {
                   "u64": 110

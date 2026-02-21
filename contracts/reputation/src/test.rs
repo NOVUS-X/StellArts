@@ -13,16 +13,16 @@ fn test_reputation_flow_integration() {
     let artisan = Address::generate(&env);
 
     // Scenario: Artisan starts with 0 reputation
-    let initial_stats = client.get_stats(&artisan);
-    assert_eq!(initial_stats, (0, 0)); // (total_stars, review_count)
+    let initial_stats = client.get_stats_scaled(&artisan);
+    assert_eq!(initial_stats, (0, 0)); // (average_scaled, review_count)
 
     // Scenario: User A submits a rating of 5 stars
     let _user_a = Address::generate(&env);
     client.rate_artisan(&artisan, &5);
 
     // Verify after first rating
-    let stats_after_user_a = client.get_stats(&artisan);
-    assert_eq!(stats_after_user_a, (5, 1)); // (total_stars, review_count)
+    let stats_after_user_a = client.get_stats_scaled(&artisan);
+    assert_eq!(stats_after_user_a, (500, 1)); // (500 = 5.0 * 100, 1 review)
 
     // Scenario: User B submits a rating of 3 stars
     let _user_b = Address::generate(&env);
@@ -83,7 +83,7 @@ fn test_reputation_robustness_multiple_reviews() {
         client.rate_artisan(&artisan, &rating);
     }
 
-    let stats = client.get_stats(&artisan);
+    let stats = client.get_stats_scaled(&artisan);
     assert_eq!(stats.1, 10); // 10 reviews
 
     // Calculate expected total: 5+4+5+3+5+4+5+5+4+3 = 43
@@ -100,7 +100,8 @@ fn test_reputation_robustness_multiple_reviews() {
 
     let final_stats = client.get_stats(&artisan);
     assert_eq!(final_stats.1, 110); // 110 total reviews
-    assert_eq!(final_stats.0, 543); // 43 + (100 * 5) = 543 total stars
+    // Average: (43 + 500) / 110 = 543 / 110 = 4.936... → 493 scaled
+    assert_eq!(final_stats.0, 493); // 493 = 4.93 * 100 (scaled average)
 }
 
 #[test]
@@ -120,8 +121,8 @@ fn test_reputation_isolation_between_artisans() {
     client.rate_artisan(&artisan2, &4);
     client.rate_artisan(&artisan2, &4);
 
-    let stats1 = client.get_stats(&artisan1);
-    let stats2 = client.get_stats(&artisan2);
+    let stats1 = client.get_stats_scaled(&artisan1);
+    let stats2 = client.get_stats_scaled(&artisan2);
 
     // Verify isolation: artisan1 has 8/2 = 4.0 average
     assert_eq!(stats1, (8, 2));

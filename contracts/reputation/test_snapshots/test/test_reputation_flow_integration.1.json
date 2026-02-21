@@ -154,7 +154,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
@@ -177,7 +177,7 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
@@ -305,7 +305,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
@@ -328,13 +328,13 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
               "vec": [
                 {
-                  "u64": 5
+                  "u64": 500
                 },
                 {
                   "u64": 1
@@ -456,7 +456,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
@@ -479,13 +479,13 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
               "vec": [
                 {
-                  "u64": 8
+                  "u64": 400
                 },
                 {
                   "u64": 2
