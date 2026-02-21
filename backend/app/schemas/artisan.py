@@ -203,6 +203,15 @@ class PortfolioItem(BaseModel):
         from_attributes = True
 
 
+class PortfolioItemCreate(BaseModel):
+    title: str | None = Field(None, max_length=200, description="Optional portfolio item title")
+    image: str = Field(..., max_length=500, description="URL or path to the portfolio image")
+
+
+class AvailabilityUpdate(BaseModel):
+    is_available: bool = Field(..., description="Set artisan availability status")
+
+
 class ArtisanProfileResponse(BaseModel):
     id: int
     name: str | None
