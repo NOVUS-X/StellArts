@@ -102,3 +102,7 @@ venv.bak/
 # Project specific
 test.db
 .ruff_cache/
+
+# Claude Code
+*.claude
+*CLAUDE.md
