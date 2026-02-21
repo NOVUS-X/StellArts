@@ -17,8 +17,8 @@ The system supports three distinct user roles:
 ### 1. Registration
 - **Endpoint**: `POST /api/v1/auth/register`
 - **Access**: Public
-- **Description**: Users can register with a specific role (client, artisan, or admin)
-- **Role Assignment**: Role is set during registration and cannot be changed without admin privileges
+- **Description**: Users can register with a public role (`client` or `artisan`)
+- **Role Assignment**: Public registration cannot create `admin` users
 
 ### 2. Login
 - **Endpoint**: `POST /api/v1/auth/login`
@@ -28,12 +28,20 @@ The system supports three distinct user roles:
 ### 3. Token Refresh
 - **Endpoint**: `POST /api/v1/auth/refresh`
 - **Access**: Requires valid refresh token
-- **Description**: Generates new access token using refresh token
+- **Description**: Generates new access token using refresh token if its JTI is not blacklisted
+- **Body**:
+  ```json
+  {"refresh_token": "<jwt>"}
+  ```
 
 ### 4. Logout
 - **Endpoint**: `POST /api/v1/auth/logout`
 - **Access**: Requires valid JWT token
-- **Description**: Blacklists the current token to prevent further use
+- **Description**: Blacklists both access and refresh token JTIs to fully terminate session
+- **Body**:
+  ```json
+  {"refresh_token": "<jwt>"}
+  ```
 
 ## Protected Endpoints by Role
 
@@ -124,7 +132,7 @@ Returned when:
 
 ### Token Management
 - **JWT Tokens**: Stateless authentication using JSON Web Tokens
-- **Token Blacklisting**: Logout functionality blacklists tokens in Redis
+- **Token Blacklisting**: Logout blacklists both access and refresh token JTIs in Redis
 - **Refresh Tokens**: Separate refresh tokens for secure token renewal
 - **Token Expiration**: Access tokens expire in 30 minutes, refresh tokens in 3 days
 
