@@ -601,7 +601,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
@@ -624,7 +624,7 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
@@ -657,7 +657,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
@@ -680,7 +680,7 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_stats"
+                "symbol": "get_stats_scaled"
               }
             ],
             "data": {
