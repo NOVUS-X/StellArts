@@ -3,28 +3,30 @@ name: Contracts CI
 on:
   pull_request:
     paths:
-      - 'contracts/**'
-      - '.github/workflows/contracts.yml'
+      - "contracts/**"
+      - ".github/workflows/contracts.yml"
   push:
     branches:
       - main
     paths:
-      - 'contracts/**'
-      - '.github/workflows/contracts.yml'
+      - "contracts/**"
+      - ".github/workflows/contracts.yml"
 
 jobs:
   test:
     name: Test Contracts
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2025-01-21
           targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
 
       - name: Cache cargo registry
         uses: actions/cache@v3
@@ -49,6 +51,10 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-build-target-
+
+      - name: Clean build cache
+        working-directory: contracts
+        run: cargo clean
 
       - name: Run tests
         working-directory: contracts
