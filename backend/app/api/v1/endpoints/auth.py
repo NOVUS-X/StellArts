@@ -10,12 +10,15 @@ from app.core.security import (
     create_refresh_token,
     decode_token,
     get_password_hash,
+    is_token_blacklisted,
     verify_password,
 )
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import (
     LoginRequest,
+    LogoutRequest,
+    RefreshRequest,
     RegisterRequest,
     RegisterResponse,
     TokenResponse,
@@ -66,14 +69,25 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh_token(refresh_token: str):
+def refresh_token(request: RefreshRequest):
     try:
-        payload = decode_token(refresh_token)
+        payload = decode_token(request.refresh_token)
+        jti = payload.get("jti")
+        if not jti:
+            raise HTTPException(status_code=401, detail="Malformed refresh token")
+        if is_token_blacklisted(jti):
+            raise HTTPException(
+                status_code=401, detail="Refresh token has been revoked"
+            )
+
         user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Malformed refresh token")
+
         access_token = create_access_token(user_id)
         return {
             "access_token": access_token,
-            "refresh_token": refresh_token,
+            "refresh_token": request.refresh_token,
             "token_type": "bearer",
         }
     except JWTError:
@@ -82,21 +96,26 @@ def refresh_token(refresh_token: str):
 
 @router.post("/logout")
 def logout(
+    request: LogoutRequest,
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Logout user by blacklisting their current token"""
-    token = credentials.credentials
-    decoded = decode_token(token)
-    if not decoded:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    """Logout user by blacklisting both access and refresh tokens."""
+    try:
+        access_payload = decode_token(credentials.credentials)
+        refresh_payload = decode_token(request.refresh_token)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token") from None
 
-    jti = decoded.get("jti")
-    exp = decoded.get("exp")
-    if not jti or not exp:
+    access_jti = access_payload.get("jti")
+    access_exp = access_payload.get("exp")
+    refresh_jti = refresh_payload.get("jti")
+    refresh_exp = refresh_payload.get("exp")
+    if not access_jti or not access_exp or not refresh_jti or not refresh_exp:
         raise HTTPException(status_code=400, detail="Malformed token")
 
-    blacklist_token(jti, exp)
+    blacklist_token(access_jti, access_exp)
+    blacklist_token(refresh_jti, refresh_exp)
     return {"message": "Successfully logged out", "user": current_user.email}
 
 

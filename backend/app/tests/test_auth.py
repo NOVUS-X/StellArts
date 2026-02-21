@@ -46,7 +46,11 @@ def test_logout_user(client):
     tokens = login_resp.json()
 
     headers = {"Authorization": f"Bearer {tokens['access_token']}"}
-    response = client.post("api/v1/auth/logout", headers=headers)
+    response = client.post(
+        "api/v1/auth/logout",
+        headers=headers,
+        json={"refresh_token": tokens["refresh_token"]},
+    )
     assert response.status_code == 200
     assert response.json()["message"] == "Successfully logged out"
 
@@ -114,3 +118,72 @@ def test_unknown_role_rejected(client):
         },
     )
     assert response.status_code == 422
+
+
+def test_refresh_token_returns_new_access_token(client):
+    test_user_data = {
+        "email": "refreshuser@example.com",
+        "password": "StrongPass1!",
+        "role": "client",
+    }
+    client.post("api/v1/auth/register", json=test_user_data)
+
+    login_resp = client.post(
+        "api/v1/auth/login",
+        json={"email": "refreshuser@example.com", "password": "StrongPass1!"},
+    )
+    tokens = login_resp.json()
+
+    refresh_resp = client.post(
+        "api/v1/auth/refresh",
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert refresh_resp.status_code == 200
+    refreshed = refresh_resp.json()
+    assert "access_token" in refreshed
+    assert refreshed["refresh_token"] == tokens["refresh_token"]
+
+
+def test_cannot_refresh_after_logout(client, monkeypatch):
+    revoked_jtis = set()
+
+    def fake_blacklist_token(jti: str, _exp: int):
+        revoked_jtis.add(jti)
+
+    def fake_is_token_blacklisted(jti: str) -> bool:
+        return jti in revoked_jtis
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.auth.blacklist_token", fake_blacklist_token
+    )
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.auth.is_token_blacklisted", fake_is_token_blacklisted
+    )
+
+    test_user_data = {
+        "email": "logoutrefresh@example.com",
+        "password": "StrongPass1!",
+        "role": "client",
+    }
+    client.post("api/v1/auth/register", json=test_user_data)
+
+    login_resp = client.post(
+        "api/v1/auth/login",
+        json={"email": "logoutrefresh@example.com", "password": "StrongPass1!"},
+    )
+    tokens = login_resp.json()
+
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    logout_resp = client.post(
+        "api/v1/auth/logout",
+        headers=headers,
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert logout_resp.status_code == 200
+
+    refresh_resp = client.post(
+        "api/v1/auth/refresh",
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert refresh_resp.status_code == 401
+    assert "revoked" in refresh_resp.json()["detail"].lower()
