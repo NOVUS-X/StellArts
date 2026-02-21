@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6380
     REDIS_DB: int = 0
+    NEARBY_CACHE_TTL: int = 60  # Seconds to cache nearby-artisan search results
 
     # CORS
     BACKEND_CORS_ORIGINS: list[AnyHttpUrl] = []
