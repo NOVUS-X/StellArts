@@ -40,11 +40,13 @@ if ESCROW_SECRET:
     except Exception:
         pass  # Invalid secret, will check for public key below
 
+DEBUG_MODE = os.getenv("DEBUG", "").lower() == "true"
+
 if not ESCROW_PUBLIC or not StrKey.is_valid_ed25519_public_key(ESCROW_PUBLIC):
-    # Allow tests to run without strict Stellar configuration.
+    # Allow local/test environments to boot without strict Stellar configuration.
     import sys
 
-    if "pytest" not in sys.modules:
+    if "pytest" not in sys.modules and not DEBUG_MODE:
         raise RuntimeError(
             "STELLAR_ESCROW_SECRET or a valid STELLAR_ESCROW_PUBLIC must be configured"
         )
