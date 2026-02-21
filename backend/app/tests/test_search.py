@@ -38,11 +38,11 @@ class MockRedisGeo:
             return 1
         return 0
 
-    async def georadius(
+    async def geosearch(
         self,
-        key,
-        lon,
-        lat,
+        name,
+        longitude,
+        latitude,
         radius,
         unit="m",
         withdist=False,
@@ -50,18 +50,18 @@ class MockRedisGeo:
         sort="ASC",
         count=None,
     ):
-        if key not in self.geo_data:
+        if name not in self.geo_data:
             return []
 
-        center_lon = float(lon)
-        center_lat = float(lat)
+        center_lon = float(longitude)
+        center_lat = float(latitude)
         radius_m = float(radius)
         if unit == "km":
             radius_m *= 1000
 
         results = []
 
-        for member, coords in self.geo_data[key].items():
+        for member, coords in self.geo_data[name].items():
             member_lon, member_lat = coords
 
             # Simplified Haversine for the mock
@@ -113,7 +113,7 @@ def mock_redis():
     # Create an AsyncMock that delegates relevant calls to our MockRedisGeo
     mock = AsyncMock()
     mock.geoadd.side_effect = mock_geo.geoadd
-    mock.georadius.side_effect = mock_geo.georadius
+    mock.geosearch.side_effect = mock_geo.geosearch
     mock.hset.side_effect = mock_geo.hset
     mock.delete.side_effect = mock_geo.delete
     mock.zrem.side_effect = mock_geo.zrem

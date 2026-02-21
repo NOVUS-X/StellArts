@@ -5,8 +5,8 @@
 #[cfg(test)]
 mod happy_path_tests {
     use crate::{DataKey, Escrow, EscrowContract, EscrowContractClient, Status};
-    use soroban_sdk::{token, Address, Env};
     use soroban_sdk::testutils::Address as AddressTestUtils;
+    use soroban_sdk::{token, Address, Env};
 
     /// Test context holding common test objects
     struct TestContext {
@@ -27,7 +27,7 @@ mod happy_path_tests {
             let token_admin = Address::generate(&env);
             let token_contract = env.register_stellar_asset_contract_v2(token_admin);
             let token_address = token_contract.address();
-            
+
             let client_contract = EscrowContractClient::new(&env, &contract_id);
             let token_client = token::Client::new(&env, &token_address);
             let token_contract_client = token::StellarAssetClient::new(&env, &token_address);
@@ -45,8 +45,9 @@ mod happy_path_tests {
         /// Get escrow from storage
         fn get_escrow(&self, engagement_id: u64) -> Escrow {
             self.env.as_contract(&self.contract_id, || {
-                self.env.storage()
-                    .instance()
+                self.env
+                    .storage()
+                    .persistent()
                     .get(&DataKey::Escrow(engagement_id))
                     .expect("Escrow should exist")
             })
@@ -55,7 +56,8 @@ mod happy_path_tests {
         /// Initialize an engagement
         fn initialize_engagement(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
             let deadline = self.env.ledger().timestamp() + 86400;
-            self.client_contract.initialize(client, artisan, &amount, &deadline)
+            self.client_contract
+                .initialize(client, artisan, &amount, &deadline)
         }
 
         /// Mint tokens to an address
@@ -65,12 +67,14 @@ mod happy_path_tests {
 
         /// Deposit funds into an escrow
         fn deposit_funds(&self, engagement_id: u64) {
-            self.client_contract.deposit(&engagement_id, &self.token_address);
+            self.client_contract
+                .deposit(&engagement_id, &self.token_address);
         }
 
         /// Release funds from an escrow
         fn release_funds(&self, engagement_id: u64) {
-            self.client_contract.release(&engagement_id, &self.token_address);
+            self.client_contract
+                .release(&engagement_id, &self.token_address);
         }
 
         /// Full workflow: initialize, mint, deposit
@@ -105,7 +109,7 @@ mod happy_path_tests {
         let engagement_id = ctx.initialize_engagement(&client, &artisan, amount);
 
         assert_eq!(engagement_id, 1, "First engagement should have ID 1");
-        
+
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.client, client);
         assert_eq!(escrow.artisan, artisan);
@@ -124,10 +128,16 @@ mod happy_path_tests {
         ctx.mint_tokens(&client, initial_mint);
 
         let client_balance = ctx.token_client.balance(&client);
-        assert_eq!(client_balance, initial_mint, "Client should have exactly minted amount");
+        assert_eq!(
+            client_balance, initial_mint,
+            "Client should have exactly minted amount"
+        );
 
         let contract_balance = ctx.token_client.balance(&ctx.contract_id);
-        assert_eq!(contract_balance, 0, "Contract should have no tokens before deposit");
+        assert_eq!(
+            contract_balance, 0,
+            "Contract should have no tokens before deposit"
+        );
     }
 
     /// Test 3: Client Deposit into Escrow
@@ -171,10 +181,10 @@ mod happy_path_tests {
         let escrow_amount: i128 = 5000;
 
         let engagement_id = ctx.full_deposit_workflow(&client, &artisan, escrow_amount);
-        
+
         let artisan_balance_before = ctx.token_client.balance(&artisan);
         ctx.release_funds(engagement_id);
-        
+
         assert_eq!(
             ctx.token_client.balance(&artisan),
             artisan_balance_before + escrow_amount,
@@ -219,7 +229,7 @@ mod happy_path_tests {
 
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.status, Status::Released);
-        
+
         // Verify token conservation
         let total = ctx.token_client.balance(&client)
             + ctx.token_client.balance(&ctx.contract_id)
@@ -302,16 +312,17 @@ mod happy_path_tests {
             let amount: i128 = 1000 * i as i128;
 
             let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
-            
+
             // After deposit, contract should hold the amount (no other engagements pending)
             assert_eq!(
                 ctx.token_client.balance(&ctx.contract_id),
                 amount,
-                "Contract holds current engagement amount at iteration {}", i
+                "Contract holds current engagement amount at iteration {}",
+                i
             );
 
             ctx.release_funds(engagement_id);
-            
+
             // After release, contract should be empty for this iteration
             assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
             assert_eq!(ctx.token_client.balance(&artisan), amount);
@@ -348,4 +359,5 @@ mod happy_path_tests {
         assert_eq!(escrow.client, client);
         assert_eq!(escrow.artisan, artisan);
         assert_eq!(escrow.amount, amount);
-    }}
+    }
+}

@@ -77,7 +77,7 @@ impl ReputationContract {
         );
     }
 
-    /// Get reputation statistics for a user
+    /// Get reputation statistics for a user (scaled average)
     /// Returns (average_scaled_by_100, count)
     /// Example: 9 total stars / 2 reviews = 4.5 average → returns (450, 2)
     pub fn get_stats_scaled(env: Env, user: Address) -> (u64, u64) {

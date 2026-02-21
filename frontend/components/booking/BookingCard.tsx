@@ -12,12 +12,14 @@ export interface BookingProps {
   service: string;
   date: Date;
   price: number;
-  status: "pending" | "confirmed" | "completed" | "cancelled";
+  status: "pending" | "confirmed" | "in_progress" | "completed" | "cancelled";
 }
 
 const statusStyles = {
   pending: "bg-amber-50 text-amber-700 border-amber-200 ring-amber-500/10",
   confirmed: "bg-blue-50 text-blue-700 border-blue-200 ring-blue-500/10",
+  in_progress:
+    "bg-violet-50 text-violet-700 border-violet-200 ring-violet-500/10",
   completed:
     "bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-500/10",
   cancelled: "bg-red-50 text-red-700 border-red-200 ring-red-500/10",
