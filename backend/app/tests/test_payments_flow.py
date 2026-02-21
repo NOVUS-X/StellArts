@@ -1,9 +1,9 @@
-from decimal import Decimal
+from uuid import UUID
 
-from stellar_sdk import Keypair, TransactionEnvelope, Network
+from stellar_sdk import Keypair, Network, TransactionEnvelope
 
+from app.models.payment import Payment, PaymentStatus
 from app.services import payments
-from app.models.payment import Payment
 
 
 def get_auth_headers(client, email, password, role):
@@ -79,9 +79,11 @@ def test_payments_prepare_and_submit(monkeypatch, client, db_session):
     unsigned_xdr = payload["unsigned_xdr"]
 
     # verify we got a valid transaction envelope back
-    tx = TransactionEnvelope.from_xdr(unsigned_xdr, network_passphrase=Network.TESTNET_NETWORK_PASSPHRASE)
+    tx = TransactionEnvelope.from_xdr(
+        unsigned_xdr, network_passphrase=Network.TESTNET_NETWORK_PASSPHRASE
+    )
     assert len(tx.transaction.operations) == 1
-    assert tx.transaction.operations[0].destination == payments.ESCROW_PUBLIC
+    assert tx.transaction.operations[0].destination.account_id == payments.ESCROW_PUBLIC
 
     # sign with our secret
     tx.sign(kp)
@@ -97,7 +99,10 @@ def test_payments_prepare_and_submit(monkeypatch, client, db_session):
     # verify a record was committed to the database
     held = (
         db_session.query(Payment)
-        .filter(Payment.booking_id == booking_id, Payment.status == "held")
+        .filter(
+            Payment.booking_id == UUID(booking_id),
+            Payment.status == PaymentStatus.PENDING,
+        )
         .first()
     )
     assert held is not None

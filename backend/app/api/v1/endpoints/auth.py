@@ -39,7 +39,7 @@ def register_user(user_in: RegisterRequest, db: Session = Depends(get_db)):
     user = User(
         email=user_in.email,
         hashed_password=hashed_pw,
-        role=user_in.role,
+        role=user_in.role.value,
         full_name=user_in.full_name,
         phone=user_in.phone,
     )

@@ -144,17 +144,12 @@ curl -X POST "http://localhost:8000/api/v1/auth/register" \
   }'
 ```
 
-**Create an Admin:**
+**Create an Admin (trusted environment only):**
 ```bash
-curl -X POST "http://localhost:8000/api/v1/auth/register" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "admin@test.com",
-    "password": "TestPass123!",
-    "role": "admin",
-    "full_name": "Test Admin"
-  }'
+python scripts/create_admin.py --email admin@test.com --password "TestPass123!"
 ```
+
+Public registration only allows `"client"` and `"artisan"` roles.
 
 ### 2. Login and Get Tokens
 

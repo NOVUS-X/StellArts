@@ -10,10 +10,15 @@ class RoleEnum(str, Enum):
     admin = "admin"
 
 
+class PublicRoleEnum(str, Enum):
+    client = "client"
+    artisan = "artisan"
+
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=72)
-    role: RoleEnum
+    role: PublicRoleEnum
     full_name: str | None = None
     phone: str | None = None
     username: str | None = None
@@ -21,8 +26,8 @@ class RegisterRequest(BaseModel):
     @field_validator("role")
     @classmethod
     def validate_role(cls, value):
-        if value not in ["client", "artisan", "admin"]:
-            raise ValueError("Role must be 'client', 'artisan', or 'admin'")
+        if value not in {PublicRoleEnum.client, PublicRoleEnum.artisan}:
+            raise ValueError("Role must be 'client' or 'artisan'")
         return value
 
     @field_validator("password")

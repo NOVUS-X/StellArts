@@ -7,18 +7,15 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.services.payments import (
+    prepare_payment,
     refund_payment,
     release_payment,
-    prepare_payment,
     submit_signed_payment,
 )
 
 router = APIRouter()
 
 # deprecated: used by the insecure /hold endpoint which has been removed
-
-
-
 
 
 class PrepareRequest(BaseModel):
@@ -43,11 +40,9 @@ class RefundRequest(BaseModel):
     amount: Decimal = Field(..., gt=0)
 
 
-
 # The old /hold endpoint has been removed due to security concerns. Clients
 # should use the two-step prepare/submit flow instead.  A request to this path
 # will now return 404 (FastAPI simply won't register it).
-
 
 
 @router.post("/prepare", summary="Prepare unsigned payment XDR for client signing")
