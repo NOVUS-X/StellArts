@@ -217,9 +217,22 @@ def update_booking_status(
                 detail="Only the artisan can confirm a booking",
             )
 
-    # CONFIRMED -> COMPLETED: Only client can perform this transition
-    elif new_status == BookingStatus.COMPLETED:
+    # CONFIRMED -> IN_PROGRESS: Only artisan can perform this transition
+    elif new_status == BookingStatus.IN_PROGRESS:
         if current_status != BookingStatus.CONFIRMED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot start booking from {current_status.value} status",
+            )
+        if not is_artisan:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the artisan can start a booking",
+            )
+
+    # IN_PROGRESS -> COMPLETED: Only client can perform this transition
+    elif new_status == BookingStatus.COMPLETED:
+        if current_status != BookingStatus.IN_PROGRESS:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot complete booking from {current_status.value} status",
@@ -240,12 +253,22 @@ def update_booking_status(
                     detail="Clients can only cancel pending bookings",
                 )
         elif is_artisan:
-            # Artisan can cancel if booking is PENDING or CONFIRMED
-            if current_status not in (BookingStatus.PENDING, BookingStatus.CONFIRMED):
+            # Artisan can cancel if booking is PENDING, CONFIRMED, or IN_PROGRESS
+            if current_status not in (
+                BookingStatus.PENDING,
+                BookingStatus.CONFIRMED,
+                BookingStatus.IN_PROGRESS,
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Artisans can only cancel pending or confirmed bookings",
+                    detail="Artisans can only cancel pending, confirmed, or in-progress bookings",
                 )
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status transition to {new_status.value}",
+        )
 
     # Apply the status update
     booking.status = new_status
