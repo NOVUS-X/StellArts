@@ -3,6 +3,7 @@
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Wrench, Zap, Star, ArrowRight } from "lucide-react";
+import Link from "next/link";
 import Stats from "./Stats";
 import { formatCount, useArtisanCounts } from "../../hooks/useArtisanStats";
 
@@ -77,15 +78,17 @@ export default function Hero() {
 								size="lg"
 								className="bg-blue-600 hover:bg-blue-700 text-white text-lg px-8"
 							>
-								Find an Artisan
-								<ArrowRight className="ml-2 w-5 h-5" />
+								<Link href='/artisans'>
+									Find an Artisan
+									<ArrowRight className='ml-2 w-5 h-5' />
+								</Link>
 							</Button>
 							<Button
 								size="lg"
 								variant="outline"
 								className="border-blue-600 text-blue-600 hover:bg-blue-50 text-lg px-8"
 							>
-								Join as Artisan
+								<Link href='/register?role=artisan'>Join as Artisan</Link>
 							</Button>
 						</div>
 
