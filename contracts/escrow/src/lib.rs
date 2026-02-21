@@ -2,6 +2,12 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
 
+// TTL constants for persistent storage (in ledgers)
+// Note: Each ledger is approximately 5 seconds
+const ESCROW_TTL: u32 = 1_036_800; // ~60 days
+const NEXT_ID_TTL: u32 = 6_220_800; // ~1 year
+const TTL_THRESHOLD: u32 = 17_280; // ~1 day - triggers extension when TTL drops below this
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Escrow {
@@ -62,16 +68,20 @@ impl EscrowContract {
         // Generate unique engagement ID
         let next_id = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::NextId)
             .unwrap_or(1u64);
 
         let engagement_id = next_id;
 
         // Update next ID for future engagements
-        env.storage()
-            .instance()
-            .set(&DataKey::NextId, &(next_id + 1));
+        let next_id_key = DataKey::NextId;
+        env.storage().persistent().set(&next_id_key, &(next_id + 1));
+        env.storage().persistent().extend_ttl(
+            &next_id_key,
+            TTL_THRESHOLD as u32,
+            NEXT_ID_TTL as u32,
+        );
 
         // Create new escrow record
         let escrow = Escrow {
@@ -83,9 +93,11 @@ impl EscrowContract {
         };
 
         // Store the escrow in persistent storage
+        let escrow_key = DataKey::Escrow(engagement_id);
+        env.storage().persistent().set(&escrow_key, &escrow);
         env.storage()
-            .instance()
-            .set(&DataKey::Escrow(engagement_id), &escrow);
+            .persistent()
+            .extend_ttl(&escrow_key, TTL_THRESHOLD as u32, ESCROW_TTL as u32);
 
         // Emit event
         env.events().publish(
@@ -107,7 +119,7 @@ impl EscrowContract {
         let key = DataKey::Escrow(engagement_id);
         let mut escrow: Escrow = env
             .storage()
-            .instance()
+            .persistent()
             .get(&key)
             .unwrap_or_else(|| panic!("Escrow not found for engagement {}", engagement_id));
 
@@ -121,13 +133,20 @@ impl EscrowContract {
 
         // Transfer tokens from client to escrow contract
         let token_client = token::Client::new(&env, &token);
-        token_client.transfer(&escrow.client, &env.current_contract_address(), &escrow.amount);
+        token_client.transfer(
+            &escrow.client,
+            &env.current_contract_address(),
+            &escrow.amount,
+        );
 
         // Update escrow status to Funded
         escrow.status = Status::Funded;
 
-        // Save the updated escrow
-        env.storage().instance().set(&key, &escrow);
+        // Save the updated escrow and extend TTL
+        env.storage().persistent().set(&key, &escrow);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD as u32, ESCROW_TTL as u32);
     }
 
     /// Release funds from escrow to the artisan
@@ -136,7 +155,7 @@ impl EscrowContract {
         let key = DataKey::Escrow(engagement_id);
         let mut escrow: Escrow = env
             .storage()
-            .instance()
+            .persistent()
             .get(&key)
             .expect("Escrow not found");
 
@@ -150,11 +169,18 @@ impl EscrowContract {
 
         // Logic: Transfer the stored escrow amount from the contract address to the artisan's address
         let token_client = token::Client::new(&env, &token);
-        token_client.transfer(&env.current_contract_address(), &escrow.artisan, &escrow.amount);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &escrow.artisan,
+            &escrow.amount,
+        );
 
         // State: Update the escrow status to Released
         escrow.status = Status::Released;
-        env.storage().instance().set(&key, &escrow);
+        env.storage().persistent().set(&key, &escrow);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD as u32, ESCROW_TTL as u32);
     }
 }
 
@@ -164,7 +190,7 @@ mod test;
 #[cfg(test)]
 mod test_legacy {
     use super::*;
-    use soroban_sdk::{testutils::{Address as _}, Address, Env, IntoVal};
+    use soroban_sdk::{testutils::Address as _, Address, Env, IntoVal};
 
     #[test]
     fn test_initialize_engagement() {
@@ -179,14 +205,18 @@ mod test_legacy {
         let deadline = env.ledger().timestamp() + 86400; // 24 hours from now
 
         // Initialize engagement
-        let engagement_id = client.initialize(&client_address, &artisan_address, &amount, &deadline);
+        let engagement_id =
+            client.initialize(&client_address, &artisan_address, &amount, &deadline);
 
         // Verify the returned ID is valid (should be 1 for first engagement)
         assert_eq!(engagement_id, 1);
 
         // Verify the escrow was stored correctly
         let stored_escrow: Escrow = env.as_contract(&contract_id, || {
-            env.storage().instance().get(&DataKey::Escrow(engagement_id)).unwrap()
+            env.storage()
+                .persistent()
+                .get(&DataKey::Escrow(engagement_id))
+                .unwrap()
         });
 
         assert_eq!(stored_escrow.client, client_address);
@@ -197,7 +227,10 @@ mod test_legacy {
 
         // Verify next ID was updated
         let next_id: u64 = env.as_contract(&contract_id, || {
-            env.storage().instance().get(&DataKey::NextId).unwrap_or(1)
+            env.storage()
+                .persistent()
+                .get(&DataKey::NextId)
+                .unwrap_or(1)
         });
         assert_eq!(next_id, 2); // Should be incremented to 2
     }
@@ -246,7 +279,12 @@ mod test_legacy {
         let deadline = env.ledger().timestamp() + 86400;
 
         // This should panic because amount is negative
-        client.initialize(&client_address, &artisan_address, &negative_amount, &deadline);
+        client.initialize(
+            &client_address,
+            &artisan_address,
+            &negative_amount,
+            &deadline,
+        );
     }
 
     // NOTE: This test fails due to Soroban token authentication complexity
@@ -274,7 +312,8 @@ mod test_legacy {
 
         // Mint some tokens to the client using the token contract's mint function
         let initial_amount: i128 = 1000;
-        let token_contract_client = soroban_sdk::token::StellarAssetClient::new(&env, &token_address);
+        let token_contract_client =
+            soroban_sdk::token::StellarAssetClient::new(&env, &token_address);
 
         token_contract_client.mint(&client_address, &initial_amount);
 
@@ -293,7 +332,9 @@ mod test_legacy {
 
         // Store the escrow in contract storage
         env.as_contract(&contract_id, || {
-            env.storage().instance().set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(engagement_id), &escrow);
         });
 
         // Check initial token balance of contract (should be 0)
@@ -309,7 +350,10 @@ mod test_legacy {
 
         // Verify escrow status was updated to Funded
         let updated_escrow: Escrow = env.as_contract(&contract_id, || {
-            env.storage().instance().get(&DataKey::Escrow(engagement_id)).unwrap()
+            env.storage()
+                .persistent()
+                .get(&DataKey::Escrow(engagement_id))
+                .unwrap()
         });
         assert_eq!(updated_escrow.status, Status::Funded);
 
@@ -352,7 +396,9 @@ mod test_legacy {
 
         // Store the escrow
         env.as_contract(&contract_id, || {
-            env.storage().instance().set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(engagement_id), &escrow);
         });
 
         // In current implementation, any address can call deposit
@@ -402,7 +448,9 @@ mod test_legacy {
 
         // Store the escrow
         env.as_contract(&contract_id, || {
-            env.storage().instance().set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(engagement_id), &escrow);
         });
 
         // Try to deposit (should panic due to status check, but first need auth)
@@ -435,7 +483,8 @@ mod test_legacy {
         let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
         let token_address = token_contract.address();
         let token_client = soroban_sdk::token::Client::new(&env, &token_address);
-        let token_contract_client = soroban_sdk::token::StellarAssetClient::new(&env, &token_address);
+        let token_contract_client =
+            soroban_sdk::token::StellarAssetClient::new(&env, &token_address);
 
         let amount: i128 = 1000;
         let engagement_id = 1;
@@ -455,7 +504,9 @@ mod test_legacy {
 
         // Store the escrow
         env.as_contract(&contract_id, || {
-            env.storage().instance().set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(engagement_id), &escrow);
         });
 
         // Transfer tokens to contract (simulating funded escrow)
@@ -498,7 +549,9 @@ mod test_legacy {
         };
 
         env.as_contract(&contract_id, || {
-            env.storage().instance().set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(engagement_id), &escrow);
         });
 
         client.release(&engagement_id, &token_address);
@@ -518,7 +571,8 @@ mod test_legacy {
         let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
         let token_address = token_contract.address();
         let token_client = soroban_sdk::token::Client::new(&env, &token_address);
-        let token_contract_client = soroban_sdk::token::StellarAssetClient::new(&env, &token_address);
+        let token_contract_client =
+            soroban_sdk::token::StellarAssetClient::new(&env, &token_address);
 
         let amount: i128 = 1000;
         let engagement_id = 1;
@@ -535,7 +589,9 @@ mod test_legacy {
         };
 
         env.as_contract(&contract_id, || {
-            env.storage().instance().set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(engagement_id), &escrow);
         });
 
         token_client.transfer(&client_address, &contract_id, &amount);

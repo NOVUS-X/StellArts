@@ -93,10 +93,10 @@ impl ReputationContract {
         );
     }
 
-    /// Get reputation statistics for a user
+    /// Get reputation statistics for a user (scaled average)
     /// Returns (average_scaled_by_100, count)
     /// Example: 9 total stars / 2 reviews = 4.5 average → returns (450, 2)
-    pub fn get_stats(env: Env, user: Address) -> (u64, u64) {
+    pub fn get_stats_scaled(env: Env, user: Address) -> (u64, u64) {
         let data = read_reputation(&env, &user);
         if data.review_count == 0 {
             return (0, 0);
@@ -280,7 +280,7 @@ mod tests {
             },
         );
 
-        let (average_scaled, count) = client.get_stats(&artisan);
+        let (average_scaled, count) = client.get_stats_scaled(&artisan);
         assert_eq!(average_scaled, 450);
         assert_eq!(count, 2);
     }
