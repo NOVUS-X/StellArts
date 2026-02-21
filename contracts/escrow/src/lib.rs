@@ -123,8 +123,8 @@ impl EscrowContract {
             .get(&key)
             .unwrap_or_else(|| panic!("Escrow not found for engagement {}", engagement_id));
 
-        // Note: Authorization should be verified by the calling application
-        // In a production system, this would require client signature verification
+        // Auth: Require the client's signature
+        escrow.client.require_auth();
 
         // Verify that the escrow is in Pending status
         if escrow.status != Status::Pending {
@@ -364,24 +364,27 @@ mod test_legacy {
     }
 
     #[test]
+    #[should_panic]
     fn test_deposit_unauthorized_client() {
-        // Note: Current implementation doesn't verify caller authorization
-        // This test exists for completeness but doesn't enforce authorization
         let env = Env::default();
         let contract_id = env.register_contract(None, EscrowContract);
-        let _client = EscrowContractClient::new(&env, &contract_id);
+        let client = EscrowContractClient::new(&env, &contract_id);
 
         // Create test addresses
         let client_address = Address::generate(&env);
         let unauthorized_address = Address::generate(&env);
         let artisan_address = Address::generate(&env);
 
-        // Create a mock token
+        // Create a mock token and mint tokens to the client so the test
+        // doesn't fail on insufficient balance before reaching the auth check
         let token_admin = Address::generate(&env);
         let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
         let token_address = token_contract.address();
+        let token_contract_client =
+            soroban_sdk::token::StellarAssetClient::new(&env, &token_address);
+        token_contract_client.mint(&client_address, &1000i128);
 
-        // Create an escrow record
+        // Create an escrow record owned by client_address
         let engagement_id = 1;
         let escrow_amount: i128 = 500;
         let deadline = env.ledger().timestamp() + 86400;
@@ -394,15 +397,13 @@ mod test_legacy {
             deadline,
         };
 
-        // Store the escrow
         env.as_contract(&contract_id, || {
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
         });
 
-        // In current implementation, any address can call deposit
-        // This is a limitation that should be addressed in production
+        // Mock auth for the WRONG address — unauthorized_address is not the client
         env.mock_auths(&[soroban_sdk::testutils::MockAuth {
             address: &unauthorized_address,
             invoke: &soroban_sdk::testutils::MockAuthInvoke {
@@ -413,8 +414,8 @@ mod test_legacy {
             },
         }]);
 
-        // This would work in current implementation (not ideal)
-        // client.deposit(&engagement_id, &token_address);
+        // This must panic — unauthorized_address cannot satisfy escrow.client.require_auth()
+        client.deposit(&engagement_id, &token_address);
     }
 
     #[test]
