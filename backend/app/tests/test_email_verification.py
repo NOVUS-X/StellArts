@@ -68,13 +68,20 @@ def test_unverified_user_cannot_book(client, db_session):
     try:
         # Create a client user (unverified)
         hashed = get_password_hash("Password1!")
-        client_user = User(email="unv@example.com", hashed_password=hashed, role="client")
+        client_user = User(
+            email="unv@example.com", hashed_password=hashed, role="client"
+        )
         db_session.add(client_user)
         db_session.commit()
         db_session.refresh(client_user)
 
         # Create an artisan to book
-        artisan_user = User(email="art@example.com", hashed_password=hashed, role="artisan", is_verified=True)
+        artisan_user = User(
+            email="art@example.com",
+            hashed_password=hashed,
+            role="artisan",
+            is_verified=True,
+        )
         db_session.add(artisan_user)
         db_session.commit()
         db_session.refresh(artisan_user)
@@ -106,13 +113,23 @@ def test_unverified_user_cannot_book(client, db_session):
 def test_verified_user_can_book(client, db_session):
     # Create a verified client user
     hashed = get_password_hash("Password1!")
-    client_user = User(email="vclient@example.com", hashed_password=hashed, role="client", is_verified=True)
+    client_user = User(
+        email="vclient@example.com",
+        hashed_password=hashed,
+        role="client",
+        is_verified=True,
+    )
     db_session.add(client_user)
     db_session.commit()
     db_session.refresh(client_user)
 
     # Create artisan to book
-    artisan_user = User(email="art2@example.com", hashed_password=hashed, role="artisan", is_verified=True)
+    artisan_user = User(
+        email="art2@example.com",
+        hashed_password=hashed,
+        role="artisan",
+        is_verified=True,
+    )
     db_session.add(artisan_user)
     db_session.commit()
     db_session.refresh(artisan_user)
@@ -141,7 +158,12 @@ def test_verified_user_can_book(client, db_session):
 
 def test_resend_verification_fails_if_already_verified(client, db_session):
     hashed = get_password_hash("Password1!")
-    user = User(email="resend@example.com", hashed_password=hashed, role="client", is_verified=True)
+    user = User(
+        email="resend@example.com",
+        hashed_password=hashed,
+        role="client",
+        is_verified=True,
+    )
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)

@@ -9,7 +9,11 @@ from app.models.user import User
 
 
 def make_booking_payload(artisan_id: int, booking_id: str = None):
-    return {"booking_id": booking_id or str(uuid.uuid4()), "amount": 10.0, "client_public": "GABC..."}
+    return {
+        "booking_id": booking_id or str(uuid.uuid4()),
+        "amount": 10.0,
+        "client_public": "GABC...",
+    }
 
 
 def test_unverified_user_cannot_prepare(client, db_session):
@@ -19,13 +23,20 @@ def test_unverified_user_cannot_prepare(client, db_session):
     try:
         # create unverified client user
         hashed = get_password_hash("Password1!")
-        client_user = User(email="up@example.com", hashed_password=hashed, role="client")
+        client_user = User(
+            email="up@example.com", hashed_password=hashed, role="client"
+        )
         db_session.add(client_user)
         db_session.commit()
         db_session.refresh(client_user)
 
         # create artisan and booking
-        artisan_user = User(email="artp@example.com", hashed_password=hashed, role="artisan", is_verified=True)
+        artisan_user = User(
+            email="artp@example.com",
+            hashed_password=hashed,
+            role="artisan",
+            is_verified=True,
+        )
         db_session.add(artisan_user)
         db_session.commit()
         db_session.refresh(artisan_user)
@@ -43,14 +54,23 @@ def test_unverified_user_cannot_prepare(client, db_session):
         db_session.commit()
         db_session.refresh(client_profile)
 
-        booking = Booking(client_id=client_profile.id, artisan_id=artisan.id, service="S", estimated_cost=50)
+        booking = Booking(
+            client_id=client_profile.id,
+            artisan_id=artisan.id,
+            service="S",
+            estimated_cost=50,
+        )
         db_session.add(booking)
         db_session.commit()
         db_session.refresh(booking)
 
         token = create_access_token(subject=client_user.id)
 
-        payload = {"booking_id": str(booking.id), "amount": 50.0, "client_public": "GABC"}
+        payload = {
+            "booking_id": str(booking.id),
+            "amount": 50.0,
+            "client_public": "GABC",
+        }
         # Ensure prepare_payment is not called for unverified users
         with patch("app.api.v1.endpoints.payments.prepare_payment") as mock_prepare:
             resp = client.post(
@@ -71,12 +91,22 @@ def test_verified_user_can_prepare(client, db_session):
     try:
         # create verified client user
         hashed = get_password_hash("Password1!")
-        client_user = User(email="vp@example.com", hashed_password=hashed, role="client", is_verified=True)
+        client_user = User(
+            email="vp@example.com",
+            hashed_password=hashed,
+            role="client",
+            is_verified=True,
+        )
         db_session.add(client_user)
         db_session.commit()
         db_session.refresh(client_user)
         # create artisan and booking
-        artisan_user = User(email="artv@example.com", hashed_password=hashed, role="artisan", is_verified=True)
+        artisan_user = User(
+            email="artv@example.com",
+            hashed_password=hashed,
+            role="artisan",
+            is_verified=True,
+        )
         db_session.add(artisan_user)
         db_session.commit()
         db_session.refresh(artisan_user)
@@ -93,14 +123,23 @@ def test_verified_user_can_prepare(client, db_session):
         db_session.commit()
         db_session.refresh(client_profile)
 
-        booking = Booking(client_id=client_profile.id, artisan_id=artisan.id, service="S2", estimated_cost=75)
+        booking = Booking(
+            client_id=client_profile.id,
+            artisan_id=artisan.id,
+            service="S2",
+            estimated_cost=75,
+        )
         db_session.add(booking)
         db_session.commit()
         db_session.refresh(booking)
 
         token = create_access_token(subject=client_user.id)
 
-        payload = {"booking_id": str(booking.id), "amount": 75.0, "client_public": "GABC"}
+        payload = {
+            "booking_id": str(booking.id),
+            "amount": 75.0,
+            "client_public": "GABC",
+        }
         # Patch the prepare_payment function to avoid constructing a real Stellar Account
         with patch("app.api.v1.endpoints.payments.prepare_payment") as mock_prepare:
             mock_prepare.return_value = {
@@ -148,12 +187,19 @@ def test_unverified_user_cannot_submit(client, db_session, monkeypatch):
     try:
         # create unverified client and booking
         hashed = get_password_hash("Password1!")
-        client_user = User(email="usub@example.com", hashed_password=hashed, role="client")
+        client_user = User(
+            email="usub@example.com", hashed_password=hashed, role="client"
+        )
         db_session.add(client_user)
         db_session.commit()
         db_session.refresh(client_user)
 
-        artisan_user = User(email="art3@example.com", hashed_password=hashed, role="artisan", is_verified=True)
+        artisan_user = User(
+            email="art3@example.com",
+            hashed_password=hashed,
+            role="artisan",
+            is_verified=True,
+        )
         db_session.add(artisan_user)
         db_session.commit()
         db_session.refresh(artisan_user)
@@ -170,7 +216,12 @@ def test_unverified_user_cannot_submit(client, db_session, monkeypatch):
         db_session.commit()
         db_session.refresh(client_profile)
 
-        booking = Booking(client_id=client_profile.id, artisan_id=artisan.id, service="S3", estimated_cost=20)
+        booking = Booking(
+            client_id=client_profile.id,
+            artisan_id=artisan.id,
+            service="S3",
+            estimated_cost=20,
+        )
         db_session.add(booking)
         db_session.commit()
         db_session.refresh(booking)
@@ -184,7 +235,9 @@ def test_unverified_user_cannot_submit(client, db_session, monkeypatch):
         )
 
         # Patch submit_signed_payment to ensure it is not called
-        with patch("app.api.v1.endpoints.payments.submit_signed_payment") as mock_submit:
+        with patch(
+            "app.api.v1.endpoints.payments.submit_signed_payment"
+        ) as mock_submit:
             resp = client.post(
                 "/api/v1/payments/submit",
                 json={"signed_xdr": "XDR"},
@@ -203,11 +256,21 @@ def test_verified_user_can_submit(client, db_session, monkeypatch):
     try:
         # create verified client and booking
         hashed = get_password_hash("Password1!")
-        client_user = User(email="vsub@example.com", hashed_password=hashed, role="client", is_verified=True)
+        client_user = User(
+            email="vsub@example.com",
+            hashed_password=hashed,
+            role="client",
+            is_verified=True,
+        )
         db_session.add(client_user)
         db_session.commit()
         db_session.refresh(client_user)
-        artisan_user = User(email="art4@example.com", hashed_password=hashed, role="artisan", is_verified=True)
+        artisan_user = User(
+            email="art4@example.com",
+            hashed_password=hashed,
+            role="artisan",
+            is_verified=True,
+        )
         db_session.add(artisan_user)
         db_session.commit()
         db_session.refresh(artisan_user)
@@ -224,7 +287,12 @@ def test_verified_user_can_submit(client, db_session, monkeypatch):
         db_session.commit()
         db_session.refresh(client_profile)
 
-        booking = Booking(client_id=client_profile.id, artisan_id=artisan.id, service="S4", estimated_cost=300)
+        booking = Booking(
+            client_id=client_profile.id,
+            artisan_id=artisan.id,
+            service="S4",
+            estimated_cost=300,
+        )
         db_session.add(booking)
         db_session.commit()
         db_session.refresh(booking)
@@ -238,7 +306,9 @@ def test_verified_user_can_submit(client, db_session, monkeypatch):
         )
 
         # Patch submit_signed_payment to simulate success
-        with patch("app.api.v1.endpoints.payments.submit_signed_payment") as mock_submit:
+        with patch(
+            "app.api.v1.endpoints.payments.submit_signed_payment"
+        ) as mock_submit:
             mock_submit.return_value = {"status": "success", "payment_id": "1"}
             resp = client.post(
                 "/api/v1/payments/submit",

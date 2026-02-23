@@ -91,7 +91,11 @@ def test_payments_prepare_and_submit(monkeypatch, client, db_session):
     signed_xdr = tx.to_xdr()
 
     # 2. submit
-    resp2 = client.post("api/v1/payments/submit", json={"signed_xdr": signed_xdr}, headers=client_headers)
+    resp2 = client.post(
+        "api/v1/payments/submit",
+        json={"signed_xdr": signed_xdr},
+        headers=client_headers,
+    )
     assert resp2.status_code == 200
     body = resp2.json()
     assert body["status"] == "success"

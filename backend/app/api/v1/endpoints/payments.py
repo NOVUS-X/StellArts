@@ -113,7 +113,9 @@ def submit(
             memo_text = memo_text.decode()
         booking_token = memo_text.replace("hold-", "")
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid signed transaction XDR") from None
+        raise HTTPException(
+            status_code=400, detail="Invalid signed transaction XDR"
+        ) from None
 
     booking_id = booking_token
     try:
@@ -121,10 +123,15 @@ def submit(
     except ValueError:
         # Try to resolve short token to full UUID
         candidates = [
-            str(row[0]) for row in db.query(Booking.id).all() if str(row[0]).startswith(booking_token)
+            str(row[0])
+            for row in db.query(Booking.id).all()
+            if str(row[0]).startswith(booking_token)
         ]
         if len(candidates) != 1:
-            raise HTTPException(status_code=400, detail="Unable to resolve booking from transaction memo") from None
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to resolve booking from transaction memo",
+            ) from None
         booking_id = candidates[0]
 
     # booking_id may be a string; convert to UUID for DB query

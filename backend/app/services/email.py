@@ -1,4 +1,3 @@
-
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
 
 from app.core.config import settings
@@ -28,7 +27,9 @@ async def send_verification_email(to: str, full_name: str, verify_url: str) -> N
     conf = ConnectionConfig(
         MAIL_USERNAME=settings.SMTP_USER or "",
         MAIL_PASSWORD=settings.SMTP_PASSWORD or "",
-        MAIL_FROM=(settings.EMAILS_FROM or settings.SMTP_USER or "no-reply@example.com"),
+        MAIL_FROM=(
+            settings.EMAILS_FROM or settings.SMTP_USER or "no-reply@example.com"
+        ),
         MAIL_PORT=settings.SMTP_PORT or 587,
         MAIL_SERVER=settings.SMTP_HOST or "localhost",
         MAIL_STARTTLS=settings.SMTP_TLS,

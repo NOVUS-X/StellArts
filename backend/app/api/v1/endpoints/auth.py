@@ -62,7 +62,9 @@ async def register_user(
 
     # Send verification email in background
     token = generate_verification_token(user.id, user.email)
-    verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}&email={user.email}"
+    verify_url = (
+        f"{settings.FRONTEND_URL}/verify-email?token={token}&email={user.email}"
+    )
 
     background_tasks.add_task(
         send_verification_email,
@@ -76,13 +78,6 @@ async def register_user(
         "role": user.role,
         "message": "Check your email to verify your account",
     }
-
-
-
-
-
-
-
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -155,13 +150,14 @@ def get_user_by_email(email: str, db: Session) -> User | None:
     return db.query(User).filter(User.email == email).first()
 
 
-
 @router.get("/verify-email")
 def verify_email(token: str, email: str, db: Session = Depends(get_db)):
     """Verify email address using signed token from email link."""
     user_id = verify_verification_token(token, email)
     if not user_id:
-        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+        raise HTTPException(
+            status_code=400, detail="Invalid or expired verification token"
+        )
 
     user = db.query(User).filter(User.id == user_id, User.email == email).first()
     if not user:
@@ -185,8 +181,13 @@ async def resend_verification(
         raise HTTPException(status_code=400, detail="Email is already verified")
 
     token = generate_verification_token(current_user.id, current_user.email)
-    verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}&email={current_user.email}"
+    verify_url = (
+        f"{settings.FRONTEND_URL}/verify-email?token={token}&email={current_user.email}"
+    )
     background_tasks.add_task(
-        send_verification_email, to=current_user.email, full_name=current_user.full_name or "there", verify_url=verify_url
+        send_verification_email,
+        to=current_user.email,
+        full_name=current_user.full_name or "there",
+        verify_url=verify_url,
     )
     return {"message": "Verification email sent"}
