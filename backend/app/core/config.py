@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     SMTP_HOST: str | None = None
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
+    # Frontend URL used for verification links
+    FRONTEND_URL: str = "http://localhost:3000"
+    # Default from address for transactional emails (optional)
+    EMAILS_FROM: str | None = None
+    # Whether the application requires email verification for protected actions
+    REQUIRE_EMAIL_VERIFICATION: bool = True
 
     # External APIs (for future use)
     STRIPE_SECRET_KEY: str | None = None

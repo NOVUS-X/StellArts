@@ -11,10 +11,16 @@ SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 # Ensure required settings exist before app modules import Settings at import time.
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("DATABASE_URL", SQLALCHEMY_DATABASE_URL)
+# Disable email verification enforcement during tests by default
+os.environ.setdefault("REQUIRE_EMAIL_VERIFICATION", "False")
 
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+
+# Ensure tests run with email verification enforcement disabled by default
+from app.core.config import settings as _settings
+_settings.REQUIRE_EMAIL_VERIFICATION = False
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}

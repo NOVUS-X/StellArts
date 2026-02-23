@@ -10,6 +10,7 @@ from app.core.auth import (
     require_client_or_artisan,
 )
 from app.db.session import get_db
+from app.core.config import settings
 from app.models.artisan import Artisan
 from app.models.booking import Booking, BookingStatus
 from app.models.client import Client
@@ -33,6 +34,15 @@ def create_booking(
     This endpoint allows clients to create bookings for artisan services.
     The booking is created with PENDING status and requires artisan confirmation.
     """
+    # Require verified email before creating bookings (configurable)
+    if settings.REQUIRE_EMAIL_VERIFICATION and not current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Email verification required before creating a booking. "
+                "Check your inbox or request a new verification email."
+            ),
+        )
     # Find or create the client profile for the current user
     from app.models.client import Client
 
