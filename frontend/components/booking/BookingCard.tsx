@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Card,
   CardHeader,
@@ -8,14 +9,16 @@ import {
 import { cn } from "../../lib/utils";
 
 export interface BookingProps {
+  id: string;
   artisanName: string;
   service: string;
   date: Date;
   price: number;
+  currency?: "XLM" | "USD" | "USDC";
   status: "pending" | "confirmed" | "in_progress" | "completed" | "cancelled";
 }
 
-const statusStyles = {
+const statusStyles: Record<BookingProps["status"], string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200 ring-amber-500/10",
   confirmed: "bg-blue-50 text-blue-700 border-blue-200 ring-blue-500/10",
   in_progress:
@@ -26,10 +29,12 @@ const statusStyles = {
 };
 
 export function BookingCard({
+  id,
   artisanName,
   service,
   date,
   price,
+  currency = "XLM",
   status,
 }: BookingProps) {
   const formattedDate = new Intl.DateTimeFormat("en-US", {
@@ -39,10 +44,13 @@ export function BookingCard({
     minute: "2-digit",
   }).format(date);
 
-  const formattedPrice = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(price);
+  const formattedPrice =
+    currency === "USD"
+      ? new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+        }).format(price)
+      : `${price.toLocaleString(undefined, { maximumFractionDigits: 7 })} ${currency}`;
 
   return (
     <Card className="group w-full max-w-md cursor-pointer border border-gray-100 shadow-sm transition-all duration-300 hover:shadow-lg hover:border-blue-200 hover:-translate-y-1 bg-white relative overflow-hidden">
@@ -95,10 +103,13 @@ export function BookingCard({
         </div>
 
         <div className="mt-4 pt-3 border-t border-gray-100 hidden group-hover:flex items-center justify-between text-xs text-blue-600 font-medium transition-all">
-          <span>Booking ID: #8X29B</span>
-          <span className="group-hover:translate-x-1 transition-transform">
+          <span>Booking ID: #{id.slice(-8).toUpperCase()}</span>
+          <Link
+            href={`/dashboard/bookings/${id}`}
+            className="group-hover:translate-x-1 transition-transform"
+          >
             View Details →
-          </span>
+          </Link>
         </div>
       </CardContent>
     </Card>
