@@ -1,24 +1,24 @@
 # app/api/v1/endpoints/payments.py
+import uuid
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from stellar_sdk import TransactionEnvelope
 
+from app.core.auth import require_client
+from app.core.config import settings
 from app.db.session import get_db
+from app.models.booking import Booking
+from app.models.user import User
+from app.services import payments as payments_service
 from app.services.payments import (
     prepare_payment,
     refund_payment,
     release_payment,
     submit_signed_payment,
 )
-from app.services import payments as payments_service
-from app.core.auth import get_current_active_user, require_client
-from app.models.user import User
-from app.models.booking import Booking
-from stellar_sdk import TransactionEnvelope
-import uuid
-from app.core.config import settings
 
 router = APIRouter()
 
@@ -72,7 +72,7 @@ def prepare(
     try:
         b_id = uuid.UUID(req.booking_id)
     except ValueError:
-        raise HTTPException(status_code=404, detail="Booking not found")
+        raise HTTPException(status_code=404, detail="Booking not found") from None
 
     booking = db.query(Booking).filter(Booking.id == b_id).first()
     if not booking:
@@ -113,7 +113,7 @@ def submit(
             memo_text = memo_text.decode()
         booking_token = memo_text.replace("hold-", "")
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid signed transaction XDR")
+        raise HTTPException(status_code=400, detail="Invalid signed transaction XDR") from None
 
     booking_id = booking_token
     try:
@@ -124,14 +124,14 @@ def submit(
             str(row[0]) for row in db.query(Booking.id).all() if str(row[0]).startswith(booking_token)
         ]
         if len(candidates) != 1:
-            raise HTTPException(status_code=400, detail="Unable to resolve booking from transaction memo")
+            raise HTTPException(status_code=400, detail="Unable to resolve booking from transaction memo") from None
         booking_id = candidates[0]
 
     # booking_id may be a string; convert to UUID for DB query
     try:
         booking_uuid = uuid.UUID(str(booking_id))
     except ValueError:
-        raise HTTPException(status_code=404, detail="Booking not found")
+        raise HTTPException(status_code=404, detail="Booking not found") from None
 
     booking = db.query(Booking).filter(Booking.id == booking_uuid).first()
     if not booking:

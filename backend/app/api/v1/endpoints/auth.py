@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_active_user
+from app.core.config import settings
+from app.core.email_verification import (
+    generate_verification_token,
+    verify_verification_token,
+)
 from app.core.security import (
     blacklist_token,
     create_access_token,
@@ -22,11 +27,6 @@ from app.schemas.user import (
     RegisterRequest,
     RegisterResponse,
     TokenResponse,
-)
-from app.core.config import settings
-from app.core.email_verification import (
-    generate_verification_token,
-    verify_verification_token,
 )
 from app.services.email import send_verification_email
 

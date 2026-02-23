@@ -1,11 +1,11 @@
 import uuid
 from unittest.mock import patch
 
+from app.core.config import settings
 from app.core.security import create_access_token, get_password_hash
-from app.models.user import User
 from app.models.artisan import Artisan
 from app.models.booking import Booking
-from app.core.config import settings
+from app.models.user import User
 
 
 def make_booking_payload(artisan_id: int, booking_id: str = None):

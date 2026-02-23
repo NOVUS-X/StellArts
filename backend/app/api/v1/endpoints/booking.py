@@ -9,8 +9,8 @@ from app.core.auth import (
     require_client,
     require_client_or_artisan,
 )
-from app.db.session import get_db
 from app.core.config import settings
+from app.db.session import get_db
 from app.models.artisan import Artisan
 from app.models.booking import Booking, BookingStatus
 from app.models.client import Client

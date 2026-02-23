@@ -1,13 +1,11 @@
 import time
 from unittest.mock import patch
 
-import pytest
-
+from app.core.config import settings
 from app.core.email_verification import generate_verification_token
 from app.core.security import create_access_token, get_password_hash
-from app.models.user import User
 from app.models.artisan import Artisan
-from app.core.config import settings
+from app.models.user import User
 
 
 def make_register_payload(email: str = "test@example.com"):

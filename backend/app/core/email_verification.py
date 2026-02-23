@@ -1,7 +1,6 @@
-import hmac
 import hashlib
+import hmac
 import time
-from typing import Optional
 
 from app.core.config import settings
 
@@ -18,7 +17,7 @@ def generate_verification_token(user_id: int, email: str) -> str:
     return f"{user_id}:{timestamp}:{signature}"
 
 
-def verify_verification_token(token: str, email: str) -> Optional[int]:
+def verify_verification_token(token: str, email: str) -> int | None:
     """
     Verify token and return user_id if valid, else None.
     Returns None if token is expired, malformed, or signature doesn't match.
