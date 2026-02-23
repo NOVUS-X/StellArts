@@ -1,4 +1,5 @@
 """Unit tests for artisan_service.find_nearby_artisans_cached and _build_cache_key."""
+
 import os
 
 import pytest

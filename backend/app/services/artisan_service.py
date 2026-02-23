@@ -14,7 +14,7 @@ CACHE_TTL_SECONDS = getattr(settings, "NEARBY_CACHE_TTL", 60)
 def _build_cache_key(request: NearbyArtisansRequest) -> str:
     """Build a deterministic cache key from search parameters."""
     key_data = {
-        "lat": round(float(request.latitude), 4),   # 4dp ≈ 11m precision
+        "lat": round(float(request.latitude), 4),  # 4dp ≈ 11m precision
         "lon": round(float(request.longitude), 4),
         "radius": request.radius_km,
         "specialties": sorted(request.specialties or []),  # order-independent
