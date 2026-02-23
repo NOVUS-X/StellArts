@@ -107,9 +107,8 @@ def invoke_contract_function(
         while time.time() - start_time < timeout_seconds:
             time.sleep(2)
             get_response = soroban_server.get_transaction(tx_hash)
-            
             if get_response.status != "NOT_FOUND":
-                logger.info(f"Transaction confirmed")
+                logger.info("Transaction confirmed")
                 return {
                     "hash": tx_hash,
                     "status": get_response.status,
@@ -117,10 +116,9 @@ def invoke_contract_function(
                 }
         
         raise TimeoutError(f"Transaction {tx_hash} not confirmed within {timeout_seconds} seconds")
-        
     except SorobanRpcError as e:
         logger.error(f"Soroban RPC error: {str(e)}")
-        raise RuntimeError(f"Soroban RPC error: {str(e)}")
+        raise RuntimeError(f"Soroban RPC error: {str(e)}") from e
     except Exception as e:
         logger.error(f"Unexpected error in contract invocation: {str(e)}")
         raise
@@ -134,13 +132,11 @@ def initialize_escrow(
 ) -> int:
     """
     Initialize a new escrow contract on-chain.
-    
     Args:
         client_address: Stellar public key of the client
         artisan_address: Stellar public key of the artisan
         amount_stroops: Amount in stroops (1 XLM = 10,000,000 stroops)
         deadline_ledger: Ledger sequence number for deadline
-    
     Returns:
         engagement_id from the contract
     """
@@ -337,7 +333,7 @@ def get_artisan_stats(
         args,
         ESCROW_KEYPAIR,
     )
-    
     # TODO: Parse stats from result_xdr
     # Should return (average_scaled_by_100, review_count)
     return (0, 0)
+    
