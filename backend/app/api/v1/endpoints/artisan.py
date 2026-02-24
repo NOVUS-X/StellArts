@@ -27,9 +27,8 @@ from app.schemas.artisan import (
     PaginatedArtisans,
 )
 from app.services.artisan import ArtisanService
+from app.services.artisan_service import find_nearby_artisans_cached
 from app.services.geolocation import geolocation_service
-
-# from app.services.artisan_service import find_nearby_artisans_cached  # Broken import removed
 
 router = APIRouter(prefix="/artisans")
 
@@ -56,7 +55,6 @@ async def get_nearby_artisans(
     Discover artisans nearby with optional filters for skill, minimum rating, and availability.
     Results are paginated and sorted by distance (asc) then rating (desc).
     """
-    service = ArtisanService(db)
     request = NearbyArtisansRequest(
         latitude=lat,
         longitude=lon,
@@ -67,7 +65,7 @@ async def get_nearby_artisans(
         limit=page_size * page,  # Fetch enough for pagination
     )
 
-    result = await service.find_nearby_artisans(request)
+    result = await find_nearby_artisans_cached(db, request)
 
     # Manual pagination since service returns all matches within limit
     all_items = result.get("artisans", [])
@@ -89,8 +87,7 @@ async def find_nearby_artisans(
     request: NearbyArtisansRequest, db: Session = Depends(get_db)
 ):
     """Find nearby artisans - public endpoint"""
-    service = ArtisanService(db)
-    result = await service.find_nearby_artisans(request)
+    result = await find_nearby_artisans_cached(db, request)
     return result
 
 

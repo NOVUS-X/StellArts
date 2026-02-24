@@ -46,15 +46,19 @@ def test_nearby_artisans_search(client):
     # No auth needed for public search
     # We need to ensure DB has artisans with location
     # But for invalid search handling:
+    with patch(
+        "app.services.artisan_service.cache.get", new_callable=AsyncMock
+    ) as mock_cache_get:
+        mock_cache_get.return_value = None  # Simulate no data in cache
 
-    resp = client.post(
-        "api/v1/artisans/nearby",
-        json={"latitude": 40.0, "longitude": -70.0, "radius_km": 10},
-    )
-    # Since we use a real DB and it might be empty or redis might not be running in test env,
-    # we expect a valid response (empty list) or 500 if redis fails.
-    # Ideally should mock redis or handle it gracefully.
-    # The code handles redis failure by returning empty list or False, so it shouldn't 500.
+        resp = client.post(
+            "api/v1/artisans/nearby",
+            json={"latitude": 40.0, "longitude": -70.0, "radius_km": 10},
+        )
+        # Since we use a real DB and it might be empty or redis might not be running in test env,
+        # we expect a valid response (empty list) or 500 if redis fails.
+        # Ideally should mock redis or handle it gracefully.
+        # The code handles redis failure by returning empty list or False, so it shouldn't 500.
 
-    if resp.status_code == 200:
-        assert "artisans" in resp.json()
+        if resp.status_code == 200:
+            assert "artisans" in resp.json()
