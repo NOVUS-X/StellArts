@@ -41,9 +41,7 @@ class BookingCreate(BaseModel):
 class BookingStatusUpdate(BaseModel):
     """Schema for updating booking status"""
 
-    model_config = ConfigDict(
-        json_schema_extra={"example": {"status": "confirmed"}}
-    )
+    model_config = ConfigDict(json_schema_extra={"example": {"status": "confirmed"}})
 
     status: str = Field(..., description="New status for the booking")
 

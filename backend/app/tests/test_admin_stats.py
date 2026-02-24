@@ -53,7 +53,9 @@ def client_token(client_user):
     return create_access_token(subject=client_user.id)
 
 
-def test_admin_stats_active_users_count(client: TestClient, db_session: Session, admin_token: str):
+def test_admin_stats_active_users_count(
+    client: TestClient, db_session: Session, admin_token: str
+):
     """Test that active_users count is accurate in system statistics."""
     # Create test users with different active states
     active_user_1 = User(
@@ -83,8 +85,7 @@ def test_admin_stats_active_users_count(client: TestClient, db_session: Session,
 
     # Call the admin stats endpoint
     response = client.get(
-        "/api/v1/admin/stats",
-        headers={"Authorization": f"Bearer {admin_token}"}
+        "/api/v1/admin/stats", headers={"Authorization": f"Bearer {admin_token}"}
     )
 
     assert response.status_code == 200
@@ -107,7 +108,9 @@ def test_admin_stats_active_users_count(client: TestClient, db_session: Session,
     assert stats["active_users"] + stats["inactive_users"] == stats["total_users"]
 
 
-def test_admin_stats_role_distribution(client: TestClient, db_session: Session, admin_token: str):
+def test_admin_stats_role_distribution(
+    client: TestClient, db_session: Session, admin_token: str
+):
     """Test that role distribution is accurate in system statistics."""
     # Create users with different roles
     client_user = User(
@@ -130,8 +133,7 @@ def test_admin_stats_role_distribution(client: TestClient, db_session: Session, 
 
     # Call the admin stats endpoint
     response = client.get(
-        "/api/v1/admin/stats",
-        headers={"Authorization": f"Bearer {admin_token}"}
+        "/api/v1/admin/stats", headers={"Authorization": f"Bearer {admin_token}"}
     )
 
     assert response.status_code == 200
@@ -153,8 +155,7 @@ def test_admin_stats_role_distribution(client: TestClient, db_session: Session, 
 def test_admin_stats_requires_admin_role(client: TestClient, client_token: str):
     """Test that non-admin users cannot access system statistics."""
     response = client.get(
-        "/api/v1/admin/stats",
-        headers={"Authorization": f"Bearer {client_token}"}
+        "/api/v1/admin/stats", headers={"Authorization": f"Bearer {client_token}"}
     )
 
     assert response.status_code == 403
