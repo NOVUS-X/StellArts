@@ -1,10 +1,38 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Wrench, Zap, Star, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Stats from "./Stats";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+interface ArtisanCounts {
+	plumbers: number;
+	electricians: number;
+	carpenters: number;
+	painters: number;
+	[key: string]: number;
+}
+
+function formatCount(n: number | undefined): string {
+	if (n === undefined || n === 0) return "Coming soon";
+	if (n >= 1000) return `${(n / 1000).toFixed(1)}K+`;
+	return `${n} available`;
+}
+
 export default function Hero() {
+	const [counts, setCounts] = useState<ArtisanCounts | null>(null);
+
+	useEffect(() => {
+		fetch(`${API_BASE}/api/v1/artisans/counts`)
+			.then((r) => r.json())
+			.then((data) => setCounts(data))
+			.catch(() => setCounts(null));
+	}, []);
+
 	return (
 		<section className='pt-32 pb-20 px-6'>
 			<div className='container mx-auto max-w-6xl'>
@@ -57,7 +85,7 @@ export default function Hero() {
 											Plumbers
 										</div>
 										<div className='text-xs text-gray-500'>
-											2,345 available
+											{counts ? formatCount(counts.plumbers) : "Near you"}
 										</div>
 									</CardContent>
 								</Card>
@@ -68,7 +96,7 @@ export default function Hero() {
 											Electricians
 										</div>
 										<div className='text-xs text-gray-500'>
-											1,892 available
+											{counts ? formatCount(counts.electricians) : "On demand"}
 										</div>
 									</CardContent>
 								</Card>
@@ -79,7 +107,7 @@ export default function Hero() {
 											Carpenters
 										</div>
 										<div className='text-xs text-gray-500'>
-											1,567 available
+											{counts ? formatCount(counts.carpenters) : "Verified"}
 										</div>
 									</CardContent>
 								</Card>
@@ -90,7 +118,7 @@ export default function Hero() {
 											Painters
 										</div>
 										<div className='text-xs text-gray-500'>
-											1,234 available
+											{counts ? formatCount(counts.painters) : "Top rated"}
 										</div>
 									</CardContent>
 								</Card>
