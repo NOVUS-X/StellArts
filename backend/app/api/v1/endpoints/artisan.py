@@ -1,4 +1,7 @@
+import json as _json
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import (
@@ -30,6 +33,41 @@ from app.services.geolocation import geolocation_service
 # from app.services.artisan_service import find_nearby_artisans_cached  # Broken import removed
 
 router = APIRouter(prefix="/artisans")
+
+
+@router.get("/counts")
+def get_artisan_counts(db: Session = Depends(get_db)):
+    """Return available artisan counts grouped by specialty for the landing page.
+
+    Parses the JSON-encoded ``specialties`` column and returns a dict whose keys
+    are lower-cased specialty names and whose values are the number of *available*
+    artisans that list that specialty.  A ``total`` key gives the overall count of
+    available artisans regardless of specialty.
+    """
+    artisans = (
+        db.query(Artisan.specialties)
+        .filter(Artisan.is_available == True)  # noqa: E712
+        .all()
+    )
+
+    counts: dict[str, int] = {}
+    for (raw,) in artisans:
+        if not raw:
+            continue
+        try:
+            specs = _json.loads(raw)
+            if isinstance(specs, list):
+                for s in specs:
+                    key = str(s).strip().lower()
+                    counts[key] = counts.get(key, 0) + 1
+            else:
+                key = str(specs).strip().lower()
+                counts[key] = counts.get(key, 0) + 1
+        except Exception:
+            continue
+
+    counts["total"] = len(artisans)
+    return counts
 
 
 # ✅ GET-based nearby artisans search (from Discovery&Filtering)
