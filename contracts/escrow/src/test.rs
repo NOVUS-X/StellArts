@@ -4,7 +4,7 @@
 
 #[cfg(test)]
 mod happy_path_tests {
-    use crate::{DataKey, Escrow, EscrowContract, EscrowContractClient, ReclaimedEvent, Status};
+    use crate::{DataKey, Escrow, EscrowContract, EscrowContractClient, Status};
     use soroban_sdk::testutils::{Address as AddressTestUtils, Events, Ledger};
     use soroban_sdk::{token, Address, Env};
 
