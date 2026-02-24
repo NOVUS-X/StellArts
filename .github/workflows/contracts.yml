@@ -25,6 +25,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+          components: clippy, rustfmt
 
       - name: Cache cargo registry
         uses: actions/cache@v3
@@ -49,6 +50,14 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-build-target-
+
+      - name: Check formatting
+        working-directory: contracts
+        run: cargo fmt --all -- --check
+
+      - name: Lint contracts
+        working-directory: contracts
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Run tests
         working-directory: contracts
