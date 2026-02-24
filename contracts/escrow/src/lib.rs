@@ -162,7 +162,7 @@ impl EscrowContract {
         env.storage().persistent().set(&key, &escrow);
         env.storage()
             .persistent()
-            .extend_ttl(&key, TTL_THRESHOLD as u32, ESCROW_TTL as u32);
+            .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
     }
 
     /// Release funds from escrow to the artisan
@@ -204,7 +204,7 @@ impl EscrowContract {
         env.storage().persistent().set(&key, &escrow);
         env.storage()
             .persistent()
-            .extend_ttl(&key, TTL_THRESHOLD as u32, ESCROW_TTL as u32);
+            .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
     }
 
     /// Allow the client to reclaim funds after the deadline has passed when an escrow is still funded.
@@ -246,7 +246,7 @@ impl EscrowContract {
         env.storage().persistent().set(&key, &escrow);
         env.storage()
             .persistent()
-            .extend_ttl(&key, TTL_THRESHOLD as u32, ESCROW_TTL as u32);
+            .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
 
         // Emit event
         env.events().publish(
