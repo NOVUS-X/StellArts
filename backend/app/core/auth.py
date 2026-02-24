@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import List, Optional
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
@@ -34,7 +38,7 @@ class AuthorizationError(HTTPException):
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     """
@@ -82,7 +86,7 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
     return current_user
 
 
-def require_roles(allowed_roles: list[RoleEnum]):
+def require_roles(allowed_roles: List[RoleEnum]):
     """
     Create a dependency that requires specific roles.
     Returns a function that can be used as a FastAPI dependency.

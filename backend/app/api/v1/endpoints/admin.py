@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -14,7 +16,7 @@ def get_all_users(
     current_user: User = Depends(require_admin),
     skip: int = 0,
     limit: int = 100,
-    role_filter: str | None = None,
+    role_filter: Optional[str] = None,
 ):
     """Get all users with optional role filtering - admin only"""
     query = db.query(User)

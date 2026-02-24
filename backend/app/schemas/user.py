@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import re
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -19,9 +22,9 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=72)
     role: PublicRoleEnum
-    full_name: str | None = None
-    phone: str | None = None
-    username: str | None = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    username: Optional[str] = None
 
     @field_validator("role")
     @classmethod
@@ -70,9 +73,9 @@ class UserOut(BaseModel):
     id: int
     email: EmailStr
     role: str
-    full_name: str | None = None
-    phone: str | None = None
-    username: str | None = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    username: Optional[str] = None
 
     class Config:
         from_attributes = True

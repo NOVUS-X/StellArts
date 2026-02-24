@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional, Union
 
 import bcrypt
 import redis
@@ -22,7 +24,7 @@ def is_token_blacklisted(jti: str) -> bool:
 
 
 def create_access_token(
-    subject: str | Any, expires_delta: timedelta | None = None
+    subject: Union[str, Any], expires_delta: Optional[timedelta] = None
 ) -> str:
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -38,7 +40,7 @@ def create_access_token(
     return encoded_jwt
 
 
-def create_refresh_token(subject: str | Any, expires_delta: timedelta | None = None):
+def create_refresh_token(subject: Union[str, Any], expires_delta: Optional[timedelta] = None):
     expire = datetime.utcnow() + (
         expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     )
