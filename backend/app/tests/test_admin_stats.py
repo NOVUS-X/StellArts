@@ -77,28 +77,28 @@ def test_admin_stats_active_users_count(client: TestClient, db_session: Session,
         role="client",
         is_active=False,
     )
-    
+
     db_session.add_all([active_user_1, active_user_2, inactive_user])
     db_session.commit()
-    
+
     # Call the admin stats endpoint
     response = client.get(
         "/api/v1/admin/stats",
         headers={"Authorization": f"Bearer {admin_token}"}
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # Verify stats structure
     assert "stats" in data
     stats = data["stats"]
-    
+
     # Count active users in database (including the admin user from fixture)
-    total_active = db_session.query(User).filter(User.is_active == True).count()
-    total_inactive = db_session.query(User).filter(User.is_active == False).count()
+    total_active = db_session.query(User).filter(User.is_active.is_(True)).count()
+    total_inactive = db_session.query(User).filter(User.is_active.is_(False)).count()
     total_users = db_session.query(User).count()
-    
+
     # Assert active_users is greater than 0 and matches database
     assert stats["active_users"] > 0, "active_users should be greater than 0"
     assert stats["active_users"] == total_active
@@ -124,27 +124,27 @@ def test_admin_stats_role_distribution(client: TestClient, db_session: Session, 
         role="artisan",
         is_active=True,
     )
-    
+
     db_session.add_all([client_user, artisan_user])
     db_session.commit()
-    
+
     # Call the admin stats endpoint
     response = client.get(
         "/api/v1/admin/stats",
         headers={"Authorization": f"Bearer {admin_token}"}
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # Verify role distribution
     stats = data["stats"]
     assert "role_distribution" in stats
-    
+
     clients_count = db_session.query(User).filter(User.role == "client").count()
     artisans_count = db_session.query(User).filter(User.role == "artisan").count()
     admins_count = db_session.query(User).filter(User.role == "admin").count()
-    
+
     assert stats["role_distribution"]["clients"] == clients_count
     assert stats["role_distribution"]["artisans"] == artisans_count
     assert stats["role_distribution"]["admins"] == admins_count
@@ -156,5 +156,5 @@ def test_admin_stats_requires_admin_role(client: TestClient, client_token: str):
         "/api/v1/admin/stats",
         headers={"Authorization": f"Bearer {client_token}"}
     )
-    
+
     assert response.status_code == 403

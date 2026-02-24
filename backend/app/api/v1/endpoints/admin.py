@@ -1,4 +1,4 @@
-from typing import Optional
+from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -16,7 +16,7 @@ def get_all_users(
     current_user: User = Depends(require_admin),
     skip: int = 0,
     limit: int = 100,
-    role_filter: Optional[str] = None,
+    role_filter: str | None = None,
 ):
     """Get all users with optional role filtering - admin only"""
     query = db.query(User)
@@ -155,7 +155,7 @@ def get_system_stats(
 ):
     """Get system statistics - admin only"""
     total_users = db.query(User).count()
-    active_users = db.query(User).filter(User.is_active == True).count()
+    active_users = db.query(User).filter(User.is_active).count()
     clients = db.query(User).filter(User.role == "client").count()
     artisans = db.query(User).filter(User.role == "artisan").count()
     admins = db.query(User).filter(User.role == "admin").count()
