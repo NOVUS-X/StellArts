@@ -8,7 +8,7 @@ This document describes the Stellar-based escrow payment integration for StellAr
 
 The payment system supports three main operations:
 
-1. **Hold** – Move client funds into escrow when a booking is created.
+1. **Prepare & Submit** – Create an unsigned transaction envelope and coordinate client‑side signing to move funds into escrow.
 2. **Release** – Release funds to the artisan when the job is confirmed as completed.
 3. **Refund** – Refund client if the booking is cancelled or rejected.
 
@@ -18,7 +18,14 @@ All payments are tracked in the `payments` table with a unique transaction ID an
 
 ## 2. Payment Flow Diagrams
 
-### 2.1 Hold Funds
+### 2.1 Prepare & Submit Funds
+
+The original single-step `POST /payments/hold` call was insecure because it
+required the client to send a secret key to the server.  The new flow splits
+that operation into two phases: the backend builds an unsigned transaction (the
+"prepare" step), the user's wallet signs it locally, and then the frontend
+submits the signed envelope back to the server (the "submit" step).  Private
+keys never leave the client.
 
 ### 2.2 Release Funds
 
@@ -27,7 +34,10 @@ All payments are tracked in the `payments` table with a unique transaction ID an
 
 ```mermaid
 flowchart TD
-    A[Client initiates booking] --> B[POST /payments/hold]
+    A[Client initiates booking] --> B[POST /payments/prepare (unsigned XDR)]
+    B --> C[Wallet signs transaction in browser]
+    C --> D[POST /payments/submit (signed XDR)]
+    D --> E[Backend records & submits to Stellar]
     B --> C[Backend creates payment record & submits to Stellar Testnet]
     C --> D[Funds held in escrow]
     D --> E[Booking confirmed] --> F[POST /payments/release]
@@ -44,25 +54,53 @@ flowchart TD
 
 ## 3. Example API Requests & Responses
 
-### 3.1 Hold Funds
+### 3.1 Prepare Transaction
 **Request**  
 ```http
-POST /api/v1/payments/hold
+POST /api/v1/payments/prepare
 Content-Type: application/json
 
 {
-  "client_secret": "<CLIENT_SECRET>",
   "booking_id": "<BOOKING_ID>",
-  "amount": <AMOUNT>
+  "amount": <AMOUNT>,
+  "client_public": "<CLIENT_PUBLIC_KEY>"
 }
 ```
 
 **Response**
+```
+{
+  "status": "prepared",
+  "unsigned_xdr": "<BASE64_XDR>",
+  "booking_id": "<BOOKING_ID>",
+  "amount": "<AMOUNT>"
+}
+```
+
+After receiving the unsigned envelope the frontend should send it to the
+user's Stellar wallet for signing (Freighter, Albedo, etc.). Once signed the
+wallet will return a new XDR string which the frontend then sends to
+``/api/v1/payments/submit``.
+
+### Submit Signed Transaction
+**Request**
+```http
+POST /api/v1/payments/submit
+Content-Type: application/json
+
+{
+  "signed_xdr": "<SIGNED_XDR_FROM_WALLET>"
+}
+```
+
+**Response**
+```
 {
   "status": "success",
   "payment_id": "<PAYMENT_ID>",
   "transaction_hash": "<TRANSACTION_HASH>"
 }
+```
 
 ### 3.2 Release Funds
 

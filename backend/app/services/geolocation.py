@@ -120,12 +120,12 @@ class GeolocationService:
             # Convert km to meters for Redis
             radius_m = radius_km * 1000
 
-            # Use GEORADIUS to find nearby artisans
-            results = await cache.redis.georadius(
-                self.redis_key,
-                float(longitude),
-                float(latitude),
-                radius_m,
+            # Use GEOSEARCH to find nearby artisans
+            results = await cache.redis.geosearch(
+                name=self.redis_key,
+                longitude=float(longitude),
+                latitude=float(latitude),
+                radius=radius_m,
                 unit="m",
                 withdist=True,
                 withcoord=True,
