@@ -3,11 +3,25 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BookingCreate(BaseModel):
     """Schema for creating a new booking"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "artisan_id": 1,
+                "service": "Plumbing repair for kitchen sink",
+                "date": "2026-02-15T10:00:00",
+                "estimated_cost": 150.00,
+                "estimated_hours": 2.5,
+                "location": "123 Main St, Apt 4B",
+                "notes": "Please bring replacement parts",
+            }
+        }
+    )
 
     artisan_id: int = Field(..., description="ID of the artisan to book")
     service: str = Field(..., min_length=1, description="Description of the service")
@@ -23,31 +37,21 @@ class BookingCreate(BaseModel):
     )
     notes: str | None = Field(None, description="Additional notes")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "artisan_id": 1,
-                "service": "Plumbing repair for kitchen sink",
-                "date": "2026-02-15T10:00:00",
-                "estimated_cost": 150.00,
-                "estimated_hours": 2.5,
-                "location": "123 Main St, Apt 4B",
-                "notes": "Please bring replacement parts",
-            }
-        }
-
 
 class BookingStatusUpdate(BaseModel):
     """Schema for updating booking status"""
 
-    status: str = Field(..., description="New status for the booking")
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"status": "confirmed"}}
+    )
 
-    class Config:
-        json_schema_extra = {"example": {"status": "confirmed"}}
+    status: str = Field(..., description="New status for the booking")
 
 
 class BookingResponse(BaseModel):
     """Schema for booking response"""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     client_id: int
@@ -61,6 +65,3 @@ class BookingResponse(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime | None
-
-    class Config:
-        from_attributes = True
