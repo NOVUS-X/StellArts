@@ -18,19 +18,10 @@ pub struct RateArtisanEvent {
 
 /// Public struct containing aggregated review data for a user
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct ReputationData {
     pub total_stars: u64,
     pub review_count: u64,
-}
-
-impl Default for ReputationData {
-    fn default() -> Self {
-        ReputationData {
-            total_stars: 0,
-            review_count: 0,
-        }
-    }
 }
 
 /// Helper function to read reputation data for a user
@@ -40,7 +31,7 @@ pub fn read_reputation(env: &Env, user: &Address) -> ReputationData {
     env.storage()
         .persistent()
         .get(&key)
-        .unwrap_or_else(|| ReputationData::default())
+        .unwrap_or_default()
 }
 
 /// Helper function to write reputation data for a user
@@ -60,13 +51,6 @@ impl ReputationContract {
         read_reputation(&env, &user)
     }
 
-    /// Get average rating (stats) for a user
-    /// Returns average as a rational number (total_stars, review_count)
-    pub fn get_stats(env: Env, user: Address) -> (u64, u64) {
-        let reputation = Self::get_reputation(env, user);
-        (reputation.total_stars, reputation.review_count)
-    }
-
     /// Set reputation data for a user (for testing/admin purposes)
     pub fn set_reputation(env: Env, user: Address, data: ReputationData) {
         write_reputation(&env, &user, &data);
@@ -74,7 +58,7 @@ impl ReputationContract {
 
     // update and persist an artisan’s reputation score
     pub fn rate_artisan(env: Env, artisan: Address, stars: u64) {
-        if stars < 1 || stars > 5 {
+        if !(1..=5).contains(&stars) {
             panic!("stars not in range");
         }
         let mut artisan_data = Self::get_reputation(env.clone(), artisan.clone());
@@ -93,10 +77,10 @@ impl ReputationContract {
         );
     }
 
-    /// Get reputation statistics for a user (scaled average)
+    /// Get reputation statistics for a user
     /// Returns (average_scaled_by_100, count)
     /// Example: 9 total stars / 2 reviews = 4.5 average → returns (450, 2)
-    pub fn get_stats_scaled(env: Env, user: Address) -> (u64, u64) {
+    pub fn get_stats(env: Env, user: Address) -> (u64, u64) {
         let data = read_reputation(&env, &user);
         if data.review_count == 0 {
             return (0, 0);
@@ -280,7 +264,7 @@ mod tests {
             },
         );
 
-        let (average_scaled, count) = client.get_stats_scaled(&artisan);
+        let (average_scaled, count) = client.get_stats(&artisan);
         assert_eq!(average_scaled, 450);
         assert_eq!(count, 2);
     }

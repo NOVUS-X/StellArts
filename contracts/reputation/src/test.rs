@@ -22,7 +22,7 @@ fn test_reputation_flow_integration() {
 
     // Verify after first rating
     let stats_after_user_a = client.get_stats(&artisan);
-    assert_eq!(stats_after_user_a, (5, 1)); // (total_stars, review_count)
+    assert_eq!(stats_after_user_a, (500, 1)); // (average_scaled_by_100, review_count)
 
     // Scenario: User B submits a rating of 3 stars
     let _user_b = Address::generate(&env);
@@ -30,10 +30,10 @@ fn test_reputation_flow_integration() {
 
     // Assert that get_stats returns an average of 4.0
     let final_stats = client.get_stats(&artisan);
-    assert_eq!(final_stats, (8, 2)); // (total_stars, review_count)
+    assert_eq!(final_stats, (400, 2)); // (average_scaled_by_100, review_count)
 
-    // Calculate average: 8 total_stars / 2 review_count = 4.0
-    let average = final_stats.0 as f64 / final_stats.1 as f64;
+    // Calculate average: 400 / 100 = 4.0
+    let average = final_stats.0 as f64 / 100.0;
     assert_eq!(average, 4.0);
 
     // Verify reputation data is consistent
@@ -86,11 +86,11 @@ fn test_reputation_robustness_multiple_reviews() {
     let stats = client.get_stats(&artisan);
     assert_eq!(stats.1, 10); // 10 reviews
 
-    // Calculate expected total: 5+4+5+3+5+4+5+5+4+3 = 43
-    assert_eq!(stats.0, 43); // 43 total stars
+    // Calculate expected average: (5+4+5+3+5+4+5+5+4+3) / 10 = 4.3, scaled = 430
+    assert_eq!(stats.0, 430); // 430 = 4.3 * 100
 
-    // Verify average: 43 / 10 = 4.3
-    let average = stats.0 as f64 / stats.1 as f64;
+    // Verify average: 430 / 100 = 4.3
+    let average = stats.0 as f64 / 100.0;
     assert_eq!(average, 4.3);
 
     // Verify no overflow with many reviews
@@ -100,7 +100,7 @@ fn test_reputation_robustness_multiple_reviews() {
 
     let final_stats = client.get_stats(&artisan);
     assert_eq!(final_stats.1, 110); // 110 total reviews
-    assert_eq!(final_stats.0, 543); // 43 + (100 * 5) = 543 total stars
+    assert_eq!(final_stats.0, 493); // (43 + 500) * 100 / 110 = 493 (scaled average)
 }
 
 #[test]
@@ -123,11 +123,11 @@ fn test_reputation_isolation_between_artisans() {
     let stats1 = client.get_stats(&artisan1);
     let stats2 = client.get_stats(&artisan2);
 
-    // Verify isolation: artisan1 has 8/2 = 4.0 average
-    assert_eq!(stats1, (8, 2));
+    // Verify isolation: artisan1 has 8/2 = 4.0 average, scaled = 400
+    assert_eq!(stats1, (400, 2));
 
-    // Verify isolation: artisan2 has 8/2 = 4.0 average
-    assert_eq!(stats2, (8, 2));
+    // Verify isolation: artisan2 has 8/2 = 4.0 average, scaled = 400
+    assert_eq!(stats2, (400, 2));
 
     // But they should have different addresses (isolation)
     assert_ne!(artisan1, artisan2); // Different addresses
