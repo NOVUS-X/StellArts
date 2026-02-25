@@ -1,10 +1,10 @@
 import re
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
-class RoleEnum(str, Enum):
+class RoleEnum(StrEnum):
     client = "client"
     artisan = "artisan"
     admin = "admin"

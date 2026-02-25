@@ -2,21 +2,22 @@
 Soroban smart contract integration for StellArts.
 Handles all interactions with Soroban contracts on the Stellar network.
 """
-import time
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+import time
+from typing import Any
 
 from stellar_sdk import (
-    SorobanServer,
     Keypair,
     Network,
+    SorobanServer,
     TransactionBuilder,
     scval,
+)
+from stellar_sdk import (
     xdr as stellar_xdr,
 )
-from stellar_sdk.soroban_rpc import SendTransactionStatus
 from stellar_sdk.exceptions import SorobanRpcError
-from stellar_sdk.contract import ContractClient
+from stellar_sdk.soroban_rpc import SendTransactionStatus
 
 from app.core.config import settings
 
@@ -37,23 +38,23 @@ soroban_server = SorobanServer(SOROBAN_RPC_URL)
 def invoke_contract_function(
     contract_id: str,
     function_name: str,
-    args: List[stellar_xdr.SCVal],
+    args: list[stellar_xdr.SCVal],
     source_keypair: Keypair,
     timeout_seconds: int = 60,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Build, simulate, sign, and submit a Soroban contract invocation.
-    
+
     Args:
         contract_id: The contract ID (C... format)
         function_name: Name of the contract function to call
         args: List of SCVal arguments
         source_keypair: Keypair of the transaction submitter
         timeout_seconds: Maximum time to wait for confirmation
-    
+
     Returns:
         Dictionary with transaction hash, status, and result
-    
+
     Raises:
         RuntimeError: If transaction fails
         TimeoutError: If transaction not confirmed within timeout
@@ -61,7 +62,7 @@ def invoke_contract_function(
     try:
         # Load source account
         source_account = soroban_server.load_account(source_keypair.public_key)
-        
+
         # Build transaction
         tx = (
             TransactionBuilder(
@@ -76,33 +77,33 @@ def invoke_contract_function(
             )
             .build()
         )
-        
+
         # Simulate transaction to get resource usage
         logger.info(f"Simulating {function_name} on contract {contract_id[:8]}...")
         sim_response = soroban_server.simulate_transaction(tx)
-        
+
         if hasattr(sim_response, "error") and sim_response.error:
             error_msg = f"Simulation failed: {sim_response.error}"
             logger.error(error_msg)
             raise RuntimeError(error_msg)
-        
+
         # Prepare transaction with simulation results
         tx = soroban_server.prepare_transaction(tx, sim_response)
         tx.sign(source_keypair)
-        
+
         # Submit transaction
         logger.info(f"Submitting {function_name} transaction...")
         send_response = soroban_server.send_transaction(tx)
-        
+
         if send_response.status == SendTransactionStatus.ERROR:
             error_msg = f"Transaction failed: {send_response.error_result_xdr}"
             logger.error(error_msg)
             raise RuntimeError(error_msg)
-        
+
         # Poll for confirmation
         tx_hash = send_response.hash
         logger.info(f"Transaction submitted with hash: {tx_hash}")
-        
+
         start_time = time.time()
         while time.time() - start_time < timeout_seconds:
             time.sleep(2)
@@ -114,7 +115,7 @@ def invoke_contract_function(
                     "status": get_response.status,
                     "result": get_response.result_xdr if hasattr(get_response, "result_xdr") else None
                 }
-        
+
         raise TimeoutError(f"Transaction {tx_hash} not confirmed within {timeout_seconds} seconds")
     except SorobanRpcError as e:
         logger.error(f"Soroban RPC error: {str(e)}")
@@ -142,9 +143,9 @@ def initialize_escrow(
     """
     if not ESCROW_CONTRACT_ID:
         raise RuntimeError("ESCROW_CONTRACT_ID not configured")
-    
+
     logger.info(f"Initializing escrow: client={client_address[:8]}..., artisan={artisan_address[:8]}...")
-    
+
     # Convert Python types to Soroban SCVals
     args = [
         scval.to_address(client_address),
@@ -152,20 +153,20 @@ def initialize_escrow(
         scval.to_int128(amount_stroops),
         scval.to_uint64(deadline_ledger),
     ]
-    
+
     # Invoke contract
-    result = invoke_contract_function(
+    invoke_contract_function(
         ESCROW_CONTRACT_ID,
         "initialize",
         args,
         ESCROW_KEYPAIR,  # Platform signs the initialization
     )
-    
+
     # For now, we'll return a placeholder engagement_id
     # In production, you'd parse this from result["result"]
     # The contract returns u64, so we need to parse it
     engagement_id = 1  # TODO: Parse from result
-    
+
     logger.info(f"Escrow initialized with engagement_id: {engagement_id}")
     return engagement_id
 
@@ -176,24 +177,24 @@ def build_deposit_transaction(
 ) -> str:
     """
     Build an unsigned transaction for the client to deposit funds.
-    
+
     Args:
         engagement_id: The escrow engagement ID
         client_address: Client's Stellar address
-    
+
     Returns:
         Base64-encoded unsigned transaction XDR
     """
     if not ESCROW_CONTRACT_ID:
         raise RuntimeError("ESCROW_CONTRACT_ID not configured")
-    
+
     # Load client account to get sequence number
     client_account = soroban_server.load_account(client_address)
-    
+
     args = [
         scval.to_uint64(engagement_id),
     ]
-    
+
     # Build transaction without signing
     tx = (
         TransactionBuilder(
@@ -208,32 +209,32 @@ def build_deposit_transaction(
         )
         .build()
     )
-    
+
     # Return unsigned XDR
     return tx.to_xdr()
 
 
 def release_escrow(
     engagement_id: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Release funds from escrow to artisan.
-    
+
     Args:
         engagement_id: The escrow engagement ID
-    
+
     Returns:
         Transaction result
     """
     if not ESCROW_CONTRACT_ID:
         raise RuntimeError("ESCROW_CONTRACT_ID not configured")
-    
+
     logger.info(f"Releasing escrow {engagement_id}")
-    
+
     args = [
         scval.to_uint64(engagement_id),
     ]
-    
+
     return invoke_contract_function(
         ESCROW_CONTRACT_ID,
         "release",
@@ -244,25 +245,25 @@ def release_escrow(
 
 def refund_escrow(
     engagement_id: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Refund funds from escrow to client.
-    
+
     Args:
         engagement_id: The escrow engagement ID
-    
+
     Returns:
         Transaction result
     """
     if not ESCROW_CONTRACT_ID:
         raise RuntimeError("ESCROW_CONTRACT_ID not configured")
-    
+
     logger.info(f"Refunding escrow {engagement_id}")
-    
+
     args = [
         scval.to_uint64(engagement_id),
     ]
-    
+
     return invoke_contract_function(
         ESCROW_CONTRACT_ID,
         "refund",
@@ -274,31 +275,31 @@ def refund_escrow(
 def rate_artisan_on_chain(
     artisan_address: str,
     stars: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Submit an on-chain rating for an artisan.
-    
+
     Args:
         artisan_address: Artisan's Stellar address
         stars: Rating from 1-5
-    
+
     Returns:
         Transaction result
     """
     if not REPUTATION_CONTRACT_ID:
         logger.warning("REPUTATION_CONTRACT_ID not configured - skipping on-chain rating")
         return {"status": "skipped", "reason": "contract not configured"}
-    
+
     if not 1 <= stars <= 5:
         raise ValueError("Stars must be between 1 and 5")
-    
+
     logger.info(f"Rating artisan {artisan_address[:8]}... with {stars} stars")
-    
+
     args = [
         scval.to_address(artisan_address),
         scval.to_uint64(stars),
     ]
-    
+
     return invoke_contract_function(
         REPUTATION_CONTRACT_ID,
         "rate_artisan",
@@ -309,25 +310,25 @@ def rate_artisan_on_chain(
 
 def get_artisan_stats(
     artisan_address: str,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """
     Get on-chain reputation stats for an artisan.
-    
+
     Args:
         artisan_address: Artisan's Stellar address
-    
+
     Returns:
         Tuple of (average_score_scaled_by_100, review_count)
     """
     if not REPUTATION_CONTRACT_ID:
         logger.warning("REPUTATION_CONTRACT_ID not configured")
         return (0, 0)
-    
+
     logger.info(f"Getting stats for artisan {artisan_address[:8]}...")
-    
+
     args = [scval.to_address(artisan_address)]
-    
-    result = invoke_contract_function(
+
+    invoke_contract_function(
         REPUTATION_CONTRACT_ID,
         "get_stats",
         args,
@@ -336,4 +337,3 @@ def get_artisan_stats(
     # TODO: Parse stats from result_xdr
     # Should return (average_scaled_by_100, review_count)
     return (0, 0)
-    
