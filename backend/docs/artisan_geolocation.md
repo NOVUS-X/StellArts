@@ -229,17 +229,21 @@ redis_client.hset(
 
 #### Finding Nearby Artisans
 ```python
-# Search within radius
-nearby_results = redis_client.georadius(
-    "artisans:locations",
-    longitude, latitude,
-    radius_km, unit="km",
+# Search within radius using GEOSEARCH (Redis 6.2+)
+nearby_results = redis_client.geosearch(
+    name="artisans:locations",
+    longitude=longitude,
+    latitude=latitude,
+    radius=radius_km,
+    unit="km",
     withdist=True,
     withcoord=True,
     sort="ASC",
     count=limit
 )
 ```
+
+**Note:** The `GEOSEARCH` command replaced the deprecated `GEORADIUS` command in Redis 6.2. `GEORADIUS` was removed in Redis 7.0+.
 
 #### Removing Artisan Location
 ```python
@@ -252,7 +256,7 @@ redis_client.delete(f"artisan:location:{artisan_id}")
 
 ### Performance Optimization
 
-1. **Geospatial Indexing:** Redis GEORADIUS provides O(N+log(M)) complexity
+1. **Geospatial Indexing:** Redis GEOSEARCH provides O(N+log(M)) complexity
 2. **Caching:** Location data cached in Redis for fast retrieval
 3. **Batch Operations:** Sync operations handle multiple artisans efficiently
 4. **TTL Management:** Location cache with appropriate expiration
