@@ -41,7 +41,7 @@ export default function RegisterPage() {
       await api.auth.register({
         email,
         password,
-        role,
+        role: role === "admin" ? "client" : role,
         full_name: fullName || undefined,
         phone: phone || undefined,
       });
