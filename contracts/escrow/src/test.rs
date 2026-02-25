@@ -1,7 +1,6 @@
-/// Comprehensive unit test suite for the Escrow contract happy path
-/// This module verifies the complete workflow: initialize engagement → mock token → mint tokens → deposit → release
-/// Each test step includes assertions on token balances and state transitions
-
+//! Comprehensive unit test suite for the Escrow contract happy path
+//! This module verifies the complete workflow: initialize engagement → mock token → mint tokens → deposit → release
+//! Each test step includes assertions on token balances and state transitions
 #[cfg(test)]
 mod happy_path_tests {
     use crate::{DataKey, Escrow, EscrowContract, EscrowContractClient, Status};

@@ -18,19 +18,10 @@ pub struct RateArtisanEvent {
 
 /// Public struct containing aggregated review data for a user
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct ReputationData {
     pub total_stars: u64,
     pub review_count: u64,
-}
-
-impl Default for ReputationData {
-    fn default() -> Self {
-        ReputationData {
-            total_stars: 0,
-            review_count: 0,
-        }
-    }
 }
 
 /// Helper function to read reputation data for a user
@@ -40,7 +31,7 @@ pub fn read_reputation(env: &Env, user: &Address) -> ReputationData {
     env.storage()
         .persistent()
         .get(&key)
-        .unwrap_or_else(|| ReputationData::default())
+        .unwrap_or_else(ReputationData::default)
 }
 
 /// Helper function to write reputation data for a user
@@ -65,9 +56,9 @@ impl ReputationContract {
         write_reputation(&env, &user, &data);
     }
 
-    // update and persist an artisan’s reputation score
+    // update and persist an artisan's reputation score
     pub fn rate_artisan(env: Env, artisan: Address, stars: u64) {
-        if stars < 1 || stars > 5 {
+        if !(1..=5).contains(&stars) {
             panic!("stars not in range");
         }
         let mut artisan_data = Self::get_reputation(env.clone(), artisan.clone());
@@ -212,7 +203,7 @@ mod tests {
         let client = ReputationContractClient::new(&env, &contract_id);
 
         let artisan = Address::generate(&env);
-        let _ = client.rate_artisan(&artisan, &2);
+        client.rate_artisan(&artisan, &2);
         let reputation = client.get_reputation(&artisan);
 
         // Verifies that read_reputation returns default values (0, 0) when no reputation exists
@@ -228,7 +219,7 @@ mod tests {
         let client = ReputationContractClient::new(&env, &contract_id);
 
         let artisan = Address::generate(&env);
-        let _ = client.rate_artisan(&artisan, &6);
+        client.rate_artisan(&artisan, &6);
     }
 
     #[test]
@@ -239,7 +230,7 @@ mod tests {
         let client = ReputationContractClient::new(&env, &contract_id);
 
         let artisan = Address::generate(&env);
-        let _ = client.rate_artisan(&artisan, &0);
+        client.rate_artisan(&artisan, &0);
     }
 
     #[test]
@@ -249,9 +240,9 @@ mod tests {
         let client = ReputationContractClient::new(&env, &contract_id);
 
         let artisan = Address::generate(&env);
-        let _ = client.rate_artisan(&artisan, &2);
-        let _ = client.rate_artisan(&artisan, &5);
-        let _ = client.rate_artisan(&artisan, &1);
+        client.rate_artisan(&artisan, &2);
+        client.rate_artisan(&artisan, &5);
+        client.rate_artisan(&artisan, &1);
         let reputation = client.get_reputation(&artisan);
 
         assert_eq!(reputation.total_stars, 8);
