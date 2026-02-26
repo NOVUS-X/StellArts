@@ -71,7 +71,7 @@ def _record_payment(
     db: Session,
     booking_id: str,
     tx_hash: str | None,
-    status: str,
+    status: PaymentStatus,
     amount: Decimal,
     from_acc: str,
     to_acc: str,
@@ -136,9 +136,7 @@ def release_payment(
 
     held = (
         db.query(Payment)
-        .filter(
-            Payment.booking_id == booking_id, Payment.status == PaymentStatus.PENDING
-        )
+        .filter(Payment.booking_id == booking_id, Payment.status == PaymentStatus.HELD)
         .first()
     )
     if not held:
@@ -150,7 +148,7 @@ def release_payment(
     already_released = (
         db.query(Payment)
         .filter(
-            Payment.booking_id == booking_id, Payment.status == PaymentStatus.COMPLETED
+            Payment.booking_id == booking_id, Payment.status == PaymentStatus.RELEASED
         )
         .first()
     )
@@ -187,7 +185,7 @@ def release_payment(
             db,
             booking_id,
             tx_hash,
-            PaymentStatus.COMPLETED,
+            PaymentStatus.RELEASED,
             amount,
             ESCROW_PUBLIC,
             artisan_public,
@@ -212,9 +210,7 @@ def refund_payment(
 
     held = (
         db.query(Payment)
-        .filter(
-            Payment.booking_id == booking_id, Payment.status == PaymentStatus.PENDING
-        )
+        .filter(Payment.booking_id == booking_id, Payment.status == PaymentStatus.HELD)
         .first()
     )
     if not held:
@@ -358,7 +354,7 @@ def submit_signed_payment(db: Session, signed_xdr: str) -> dict[str, Any]:
             db,
             booking_id,
             tx_hash,
-            PaymentStatus.PENDING,
+            PaymentStatus.HELD,
             Decimal(payment_op.amount),
             tx.transaction.source.account_id,
             ESCROW_PUBLIC,

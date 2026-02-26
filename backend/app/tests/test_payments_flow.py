@@ -101,7 +101,7 @@ def test_payments_prepare_and_submit(monkeypatch, client, db_session):
         db_session.query(Payment)
         .filter(
             Payment.booking_id == UUID(booking_id),
-            Payment.status == PaymentStatus.PENDING,
+            Payment.status == PaymentStatus.HELD,
         )
         .first()
     )
