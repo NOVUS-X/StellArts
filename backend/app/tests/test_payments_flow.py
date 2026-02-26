@@ -72,6 +72,7 @@ def test_payments_prepare_and_submit(monkeypatch, client, db_session):
     resp = client.post(
         "api/v1/payments/prepare",
         json={"booking_id": booking_id, "amount": 100.5, "client_public": client_pub},
+        headers=client_headers,
     )
     assert resp.status_code == 200
     payload = resp.json()
@@ -90,7 +91,11 @@ def test_payments_prepare_and_submit(monkeypatch, client, db_session):
     signed_xdr = tx.to_xdr()
 
     # 2. submit
-    resp2 = client.post("api/v1/payments/submit", json={"signed_xdr": signed_xdr})
+    resp2 = client.post(
+        "api/v1/payments/submit",
+        json={"signed_xdr": signed_xdr},
+        headers=client_headers,
+    )
     assert resp2.status_code == 200
     body = resp2.json()
     assert body["status"] == "success"
