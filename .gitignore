@@ -99,6 +99,13 @@ ENV/
 env.bak/
 venv.bak/
 
+# Frontend lib (do not ignore; root lib/ is for Python)
+!frontend/lib/
+!frontend/lib/*
+
+# macOS
+.DS_Store
+
 # Project specific
 test.db
 .ruff_cache/
