@@ -313,6 +313,21 @@ class ArtisanService:
             "updated_at": artisan.updated_at,
         }
 
+    def update_availability(self, artisan_id: int, is_available: bool) -> "Artisan | None":
+        """Update artisan availability status"""
+        try:
+            artisan = self.db.query(Artisan).filter(Artisan.id == artisan_id).first()
+            if not artisan:
+                return None
+            artisan.is_available = is_available
+            self.db.commit()
+            self.db.refresh(artisan)
+            return artisan
+        except Exception as e:
+            self.db.rollback()
+            print(f"Error updating artisan availability: {e}")
+            return None
+
     async def delete_artisan(self, artisan_id: int) -> bool:
         """Delete artisan and remove from Redis index"""
         try:
