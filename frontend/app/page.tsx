@@ -109,7 +109,7 @@ export default function Home() {
                 size="lg"
                 className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8"
               >
-                <Link href="/artisans">
+                <Link href="/register">
                   Get Started Now
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Link>

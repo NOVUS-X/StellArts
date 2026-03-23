@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # Shared/Discovery Models
@@ -108,6 +110,8 @@ class ArtisanProfileUpdate(BaseModel):
 
 # Output Schema
 class ArtisanOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     business_name: str | None = None
@@ -124,9 +128,6 @@ class ArtisanOut(BaseModel):
     total_reviews: int = 0
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
     @field_validator("specialties", mode="before")
     @classmethod
@@ -195,12 +196,11 @@ class ArtisanLocationStats(BaseModel):
 
 # Detailed Profile Models
 class PortfolioItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     title: str | None = None
     image: str
-
-    class Config:
-        from_attributes = True
 
 
 class ArtisanProfileResponse(BaseModel):

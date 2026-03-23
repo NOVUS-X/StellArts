@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import re
 from enum import Enum
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class RoleEnum(str, Enum):
@@ -67,15 +69,14 @@ class LogoutRequest(BaseModel):
 
 
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     email: EmailStr
     role: str
     full_name: str | None = None
     phone: str | None = None
     username: str | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class TokenResponse(BaseModel):

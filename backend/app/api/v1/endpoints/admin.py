@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -153,7 +155,7 @@ def get_system_stats(
 ):
     """Get system statistics - admin only"""
     total_users = db.query(User).count()
-    active_users = db.query(User).filter(User.is_active is True).count()
+    active_users = db.query(User).filter(User.is_active).count()
     clients = db.query(User).filter(User.role == "client").count()
     artisans = db.query(User).filter(User.role == "artisan").count()
     admins = db.query(User).filter(User.role == "admin").count()

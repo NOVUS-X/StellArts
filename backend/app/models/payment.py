@@ -9,8 +9,8 @@ from app.db.base import Base
 
 class PaymentStatus(enum.Enum):
     PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
+    HELD = "held"
+    RELEASED = "released"
     FAILED = "failed"
     REFUNDED = "refunded"
 
