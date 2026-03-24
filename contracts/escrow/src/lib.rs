@@ -33,6 +33,7 @@ pub enum Status {
 pub enum DataKey {
     Escrow(u64),
     NextId,
+    Arbitrator,
 }
 
 #[contracttype]
@@ -47,6 +48,23 @@ pub struct EngagementInitializedEvent {
 pub struct ReclaimedEvent {
     pub id: u64,
     pub client: Address,
+    pub amount: i128,
+    pub timestamp: u64,
+}
+
+// Event emitted when a dispute is initiated on an escrow
+#[contracttype]
+pub struct DisputeInitiatedEvent {
+    pub id: u64,
+    pub initiator: Address,
+    pub timestamp: u64,
+}
+
+// Event emitted when an arbitrator resolves a dispute
+#[contracttype]
+pub struct DisputeResolvedEvent {
+    pub id: u64,
+    pub winner: Address,
     pub amount: i128,
     pub timestamp: u64,
 }
@@ -260,6 +278,130 @@ impl EscrowContract {
         );
 
         true
+    }
+
+    /// Set the arbitrator address for resolving disputes
+    /// Can only be called by an admin (typically contract deployer)
+    /// This establishes the authority who can make arbitration decisions
+    pub fn set_arbitrator(env: Env, admin: Address, arbitrator: Address) {
+        admin.require_auth();
+
+        // Store the arbitrator address
+        let arbitrator_key = DataKey::Arbitrator;
+        env.storage().persistent().set(&arbitrator_key, &arbitrator);
+        env.storage()
+            .persistent()
+            .extend_ttl(&arbitrator_key, TTL_THRESHOLD, NEXT_ID_TTL);
+    }
+
+    /// Initiate a dispute on a funded escrow
+    /// Can be called by either the client or artisan
+    /// Transitions the escrow from Funded to Disputed status
+    pub fn dispute(env: Env, engagement_id: u64, initiator: Address) {
+        let key = DataKey::Escrow(engagement_id);
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("Escrow not found");
+
+        // Auth: Require initiator to authorize invocation
+        initiator.require_auth();
+
+        // Auth: Only client or artisan can initiate a dispute
+        if initiator != escrow.client && initiator != escrow.artisan {
+            panic!("Only client or artisan can initiate a dispute");
+        }
+
+        // State check: escrow must be Funded to dispute
+        if escrow.status != Status::Funded {
+            panic!("Escrow must be Funded to initiate a dispute");
+        }
+
+        // Transition status to Disputed
+        escrow.status = Status::Disputed;
+        env.storage().persistent().set(&key, &escrow);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
+
+        // Emit event
+        let current_time = env.ledger().timestamp();
+        env.events().publish(
+            (),
+            DisputeInitiatedEvent {
+                id: engagement_id,
+                initiator,
+                timestamp: current_time,
+            },
+        );
+    }
+
+    /// Resolve a dispute by the arbitrator
+    /// Only callable by the stored arbitrator address
+    /// Transfers funds to the winner and updates escrow status accordingly
+    pub fn arbitrate(env: Env, engagement_id: u64, winner: Address, token: Address) {
+        // Load the arbitrator address
+        let arbitrator_key = DataKey::Arbitrator;
+        let arbitrator: Address = env
+            .storage()
+            .persistent()
+            .get(&arbitrator_key)
+            .expect("Arbitrator not set");
+
+        // Auth: Require the arbitrator's authorization
+        arbitrator.require_auth();
+
+        // Load escrow
+        let key = DataKey::Escrow(engagement_id);
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("Escrow not found");
+
+        // State check: escrow must be in Disputed status
+        if escrow.status != Status::Disputed {
+            panic!("Escrow must be in Disputed status to arbitrate");
+        }
+
+        // Validation: winner must be either client or artisan
+        if winner != escrow.client && winner != escrow.artisan {
+            panic!("Winner must be either client or artisan");
+        }
+
+        // Transfer funds to the winner
+        let token_client = token::Client::new(&env, &token);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &winner,
+            &escrow.amount,
+        );
+
+        // Update status based on winner
+        if winner == escrow.client {
+            escrow.status = Status::Refunded;
+        } else {
+            escrow.status = Status::Released;
+        }
+
+        // Save updated escrow
+        env.storage().persistent().set(&key, &escrow);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
+
+        // Emit event
+        let current_time = env.ledger().timestamp();
+        env.events().publish(
+            (),
+            DisputeResolvedEvent {
+                id: engagement_id,
+                winner,
+                amount: escrow.amount,
+                timestamp: current_time,
+            },
+        );
     }
 }
 
