@@ -124,7 +124,7 @@ def invoke_contract_function(
 # Contract IDs
 ESCROW_CONTRACT_ID = settings.ESCROW_CONTRACT_ID
 REPUTATION_CONTRACT_ID = settings.REPUTATION_CONTRACT_ID
-BACKEND_SIGNER = Keypair.from_secret(settings.BACKEND_SECRET_KEY)
+BACKEND_SIGNER = Keypair.from_secret(settings.SECRET_KEY)
 
 
 def initialize_escrow_contract(source_keypair: Keypair) -> dict[str, Any]:
@@ -158,3 +158,19 @@ def get_reputation_stats(artisan_address: str, source_keypair: Keypair) -> tuple
         source_keypair,
     )
     return (0, 0)
+
+
+def transition_to_in_progress(engagement_id: int) -> dict[str, Any]:
+    """
+    Transition escrow status from Funded to InProgress.
+    Called by the backend Oracle upon artisan arrival.
+    """
+    # Convert engagement_id to Soroban Uint64
+    args = [scval.to_uint64(engagement_id)]
+    
+    return invoke_contract_function(
+        ESCROW_CONTRACT_ID,
+        "start_job",
+        args,
+        BACKEND_SIGNER,
+    )

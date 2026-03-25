@@ -377,3 +377,81 @@ def submit_bid(
         "message": "Bid submitted successfully",
         "new_estimated_cost": float(booking.estimated_cost),
     }
+
+class LocationUpdate(BaseModel):
+    latitude: float
+    longitude: float
+
+@router.post("/{booking_id}/location")
+async def update_location(
+    booking_id: UUID,
+    location_data: LocationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_client_or_artisan),
+):
+    """
+    Update artisan location and verify arrival at job site.
+    If artisan is within 100m, transitions Soroban escrow to InProgress.
+    """
+    if current_user.role != "artisan":
+        raise HTTPException(status_code=403, detail="Only artisans can send location updates")
+
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
+    if not artisan or booking.artisan_id != artisan.id:
+        raise HTTPException(status_code=403, detail="You are not the assigned artisan for this booking")
+
+    # 1. Geocode job site location if coordinates are not available
+    # For simplicity, we assume the booking.location string needs geocoding
+    from app.services.geolocation import geolocation_service
+    job_geo = await geolocation_service.geocode_address(booking.location)
+    if not job_geo:
+        raise HTTPException(status_code=400, detail="Could not verify job site coordinates")
+
+    # 2. Verify arrival (distance < 100m)
+    distance_km = await geolocation_service.calculate_distance(
+        Decimal(str(location_data.latitude)),
+        Decimal(str(location_data.longitude)),
+        job_geo.latitude,
+        job_geo.longitude
+    )
+    
+    # 100m = 0.1km
+    is_arrived = distance_km <= 0.1
+
+    if is_arrived and booking.status == BookingStatus.CONFIRMED:
+        # 3. Transition Soroban escrow to InProgress
+        from app.services import soroban
+        try:
+            # We use engagement_id from a mapping or similar. 
+            # In this MVP, we use a mock engagement_id derived from booking.id (uint64)
+            engagement_id = int(booking.id.int >> 64) % 1000000  # Mock logic
+            
+            soroban.transition_to_in_progress(engagement_id)
+            
+            # Update booking status in DB
+            booking.status = BookingStatus.IN_PROGRESS
+            db.commit()
+            
+            return {
+                "status": "arrived",
+                "message": "Arrival verified! Job started on-chain.",
+                "distance_km": distance_km
+            }
+        except Exception as e:
+            logger.error(f"Soroban transition error: {e}")
+            return {
+                "status": "error",
+                "message": "Arrival verified but on-chain transition failed.",
+                "distance_km": distance_km
+            }
+
+    return {
+        "status": "in_transit",
+        "message": "Location updated",
+        "distance_km": distance_km,
+        "arrived": is_arrived
+    }
