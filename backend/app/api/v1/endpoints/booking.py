@@ -1,3 +1,4 @@
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,7 +16,7 @@ from app.models.artisan import Artisan
 from app.models.booking import Booking, BookingStatus
 from app.models.client import Client
 from app.models.user import User
-from app.schemas.booking import BookingCreate, BookingResponse, BookingStatusUpdate
+from app.schemas.booking import BidCreate, BookingCreate, BookingResponse, BookingStatusUpdate
 
 router = APIRouter(prefix="/bookings")
 
@@ -72,13 +73,39 @@ def create_booking(
             detail="Cannot book with an inactive artisan",
         )
 
+    # Use AIService for dynamic bid range calculation and smart pitching
+    from app.services.ai_service import ai_service
+    
+    # Get artisan's hourly rate (default to 50 if not set)
+    hourly_rate = artisan.hourly_rate or Decimal("50.00")
+    estimated_hours = booking_data.estimated_hours or 2.0  # Default to 2 hours if not provided
+    
+    bid_data = ai_service.calculate_bid_range(
+        booking_data.service, 
+        hourly_rate, 
+        estimated_hours
+    )
+    
+    pitch = ai_service.generate_smart_pitch(
+        booking_data.service,
+        bid_data["material_cost"],
+        bid_data["labor_cost"],
+        bid_data["total_estimated"],
+        estimated_hours
+    )
+
     # Create the booking model instance with status = PENDING
     new_booking = Booking(
         client_id=client.id,
         artisan_id=booking_data.artisan_id,
         service=booking_data.service,
-        estimated_hours=booking_data.estimated_hours,
-        estimated_cost=booking_data.estimated_cost,
+        estimated_hours=estimated_hours,
+        estimated_cost=bid_data["total_estimated"],
+        labor_cost=bid_data["labor_cost"],
+        material_cost=bid_data["material_cost"],
+        range_min=bid_data["range_min"],
+        range_max=bid_data["range_max"],
+        artisan_pitch=pitch,
         status=BookingStatus.PENDING,
         date=booking_data.date,
         location=booking_data.location,
@@ -290,4 +317,63 @@ def update_booking_status(
         "updated_by": current_user.id,
         "new_status": booking.status.value,
         "status": booking.status.value,
+    }
+
+
+@router.post("/{booking_id}/bid")
+def submit_bid(
+    booking_id: UUID,
+    bid_data: BidCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_client_or_artisan),
+):
+    """
+    Submit a counter-offer (bid) for a booking - artisan only.
+    Enforces agentic guardrails: if bid > 300% of range_max, a justification is required.
+    """
+    if current_user.role != "artisan":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only artisans can submit bids",
+        )
+
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
+    if not artisan or booking.artisan_id != artisan.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not the assigned artisan for this booking",
+        )
+
+    # Enforce Guardrail
+    from app.services.ai_service import ai_service
+
+    is_outlier = ai_service.check_guardrail(
+        Decimal(str(bid_data.bid_amount)), booking.range_max or Decimal("0")
+    )
+
+    if is_outlier and not bid_data.justification:
+        return {
+            "status": "flagged",
+            "message": "AI Alert: Your bid is >300% of the calculated market range. Please provide a justification prompt before showing the user.",
+            "requires_justification": True,
+        }
+
+    # Update booking with the new bid
+    booking.estimated_cost = Decimal(str(bid_data.bid_amount))
+    if bid_data.justification:
+        booking.notes = (
+            (booking.notes or "") + f"\n[Artisan Justification]: {bid_data.justification}"
+        )
+
+    db.commit()
+    db.refresh(booking)
+
+    return {
+        "status": "success",
+        "message": "Bid submitted successfully",
+        "new_estimated_cost": float(booking.estimated_cost),
     }
