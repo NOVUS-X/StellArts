@@ -21,10 +21,18 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Soroban configuration
+# Soroban configuration — read at call time to avoid import-time crashes
 SOROBAN_RPC_URL = settings.SOROBAN_RPC_URL
 SOROBAN_NETWORK_PASSPHRASE = settings.SOROBAN_NETWORK_PASSPHRASE
-soroban_server = SorobanServer(SOROBAN_RPC_URL)
+_soroban_server: SorobanServer | None = None
+
+
+def _get_soroban_server() -> SorobanServer:
+    """Return a lazily-initialised SorobanServer instance."""
+    global _soroban_server
+    if _soroban_server is None:
+        _soroban_server = SorobanServer(SOROBAN_RPC_URL)
+    return _soroban_server
 
 
 def invoke_contract_function(
@@ -52,8 +60,10 @@ def invoke_contract_function(
         TimeoutError: If transaction confirmation times out
     """
     try:
+        server = _get_soroban_server()
+
         # Load source account
-        source_account = soroban_server.load_account(source_keypair.public_key)
+        source_account = server.load_account(source_keypair.public_key)
 
         # Build transaction
         tx = (
@@ -72,7 +82,7 @@ def invoke_contract_function(
 
         # Simulate transaction
         logger.info(f"Simulating {function_name} on contract {contract_id[:8]}...")
-        sim_response = soroban_server.simulate_transaction(tx)
+        sim_response = server.simulate_transaction(tx)
 
         if hasattr(sim_response, "error") and sim_response.error:
             error_msg = f"Simulation failed: {sim_response.error}"
@@ -80,12 +90,12 @@ def invoke_contract_function(
             raise RuntimeError(error_msg)
 
         # Prepare and sign
-        tx = soroban_server.prepare_transaction(tx, sim_response)
+        tx = server.prepare_transaction(tx, sim_response)
         tx.sign(source_keypair)
 
         # Submit
         logger.info(f"Submitting {function_name} transaction...")
-        send_response = soroban_server.send_transaction(tx)
+        send_response = server.send_transaction(tx)
 
         if send_response.status == SendTransactionStatus.ERROR:
             error_msg = f"Transaction failed: {send_response.error_result_xdr}"
@@ -98,7 +108,7 @@ def invoke_contract_function(
 
         start_time = time.time()
         while time.time() - start_time < timeout_seconds:
-            status_response = soroban_server.get_transaction_status(tx_hash)
+            status_response = server.get_transaction_status(tx_hash)
 
             if status_response.status == "SUCCESS":
                 logger.info(f"Transaction {tx_hash} confirmed successfully")
@@ -124,7 +134,21 @@ def invoke_contract_function(
 # Contract IDs
 ESCROW_CONTRACT_ID = settings.ESCROW_CONTRACT_ID
 REPUTATION_CONTRACT_ID = settings.REPUTATION_CONTRACT_ID
-BACKEND_SIGNER = Keypair.from_secret(settings.BACKEND_SECRET_KEY)
+# Lazily resolved — BACKEND_SECRET_KEY may be absent in dev/test environments
+_backend_signer: Keypair | None = None
+
+
+def _get_backend_signer() -> Keypair:
+    """Return the backend signing keypair, initialised on first use."""
+    global _backend_signer
+    if _backend_signer is None:
+        if not settings.BACKEND_SECRET_KEY:
+            raise RuntimeError(
+                "BACKEND_SECRET_KEY is not configured. "
+                "Set it in your .env file before using contract signing."
+            )
+        _backend_signer = Keypair.from_secret(settings.BACKEND_SECRET_KEY)
+    return _backend_signer
 
 
 def initialize_escrow_contract(source_keypair: Keypair) -> dict[str, Any]:

@@ -55,8 +55,10 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_PUBLISHABLE_KEY: str | None = None
 
-        # Soroban Configuration
+    # Soroban Configuration
     SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
+    SOROBAN_NETWORK_PASSPHRASE: str = "Test SDF Network ; September 2015"
+    BACKEND_SECRET_KEY: str | None = None
     ESCROW_CONTRACT_ID: str | None = None
     REPUTATION_CONTRACT_ID: str | None = None
 

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_active_user
@@ -35,12 +37,15 @@ from app.services.email import send_verification_email
 router = APIRouter(prefix="/auth")
 
 bearer_scheme = HTTPBearer()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post(
     "/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED
 )
+@limiter.limit("3/hour")
 async def register_user(
+    request: Request,
     user_in: RegisterRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -83,10 +88,11 @@ async def register_user(
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(request: LoginRequest, db: Session = Depends(get_db)):
-    user = get_user_by_email(request.email, db)
+@limiter.limit("5/minute")
+async def login(request: Request, login_data: LoginRequest, db: Session = Depends(get_db)):
+    user = get_user_by_email(login_data.email, db)
 
-    if not user or not verify_password(request.password, user.hashed_password):
+    if not user or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
@@ -98,9 +104,10 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh_token(request: RefreshRequest):
+@limiter.limit("10/minute")
+def refresh_token(request: Request, refresh_data: RefreshRequest):
     try:
-        payload = decode_token(request.refresh_token)
+        payload = decode_token(refresh_data.refresh_token)
         jti = payload.get("jti")
         if not jti:
             raise HTTPException(status_code=401, detail="Malformed refresh token")
@@ -116,7 +123,7 @@ def refresh_token(request: RefreshRequest):
         access_token = create_access_token(user_id)
         return {
             "access_token": access_token,
-            "refresh_token": request.refresh_token,
+            "refresh_token": refresh_data.refresh_token,
             "token_type": "bearer",
         }
     except JWTError:

@@ -203,6 +203,31 @@ class PortfolioItem(BaseModel):
     image: str
 
 
+class AvailabilityUpdate(BaseModel):
+    is_available: bool
+
+
+class PortfolioItemAdd(BaseModel):
+    title: str | None = Field(None, max_length=200)
+    image: str = Field(..., max_length=500, description="URL of the portfolio image")
+
+
+class PortfolioItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    artisan_id: int
+    title: str | None = None
+    image: str
+    created_at: datetime
+
+
+class PortfolioResponse(BaseModel):
+    artisan_id: int
+    artisan_name: str | None
+    portfolio_items: list[PortfolioItemResponse]
+
+
 class ArtisanProfileResponse(BaseModel):
     id: int
     name: str | None

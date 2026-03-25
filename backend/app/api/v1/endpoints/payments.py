@@ -1,13 +1,16 @@
 # app/api/v1/endpoints/payments.py
+import logging
 import uuid
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from stellar_sdk import TransactionEnvelope
 
-from app.core.auth import require_client
+from app.core.auth import require_admin, require_client
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.booking import Booking
@@ -157,7 +160,12 @@ def submit(
 
 
 @router.post("/release", summary="Release escrow to artisan")
-def release(req: ReleaseRequest, db: Session = Depends(get_db)):
+def release(
+    req: ReleaseRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    logger.info("Payment release triggered by admin user_id=%s", current_user.id)
     res = release_payment(db, req.booking_id, req.artisan_public, req.amount)
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message"))
@@ -165,7 +173,12 @@ def release(req: ReleaseRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/refund", summary="Refund escrow to client")
-def refund(req: RefundRequest, db: Session = Depends(get_db)):
+def refund(
+    req: RefundRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    logger.info("Payment refund triggered by admin user_id=%s", current_user.id)
     res = refund_payment(db, req.booking_id, req.client_public, req.amount)
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message"))
