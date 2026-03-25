@@ -57,7 +57,7 @@ export default function Hero() {
 											Plumbers
 										</div>
 										<div className='text-xs text-gray-500'>
-											2,345 available
+											Available near you
 										</div>
 									</CardContent>
 								</Card>
@@ -68,7 +68,7 @@ export default function Hero() {
 											Electricians
 										</div>
 										<div className='text-xs text-gray-500'>
-											1,892 available
+											Available near you
 										</div>
 									</CardContent>
 								</Card>
@@ -79,7 +79,7 @@ export default function Hero() {
 											Carpenters
 										</div>
 										<div className='text-xs text-gray-500'>
-											1,567 available
+											Available near you
 										</div>
 									</CardContent>
 								</Card>
@@ -90,7 +90,7 @@ export default function Hero() {
 											Painters
 										</div>
 										<div className='text-xs text-gray-500'>
-											1,234 available
+											Available near you
 										</div>
 									</CardContent>
 								</Card>
