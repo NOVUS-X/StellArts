@@ -55,7 +55,17 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_PUBLISHABLE_KEY: str | None = None
 
-        # Soroban Configuration
+    # Multimodal ingestion
+    INGESTION_STORAGE_DIR: str = "storage/vision_to_scope"
+    INGESTION_MIN_IMAGE_WIDTH: int = 1280
+    INGESTION_MIN_IMAGE_HEIGHT: int = 720
+    INGESTION_MIN_IMAGE_BYTES: int = 5_000
+    INGESTION_MIN_VIDEO_BYTES: int = 500_000
+    INGESTION_MIN_AUDIO_BYTES: int = 10_000
+    INGESTION_MIN_BRIGHTNESS: float = 50.0
+    INGESTION_MIN_SHARPNESS: float = 12.0
+
+    # Soroban Configuration
     SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
     ESCROW_CONTRACT_ID: str | None = None
     REPUTATION_CONTRACT_ID: str | None = None
