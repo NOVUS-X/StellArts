@@ -55,10 +55,15 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_PUBLISHABLE_KEY: str | None = None
 
-        # Soroban Configuration
+    # Soroban Configuration
     SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
     ESCROW_CONTRACT_ID: str | None = None
     REPUTATION_CONTRACT_ID: str | None = None
+
+    # Hardware / materials pricing (BigBox-style Home Depot search; override URL for other merchants)
+    RETAIL_PRODUCT_API_KEY: str | None = None
+    RETAIL_PRODUCT_API_BASE_URL: str = "https://api.bigboxapi.com/request"
+    RETAIL_PRODUCT_MERCHANT_LABEL: str = "homedepot"
 
     model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore"}
 
