@@ -8,7 +8,7 @@
     "allowJs": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["node"],
+    "types": ["node", "react", "react-dom"],
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,

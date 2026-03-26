@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.auth import (
@@ -16,6 +16,7 @@ from app.models.booking import Booking, BookingStatus
 from app.models.client import Client
 from app.models.user import User
 from app.schemas.booking import BookingCreate, BookingResponse, BookingStatusUpdate
+from app.services.inventory.tasks import run_inventory_check
 
 router = APIRouter(prefix="/bookings")
 
@@ -150,6 +151,7 @@ def get_all_bookings(
 def update_booking_status(
     booking_id: UUID,
     status_payload: BookingStatusUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -284,6 +286,10 @@ def update_booking_status(
     booking.status = new_status
     db.commit()
     db.refresh(booking)
+
+    # Trigger background inventory check when booking goes IN_PROGRESS
+    if new_status == BookingStatus.IN_PROGRESS:
+        background_tasks.add_task(run_inventory_check, booking.id, db)
 
     return {
         "message": f"Booking {booking_id} status updated",

@@ -13,6 +13,7 @@ import {
 } from "../../../components/ui/card";
 import { api, type BookingResponse } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
+import { ClientSupplyOverrideToggle } from "../../../components/booking/ClientSupplyOverrideToggle";
 import { Calendar, ArrowLeft } from "lucide-react";
 
 export default function DashboardBookingsPage() {
@@ -106,6 +107,14 @@ export default function DashboardBookingsPage() {
                       {b.status}
                     </span>
                   </p>
+                  {token && (
+                    <ClientSupplyOverrideToggle
+                      bookingId={b.id}
+                      currentValue={b.client_supply_override ?? false}
+                      bookingStatus={b.status}
+                      token={token}
+                    />
+                  )}
                   <Link
                     href={`/artisans/${b.artisan_id}`}
                     className="text-sm text-blue-600 hover:underline"

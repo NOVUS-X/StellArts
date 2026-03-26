@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6380
     REDIS_DB: int = 0
     NEARBY_CACHE_TTL: int = 60  # Seconds to cache nearby-artisan search results
+    INVENTORY_CACHE_TTL: int = 300  # Seconds to cache store inventory responses
+    STORE_API_TIMEOUT_S: int = 5  # Per-adapter timeout in seconds
 
     # CORS
     BACKEND_CORS_ORIGINS: list[AnyHttpUrl] = []
@@ -54,6 +56,10 @@ class Settings(BaseSettings):
     # External APIs (for future use)
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_PUBLISHABLE_KEY: str | None = None
+
+    # Firebase Cloud Messaging
+    FCM_PROJECT_ID: str | None = None
+    FCM_SERVICE_ACCOUNT_JSON: str | None = None
 
         # Soroban Configuration
     SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
