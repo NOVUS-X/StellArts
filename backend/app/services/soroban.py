@@ -4,17 +4,15 @@ Handles all interactions with Soroban contracts on the Stellar network.
 """
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from stellar_sdk import (
     Keypair,
-    Network,
     SorobanServer,
     TransactionBuilder,
     scval,
     xdr as stellar_xdr,
 )
-from stellar_sdk.exceptions import PrepareTransactionException, SorobanRpcError
 from stellar_sdk.soroban_rpc import SendTransactionStatus
 
 from app.core.config import settings
@@ -59,8 +57,8 @@ def invoke_contract_function(
         tx = (
             TransactionBuilder(
                 source_account=source_account,
-                network_passphrase=Network.TESTNET_NETWORK_PASSPHRASE,
-                base_fee=300,
+                network_passphrase=SOROBAN_NETWORK_PASSPHRASE,
+                base_fee=settings.SOROBAN_BASE_FEE,
             )
             .append_invoke_contract_function_op(
                 contract_id=contract_id,
@@ -81,7 +79,9 @@ def invoke_contract_function(
 
         # Prepare and sign
         tx = soroban_server.prepare_transaction(tx, sim_response)
+        prepared_xdr = tx.to_xdr()
         tx.sign(source_keypair)
+        signed_xdr = tx.to_xdr()
 
         # Submit
         logger.info(f"Submitting {function_name} transaction...")
@@ -105,6 +105,8 @@ def invoke_contract_function(
                 return {
                     "success": True,
                     "hash": tx_hash,
+                    "prepared_xdr": prepared_xdr,
+                    "signed_xdr": signed_xdr,
                     "result": status_response.result_xdr,
                 }
             elif status_response.status == "FAILED":
@@ -124,7 +126,13 @@ def invoke_contract_function(
 # Contract IDs
 ESCROW_CONTRACT_ID = settings.ESCROW_CONTRACT_ID
 REPUTATION_CONTRACT_ID = settings.REPUTATION_CONTRACT_ID
-BACKEND_SIGNER = Keypair.from_secret(settings.BACKEND_SECRET_KEY)
+
+
+def get_backend_signer() -> Keypair:
+    if not settings.BACKEND_SECRET_KEY:
+        raise RuntimeError("BACKEND_SECRET_KEY must be configured for oracle signing")
+
+    return Keypair.from_secret(settings.BACKEND_SECRET_KEY)
 
 
 def initialize_escrow_contract(source_keypair: Keypair) -> dict[str, Any]:
@@ -158,3 +166,28 @@ def get_reputation_stats(artisan_address: str, source_keypair: Keypair) -> tuple
         source_keypair,
     )
     return (0, 0)
+
+
+def release_escrow_via_oracle(
+    engagement_id: int,
+    token_address: str,
+    timeout_seconds: int = 60,
+) -> dict[str, Any]:
+    """Construct, sign, and submit a Soroban `release` invocation."""
+    if not ESCROW_CONTRACT_ID:
+        raise RuntimeError("ESCROW_CONTRACT_ID must be configured")
+
+    signer = get_backend_signer()
+    args = [
+        scval.to_uint64(engagement_id),
+        scval.to_address(token_address),
+        scval.to_address(signer.public_key),
+    ]
+
+    return invoke_contract_function(
+        ESCROW_CONTRACT_ID,
+        "release",
+        args,
+        signer,
+        timeout_seconds,
+    )

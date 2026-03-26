@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings
+from stellar_sdk import Network
 
 
 class Settings(BaseSettings):
@@ -55,10 +56,15 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_PUBLISHABLE_KEY: str | None = None
 
-        # Soroban Configuration
+    # Soroban Configuration
     SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
+    SOROBAN_NETWORK_PASSPHRASE: str = Network.TESTNET_NETWORK_PASSPHRASE
+    SOROBAN_BASE_FEE: int = 300
     ESCROW_CONTRACT_ID: str | None = None
     REPUTATION_CONTRACT_ID: str | None = None
+    BACKEND_SECRET_KEY: str | None = None
+    BACKEND_ORACLE_TOKEN: str | None = None
+    AUTO_RELEASE_CONFIDENCE_THRESHOLD: float = 0.90
 
     model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore"}
 

@@ -1,8 +1,9 @@
 # app/api/v1/endpoints/payments.py
 import uuid
 from decimal import Decimal
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from stellar_sdk import TransactionEnvelope
@@ -13,7 +14,9 @@ from app.db.session import get_db
 from app.models.booking import Booking
 from app.models.user import User
 from app.services import payments as payments_service
+from app.services.email import send_auto_release_email
 from app.services.payments import (
+    auto_release_milestone_payment,
     prepare_payment,
     refund_payment,
     release_payment,
@@ -45,6 +48,36 @@ class RefundRequest(BaseModel):
     booking_id: str
     client_public: str
     amount: Decimal = Field(..., gt=0)
+
+
+class OracleAutoReleaseRequest(BaseModel):
+    booking_id: str
+    engagement_id: int = Field(..., gt=0)
+    token_address: str = Field(..., min_length=3)
+    confidence_score: float = Field(..., ge=0, le=1)
+    test_results: dict[str, Any] | list[str] | str
+
+
+def _serialize_test_results(test_results: dict[str, Any] | list[str] | str) -> str:
+    if isinstance(test_results, str):
+        return test_results
+    if isinstance(test_results, list):
+        return "\n".join(f"- {item}" for item in test_results)
+    return "\n".join(f"- {key}: {value}" for key, value in test_results.items())
+
+
+def _require_oracle_token(x_oracle_token: str | None) -> None:
+    if not settings.BACKEND_ORACLE_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Backend oracle token is not configured",
+        )
+
+    if x_oracle_token != settings.BACKEND_ORACLE_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid backend oracle token",
+        )
 
 
 # The old /hold endpoint has been removed due to security concerns. Clients
@@ -170,3 +203,53 @@ def refund(req: RefundRequest, db: Session = Depends(get_db)):
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message"))
     return res
+
+
+@router.post(
+    "/oracle/auto-release",
+    summary="Auto-release escrow through the backend oracle for high-confidence jobs",
+)
+def auto_release(
+    req: OracleAutoReleaseRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    x_oracle_token: str | None = Header(default=None, alias="X-Oracle-Token"),
+):
+    _require_oracle_token(x_oracle_token)
+    rendered_test_results = _serialize_test_results(req.test_results)
+    result = auto_release_milestone_payment(
+        db,
+        booking_id=req.booking_id,
+        engagement_id=req.engagement_id,
+        token_address=req.token_address,
+        confidence_score=req.confidence_score,
+        test_results=rendered_test_results,
+        threshold=settings.AUTO_RELEASE_CONFIDENCE_THRESHOLD,
+    )
+
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result["message"])
+
+    if result.get("status") in {"success", "exists"}:
+        background_tasks.add_task(
+            send_auto_release_email,
+            to=result["client_email"],
+            full_name=result["client_name"],
+            booking_id=req.booking_id,
+            confidence_score=req.confidence_score,
+            transaction_hash=result["transaction_hash"],
+            test_results=rendered_test_results,
+        )
+        result["client_notification"] = {
+            "channel": "email",
+            "recipient": result["client_email"],
+            "delivered_test_results": True,
+        }
+    else:
+        result["client_notification"] = {
+            "channel": "email",
+            "recipient": None,
+            "delivered_test_results": False,
+        }
+
+    return result

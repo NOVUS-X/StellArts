@@ -73,8 +73,17 @@ mod happy_path_tests {
 
         /// Release funds from an escrow
         fn release_funds(&self, engagement_id: u64) {
+            self.client_contract.release(
+                &engagement_id,
+                &self.token_address,
+                &self.get_escrow(engagement_id).client,
+            );
+        }
+
+        /// Release funds from an escrow using a configured oracle signer
+        fn release_funds_as_oracle(&self, engagement_id: u64, oracle: &Address) {
             self.client_contract
-                .release(&engagement_id, &self.token_address);
+                .release(&engagement_id, &self.token_address, oracle);
         }
 
         /// Full workflow: initialize, mint, deposit
@@ -360,6 +369,30 @@ mod happy_path_tests {
         assert_eq!(escrow.artisan, artisan);
     }
 
+    /// Test 10b: Backend oracle can auto-release a funded escrow
+    #[test]
+    fn test_happy_path_oracle_release_funds_to_artisan() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let admin = Address::generate(&ctx.env);
+        let oracle = Address::generate(&ctx.env);
+        let amount: i128 = 5000;
+
+        ctx.client_contract.set_oracle(&admin, &oracle);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        let artisan_balance_before = ctx.token_client.balance(&artisan);
+        ctx.release_funds_as_oracle(engagement_id, &oracle);
+
+        assert_eq!(
+            ctx.token_client.balance(&artisan),
+            artisan_balance_before + amount,
+            "Oracle release should deliver the escrow amount"
+        );
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
+        assert_eq!(ctx.get_escrow(engagement_id).status, Status::Released);
+    }
+
     /// Test 11: Deadline lifecycle – deposit before deadline, reclaim after expiry
     #[test]
     fn test_happy_path_deadline_lifecycle() {
@@ -495,8 +528,8 @@ mod happy_path_tests {
         let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
 
         // Third party attempts to dispute
-        let unauthorized = Address::generate(&ctx.env);
-        ctx.client_contract.dispute(&engagement_id, &unauthorized);
+        let _unauthorized = Address::generate(&ctx.env);
+        ctx.client_contract.dispute(&engagement_id, &_unauthorized);
     }
 
     /// Test 17: Arbitrate - arbitrator resolves dispute in favor of client (refund)
@@ -660,4 +693,5 @@ mod happy_path_tests {
         // Try to arbitrate without arbitrator set
         ctx.client_contract
             .arbitrate(&engagement_id, &client, &ctx.token_address);
-    }}
+    }
+}
