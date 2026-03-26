@@ -53,11 +53,11 @@ mod happy_path_tests {
             })
         }
 
-        /// Initialize an engagement
-        fn initialize_engagement(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
+        /// Initialize an engagement with split material and labor tranches
+        fn initialize_engagement(&self, client: &Address, artisan: &Address, material_amount: i128, labor_amount: i128) -> u64 {
             let deadline = self.env.ledger().timestamp() + 86400;
             self.client_contract
-                .initialize(client, artisan, &amount, &deadline)
+                .initialize(client, artisan, &material_amount, &labor_amount, &deadline)
         }
 
         /// Mint tokens to an address
@@ -77,17 +77,17 @@ mod happy_path_tests {
                 .release(&engagement_id, &self.token_address);
         }
 
-        /// Full workflow: initialize, mint, deposit
-        fn full_deposit_workflow(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
-            let engagement_id = self.initialize_engagement(client, artisan, amount);
-            self.mint_tokens(client, amount);
+        /// Full workflow: initialize, mint combined amount, deposit
+        fn full_deposit_workflow(&self, client: &Address, artisan: &Address, material_amount: i128, labor_amount: i128) -> u64 {
+            let engagement_id = self.initialize_engagement(client, artisan, material_amount, labor_amount);
+            self.mint_tokens(client, material_amount + labor_amount);
             self.deposit_funds(engagement_id);
             engagement_id
         }
 
         /// Full workflow: initialize, mint, deposit, release
-        fn full_workflow(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
-            let engagement_id = self.full_deposit_workflow(client, artisan, amount);
+        fn full_workflow(&self, client: &Address, artisan: &Address, material_amount: i128, labor_amount: i128) -> u64 {
+            let engagement_id = self.full_deposit_workflow(client, artisan, material_amount, labor_amount);
             self.release_funds(engagement_id);
             engagement_id
         }
@@ -104,16 +104,19 @@ mod happy_path_tests {
     fn test_happy_path_initialize_engagement() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
 
-        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount);
+        let engagement_id = ctx.initialize_engagement(&client, &artisan, material_amount, labor_amount);
 
         assert_eq!(engagement_id, 1, "First engagement should have ID 1");
 
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.client, client);
         assert_eq!(escrow.artisan, artisan);
-        assert_eq!(escrow.amount, amount);
+        assert_eq!(escrow.material_amount, material_amount);
+        assert_eq!(escrow.labor_amount, labor_amount);
+        assert!(!escrow.materials_released);
         assert_eq!(escrow.status, Status::Pending);
     }
 
@@ -146,9 +149,11 @@ mod happy_path_tests {
     fn test_happy_path_client_deposit() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let escrow_amount: i128 = 5000;
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+        let total_amount = material_amount + labor_amount;
 
-        let engagement_id = ctx.initialize_engagement(&client, &artisan, escrow_amount);
+        let engagement_id = ctx.initialize_engagement(&client, &artisan, material_amount, labor_amount);
         ctx.mint_tokens(&client, 10000);
 
         let initial_client_balance = ctx.token_client.balance(&client);
@@ -158,18 +163,19 @@ mod happy_path_tests {
 
         assert_eq!(
             ctx.token_client.balance(&client),
-            initial_client_balance - escrow_amount,
-            "Client balance should decrease by escrow amount"
+            initial_client_balance - total_amount,
+            "Client balance should decrease by total escrow amount"
         );
         assert_eq!(
             ctx.token_client.balance(&ctx.contract_id),
-            initial_contract_balance + escrow_amount,
-            "Contract balance should increase by escrow amount"
+            initial_contract_balance + total_amount,
+            "Contract balance should increase by total escrow amount"
         );
 
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.status, Status::Funded);
-        assert_eq!(escrow.amount, escrow_amount);
+        assert_eq!(escrow.material_amount, material_amount);
+        assert_eq!(escrow.labor_amount, labor_amount);
     }
 
     /// Test 4: Release Funds to Artisan
@@ -178,17 +184,19 @@ mod happy_path_tests {
     fn test_happy_path_release_funds_to_artisan() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let escrow_amount: i128 = 5000;
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+        let total_amount = material_amount + labor_amount;
 
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, escrow_amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, material_amount, labor_amount);
 
         let artisan_balance_before = ctx.token_client.balance(&artisan);
         ctx.release_funds(engagement_id);
 
         assert_eq!(
             ctx.token_client.balance(&artisan),
-            artisan_balance_before + escrow_amount,
-            "Artisan should receive the escrow amount"
+            artisan_balance_before + total_amount,
+            "Artisan should receive total escrow amount when materials not yet released"
         );
         assert_eq!(
             ctx.token_client.balance(&ctx.contract_id),
@@ -206,9 +214,11 @@ mod happy_path_tests {
     fn test_happy_path_complete_workflow() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+        let total_amount = material_amount + labor_amount;
 
-        let engagement_id = ctx.full_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_workflow(&client, &artisan, material_amount, labor_amount);
 
         // Verify final balances
         assert_eq!(
@@ -223,7 +233,7 @@ mod happy_path_tests {
         );
         assert_eq!(
             ctx.token_client.balance(&artisan),
-            amount,
+            total_amount,
             "Artisan received the escrowed amount"
         );
 
@@ -234,7 +244,7 @@ mod happy_path_tests {
         let total = ctx.token_client.balance(&client)
             + ctx.token_client.balance(&ctx.contract_id)
             + ctx.token_client.balance(&artisan);
-        assert_eq!(total, amount, "Total tokens conserved");
+        assert_eq!(total, total_amount, "Total tokens conserved");
     }
 
     /// Test 6: Multiple Engagements
@@ -245,18 +255,18 @@ mod happy_path_tests {
 
         // First engagement
         let (client1, artisan1) = create_addresses(&ctx.env);
-        let amount1 = 1000i128;
-        let id1 = ctx.full_deposit_workflow(&client1, &artisan1, amount1);
+        let (mat1, lab1) = (400i128, 600i128);
+        let id1 = ctx.full_deposit_workflow(&client1, &artisan1, mat1, lab1);
 
         // Second engagement
         let (client2, artisan2) = create_addresses(&ctx.env);
-        let amount2 = 2000i128;
-        let id2 = ctx.full_deposit_workflow(&client2, &artisan2, amount2);
+        let (mat2, lab2) = (800i128, 1200i128);
+        let id2 = ctx.full_deposit_workflow(&client2, &artisan2, mat2, lab2);
 
         // Verify both are funded
         assert_eq!(
             ctx.token_client.balance(&ctx.contract_id),
-            amount1 + amount2,
+            (mat1 + lab1) + (mat2 + lab2),
             "Contract holds both amounts"
         );
 
@@ -274,11 +284,12 @@ mod happy_path_tests {
     fn test_happy_path_large_amounts() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let large_amount: i128 = 1_000_000_000_000;
+        let large_material: i128 = 400_000_000_000;
+        let large_labor: i128 = 600_000_000_000;
 
-        ctx.full_workflow(&client, &artisan, large_amount);
+        ctx.full_workflow(&client, &artisan, large_material, large_labor);
 
-        assert_eq!(ctx.token_client.balance(&artisan), large_amount);
+        assert_eq!(ctx.token_client.balance(&artisan), large_material + large_labor);
         assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
     }
 
@@ -288,17 +299,19 @@ mod happy_path_tests {
     fn test_happy_path_exact_amount_deposit() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+        let total = material_amount + labor_amount;
 
-        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount);
-        ctx.mint_tokens(&client, amount);
+        let engagement_id = ctx.initialize_engagement(&client, &artisan, material_amount, labor_amount);
+        ctx.mint_tokens(&client, total);
         ctx.deposit_funds(engagement_id);
 
         assert_eq!(ctx.token_client.balance(&client), 0);
-        assert_eq!(ctx.token_client.balance(&ctx.contract_id), amount);
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), total);
 
         ctx.release_funds(engagement_id);
-        assert_eq!(ctx.token_client.balance(&artisan), amount);
+        assert_eq!(ctx.token_client.balance(&artisan), total);
     }
 
     /// Test 9: Sequential Operations
@@ -309,14 +322,16 @@ mod happy_path_tests {
 
         for i in 1..=3 {
             let (client, artisan) = create_addresses(&ctx.env);
-            let amount: i128 = 1000 * i as i128;
+            let material_amount: i128 = 400 * i as i128;
+            let labor_amount: i128 = 600 * i as i128;
+            let total = material_amount + labor_amount;
 
-            let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+            let engagement_id = ctx.full_deposit_workflow(&client, &artisan, material_amount, labor_amount);
 
-            // After deposit, contract should hold the amount (no other engagements pending)
+            // After deposit, contract should hold the total amount (no other engagements pending)
             assert_eq!(
                 ctx.token_client.balance(&ctx.contract_id),
-                amount,
+                total,
                 "Contract holds current engagement amount at iteration {}",
                 i
             );
@@ -325,7 +340,7 @@ mod happy_path_tests {
 
             // After release, contract should be empty for this iteration
             assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
-            assert_eq!(ctx.token_client.balance(&artisan), amount);
+            assert_eq!(ctx.token_client.balance(&artisan), total);
         }
     }
 
@@ -335,22 +350,25 @@ mod happy_path_tests {
     fn test_happy_path_state_consistency() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
 
         // Initialize and check state
-        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount);
+        let engagement_id = ctx.initialize_engagement(&client, &artisan, material_amount, labor_amount);
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.status, Status::Pending);
         assert_eq!(escrow.client, client);
         assert_eq!(escrow.artisan, artisan);
+        assert!(!escrow.materials_released);
 
         // Deposit and check state
-        ctx.mint_tokens(&client, amount);
+        ctx.mint_tokens(&client, material_amount + labor_amount);
         ctx.deposit_funds(engagement_id);
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.status, Status::Funded);
         assert_eq!(escrow.client, client);
-        assert_eq!(escrow.amount, amount);
+        assert_eq!(escrow.material_amount, material_amount);
+        assert_eq!(escrow.labor_amount, labor_amount);
 
         // Release and check final state
         ctx.release_funds(engagement_id);
@@ -365,17 +383,19 @@ mod happy_path_tests {
     fn test_happy_path_deadline_lifecycle() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+        let total_amount = material_amount + labor_amount;
 
         // set a short deadline a few seconds in the future
         let now = ctx.env.ledger().timestamp();
         let deadline = now + 10;
         let engagement_id = ctx
             .client_contract
-            .initialize(&client, &artisan, &amount, &deadline);
+            .initialize(&client, &artisan, &material_amount, &labor_amount, &deadline);
 
         // fund and deposit before the deadline
-        ctx.mint_tokens(&client, amount);
+        ctx.mint_tokens(&client, total_amount);
         ctx.deposit_funds(engagement_id);
         assert_eq!(ctx.get_escrow(engagement_id).status, Status::Funded);
 
@@ -387,7 +407,7 @@ mod happy_path_tests {
         ctx.client_contract
             .reclaim(&engagement_id, &ctx.token_address);
         let client_balance_after = ctx.token_client.balance(&client);
-        assert_eq!(client_balance_after, client_balance_before + amount);
+        assert_eq!(client_balance_after, client_balance_before + total_amount);
 
         // ensure an event from the escrow contract was emitted (token contract also emits events)
         let raw_events: soroban_sdk::Vec<(
@@ -412,10 +432,9 @@ mod happy_path_tests {
     fn test_dispute_from_client() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, 2000, 3000);
 
         // Verify initial state is Funded
         assert_eq!(ctx.get_escrow(engagement_id).status, Status::Funded);
@@ -433,10 +452,9 @@ mod happy_path_tests {
     fn test_dispute_from_artisan() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, 2000, 3000);
 
         // Verify initial state is Funded
         assert_eq!(ctx.get_escrow(engagement_id).status, Status::Funded);
@@ -455,10 +473,9 @@ mod happy_path_tests {
     fn test_dispute_from_pending_state_fails() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
 
         // Setup: Initialize but don't deposit (escrow remains Pending)
-        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount);
+        let engagement_id = ctx.initialize_engagement(&client, &artisan, 2000, 3000);
 
         // Attempt to dispute Pending escrow should fail
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -470,10 +487,9 @@ mod happy_path_tests {
     fn test_double_dispute_rejection() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, 2000, 3000);
 
         // First dispute succeeds
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -489,10 +505,9 @@ mod happy_path_tests {
     fn test_unauthorized_dispute_attempt() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, 2000, 3000);
 
         // Third party attempts to dispute
         let unauthorized = Address::generate(&ctx.env);
@@ -506,13 +521,15 @@ mod happy_path_tests {
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
         let admin = Address::generate(&ctx.env);
-        let amount: i128 = 5000;
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+        let total_amount = material_amount + labor_amount;
 
         // Setup: Set arbitrator
         ctx.client_contract.set_arbitrator(&admin, &arbitrator);
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, material_amount, labor_amount);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -527,7 +544,7 @@ mod happy_path_tests {
 
         // Verify funds transferred to client
         let client_balance_after = ctx.token_client.balance(&client);
-        assert_eq!(client_balance_after, client_balance_before + amount);
+        assert_eq!(client_balance_after, client_balance_before + total_amount);
 
         // Verify status transitioned to Refunded
         let escrow = ctx.get_escrow(engagement_id);
@@ -541,13 +558,15 @@ mod happy_path_tests {
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
         let admin = Address::generate(&ctx.env);
-        let amount: i128 = 5000;
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+        let total_amount = material_amount + labor_amount;
 
         // Setup: Set arbitrator
         ctx.client_contract.set_arbitrator(&admin, &arbitrator);
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, material_amount, labor_amount);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &artisan);
@@ -562,7 +581,7 @@ mod happy_path_tests {
 
         // Verify funds transferred to artisan
         let artisan_balance_after = ctx.token_client.balance(&artisan);
-        assert_eq!(artisan_balance_after, artisan_balance_before + amount);
+        assert_eq!(artisan_balance_after, artisan_balance_before + total_amount);
 
         // Verify status transitioned to Released
         let escrow = ctx.get_escrow(engagement_id);
@@ -577,14 +596,13 @@ mod happy_path_tests {
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
         let unauthorized = Address::generate(&ctx.env);
-        let amount: i128 = 5000;
 
         // Setup: Set arbitrator
         let admin = Address::generate(&ctx.env);
         ctx.client_contract.set_arbitrator(&admin, &arbitrator);
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, 2000, 3000);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -605,14 +623,13 @@ mod happy_path_tests {
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
         let invalid_winner = Address::generate(&ctx.env);
-        let amount: i128 = 5000;
 
         // Setup: Set arbitrator
         let admin = Address::generate(&ctx.env);
         ctx.client_contract.set_arbitrator(&admin, &arbitrator);
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, 2000, 3000);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -629,14 +646,13 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
-        let amount: i128 = 5000;
 
         // Setup: Set arbitrator
         let admin = Address::generate(&ctx.env);
         ctx.client_contract.set_arbitrator(&admin, &arbitrator);
 
         // Setup: Initialize, mint, and deposit (but don't dispute)
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, 2000, 3000);
 
         // Arbitrator tries to arbitrate on non-disputed escrow
         ctx.client_contract
@@ -649,10 +665,9 @@ mod happy_path_tests {
     fn test_arbitrate_without_arbitrator_set() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
 
         // Setup: Initialize, mint, and deposit without setting arbitrator
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, 2000, 3000);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -660,4 +675,194 @@ mod happy_path_tests {
         // Try to arbitrate without arbitrator set
         ctx.client_contract
             .arbitrate(&engagement_id, &client, &ctx.token_address);
-    }}
+    }
+
+    // -------------------------------------------------------------------------
+    // Tranching tests (ISSUE-22)
+    // -------------------------------------------------------------------------
+
+    /// Test 23: release_materials() transfers material_amount without touching labor_amount
+    #[test]
+    fn test_release_materials_only() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, material_amount, labor_amount);
+
+        // Artisan releases materials (accepts the job)
+        ctx.client_contract.release_materials(&engagement_id, &ctx.token_address);
+
+        // Artisan received exactly material_amount
+        assert_eq!(ctx.token_client.balance(&artisan), material_amount, "Artisan should receive only material_amount");
+
+        // Contract still holds labor_amount
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), labor_amount, "Contract should retain labor_amount");
+
+        // Flag is set, status still Funded
+        let escrow = ctx.get_escrow(engagement_id);
+        assert!(escrow.materials_released);
+        assert_eq!(escrow.status, Status::Funded);
+    }
+
+    /// Test 24: Full tranching workflow — deposit once, release materials, then release labor
+    #[test]
+    fn test_full_tranching_workflow() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+
+        // Client deposits combined sum once
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, material_amount, labor_amount);
+        assert_eq!(ctx.token_client.balance(&client), 0, "Client should have no balance after deposit");
+
+        // Artisan accepts job — materials released immediately
+        ctx.client_contract.release_materials(&engagement_id, &ctx.token_address);
+        assert_eq!(ctx.token_client.balance(&artisan), material_amount);
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), labor_amount);
+
+        // Job finishes — client releases labor tranche
+        ctx.release_funds(engagement_id);
+        assert_eq!(ctx.token_client.balance(&artisan), material_amount + labor_amount, "Artisan should have full amount");
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0, "Contract should be empty");
+
+        let escrow = ctx.get_escrow(engagement_id);
+        assert_eq!(escrow.status, Status::Released);
+        assert!(escrow.materials_released);
+    }
+
+    /// Test 25: Client signs once to deposit the combined sum
+    #[test]
+    fn test_single_deposit_combined_sum() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let material_amount: i128 = 1500;
+        let labor_amount: i128 = 3500;
+        let total = material_amount + labor_amount;
+
+        let engagement_id = ctx.initialize_engagement(&client, &artisan, material_amount, labor_amount);
+        ctx.mint_tokens(&client, total);
+
+        let client_before = ctx.token_client.balance(&client);
+
+        // Single deposit call covers both tranches
+        ctx.deposit_funds(engagement_id);
+
+        let client_after = ctx.token_client.balance(&client);
+        assert_eq!(client_before - client_after, total, "Client should pay combined sum in one deposit");
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), total, "Contract holds combined sum");
+    }
+
+    /// Test 26: release_materials() cannot be called twice
+    #[test]
+    #[should_panic(expected = "Materials have already been released")]
+    fn test_cannot_release_materials_twice() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, 2000, 3000);
+
+        ctx.client_contract.release_materials(&engagement_id, &ctx.token_address);
+        // Second call should panic
+        ctx.client_contract.release_materials(&engagement_id, &ctx.token_address);
+    }
+
+    /// Test 27: reclaim() returns full amount when materials have NOT been released
+    #[test]
+    fn test_reclaim_full_when_materials_not_released() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+        let total = material_amount + labor_amount;
+
+        let now = ctx.env.ledger().timestamp();
+        let deadline = now + 10;
+        let engagement_id = ctx
+            .client_contract
+            .initialize(&client, &artisan, &material_amount, &labor_amount, &deadline);
+
+        ctx.mint_tokens(&client, total);
+        ctx.deposit_funds(engagement_id);
+
+        // Fast-forward past deadline without releasing materials
+        ctx.env.ledger().set_timestamp(deadline + 1);
+
+        let client_before = ctx.token_client.balance(&client);
+        ctx.client_contract.reclaim(&engagement_id, &ctx.token_address);
+        let client_after = ctx.token_client.balance(&client);
+
+        assert_eq!(client_after - client_before, total, "Client should reclaim full amount when materials not released");
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
+    }
+
+    /// Test 28: reclaim() returns only labor_amount when materials have been released
+    #[test]
+    fn test_reclaim_labor_only_after_materials_released() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+        let total = material_amount + labor_amount;
+
+        let now = ctx.env.ledger().timestamp();
+        let deadline = now + 10;
+        let engagement_id = ctx
+            .client_contract
+            .initialize(&client, &artisan, &material_amount, &labor_amount, &deadline);
+
+        ctx.mint_tokens(&client, total);
+        ctx.deposit_funds(engagement_id);
+
+        // Artisan releases materials before deadline
+        ctx.client_contract.release_materials(&engagement_id, &ctx.token_address);
+        assert_eq!(ctx.token_client.balance(&artisan), material_amount);
+
+        // Fast-forward past deadline
+        ctx.env.ledger().set_timestamp(deadline + 1);
+
+        let client_before = ctx.token_client.balance(&client);
+        ctx.client_contract.reclaim(&engagement_id, &ctx.token_address);
+        let client_after = ctx.token_client.balance(&client);
+
+        assert_eq!(client_after - client_before, labor_amount, "Client should reclaim only labor_amount");
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
+        assert_eq!(ctx.token_client.balance(&artisan), material_amount, "Artisan keeps material_amount");
+    }
+
+    /// Test 29: arbitrate() awards only labor_amount when materials were already released
+    #[test]
+    fn test_arbitrate_labor_only_after_materials_released() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let admin = Address::generate(&ctx.env);
+        let material_amount: i128 = 2000;
+        let labor_amount: i128 = 3000;
+
+        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
+
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, material_amount, labor_amount);
+
+        // Artisan releases materials
+        ctx.client_contract.release_materials(&engagement_id, &ctx.token_address);
+        let artisan_after_materials = ctx.token_client.balance(&artisan);
+        assert_eq!(artisan_after_materials, material_amount);
+
+        // Dispute raised over labor
+        ctx.client_contract.dispute(&engagement_id, &client);
+
+        // Arbitrate in favor of artisan — should only award labor_amount
+        ctx.client_contract.arbitrate(&engagement_id, &artisan, &ctx.token_address);
+
+        assert_eq!(
+            ctx.token_client.balance(&artisan),
+            material_amount + labor_amount,
+            "Artisan gets materials (already received) + labor from arbitration"
+        );
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
+        assert_eq!(ctx.get_escrow(engagement_id).status, Status::Released);
+    }
+}

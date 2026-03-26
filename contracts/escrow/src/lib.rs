@@ -13,7 +13,9 @@ const TTL_THRESHOLD: u32 = 17_280; // ~1 day - triggers extension when TTL drops
 pub struct Escrow {
     pub client: Address,
     pub artisan: Address,
-    pub amount: i128,
+    pub material_amount: i128,
+    pub labor_amount: i128,
+    pub materials_released: bool,
     pub status: Status,
     pub deadline: u64,
 }
@@ -41,6 +43,17 @@ pub struct EngagementInitializedEvent {
     pub id: u64,
     pub client: Address,
     pub artisan: Address,
+    pub material_amount: i128,
+    pub labor_amount: i128,
+}
+
+// Event emitted when the artisan releases the materials tranche
+#[contracttype]
+pub struct MaterialsReleasedEvent {
+    pub id: u64,
+    pub artisan: Address,
+    pub amount: i128,
+    pub timestamp: u64,
 }
 
 // Event emitted when a funded escrow is reclaimed by the client after the deadline
@@ -74,13 +87,14 @@ pub struct EscrowContract;
 
 #[contractimpl]
 impl EscrowContract {
-    /// Initialize a new escrow engagement
+    /// Initialize a new escrow engagement with split material and labor tranches
     /// Creates a new escrow record with Pending status
     pub fn initialize(
         env: Env,
         client: Address,
         artisan: Address,
-        amount: i128,
+        material_amount: i128,
+        labor_amount: i128,
         deadline: u64,
     ) -> u64 {
         // Validation: client cannot be the same as artisan
@@ -88,8 +102,11 @@ impl EscrowContract {
             panic!("Client and artisan cannot be the same address");
         }
 
-        // Validation: amount must be positive
-        if amount <= 0 {
+        // Validation: both amounts must be positive
+        if material_amount <= 0 {
+            panic!("Amount must be greater than zero");
+        }
+        if labor_amount <= 0 {
             panic!("Amount must be greater than zero");
         }
 
@@ -113,7 +130,9 @@ impl EscrowContract {
         let escrow = Escrow {
             client: client.clone(),
             artisan: artisan.clone(),
-            amount,
+            material_amount,
+            labor_amount,
+            materials_released: false,
             status: Status::Pending,
             deadline,
         };
@@ -132,6 +151,8 @@ impl EscrowContract {
                 id: engagement_id,
                 client,
                 artisan,
+                material_amount,
+                labor_amount,
             },
         );
 
@@ -165,12 +186,12 @@ impl EscrowContract {
             panic!("Escrow must be in Pending status to deposit funds");
         }
 
-        // Transfer tokens from client to escrow contract
+        // Transfer tokens from client to escrow contract (combined material + labor in one tx)
         let token_client = token::Client::new(&env, &token);
         token_client.transfer(
             &escrow.client,
             &env.current_contract_address(),
-            &escrow.amount,
+            &(escrow.material_amount + escrow.labor_amount),
         );
 
         // Update escrow status to Funded
@@ -181,6 +202,58 @@ impl EscrowContract {
         env.storage()
             .persistent()
             .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
+    }
+
+    /// Release the material tranche to the artisan immediately upon job acceptance
+    /// Called by the artisan when they accept the job; transfers material_amount to them.
+    /// The labor tranche remains locked until the client calls release().
+    pub fn release_materials(env: Env, engagement_id: u64, token: Address) {
+        let key = DataKey::Escrow(engagement_id);
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("Escrow not found");
+
+        // Auth: artisan must authorize (signals job acceptance)
+        escrow.artisan.require_auth();
+
+        // State check: must be Funded
+        if escrow.status != Status::Funded {
+            panic!("Escrow must be Funded to release materials");
+        }
+
+        // Idempotency guard: materials can only be released once
+        if escrow.materials_released {
+            panic!("Materials have already been released");
+        }
+
+        // Transfer material_amount to artisan
+        let token_client = token::Client::new(&env, &token);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &escrow.artisan,
+            &escrow.material_amount,
+        );
+
+        // Mark materials as released; labor tranche remains locked
+        escrow.materials_released = true;
+        env.storage().persistent().set(&key, &escrow);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
+
+        // Emit event
+        let current_time = env.ledger().timestamp();
+        env.events().publish(
+            (),
+            MaterialsReleasedEvent {
+                id: engagement_id,
+                artisan: escrow.artisan,
+                amount: escrow.material_amount,
+                timestamp: current_time,
+            },
+        );
     }
 
     /// Release funds from escrow to the artisan
@@ -209,12 +282,18 @@ impl EscrowContract {
             panic!("Escrow is not funded");
         }
 
-        // Logic: Transfer the stored escrow amount from the contract address to the artisan's address
+        // Logic: Transfer remaining funds to artisan.
+        // If materials were already released, only the labor tranche remains.
+        let transfer_amount = if escrow.materials_released {
+            escrow.labor_amount
+        } else {
+            escrow.material_amount + escrow.labor_amount
+        };
         let token_client = token::Client::new(&env, &token);
         token_client.transfer(
             &env.current_contract_address(),
             &escrow.artisan,
-            &escrow.amount,
+            &transfer_amount,
         );
 
         // State: Update the escrow status to Released
@@ -251,12 +330,18 @@ impl EscrowContract {
             panic!("Deadline has not passed; cannot reclaim yet");
         }
 
-        // Transfer funds back to client
+        // Transfer remaining funds back to client.
+        // If materials were already released to the artisan, only labor_amount remains.
+        let reclaim_amount = if escrow.materials_released {
+            escrow.labor_amount
+        } else {
+            escrow.material_amount + escrow.labor_amount
+        };
         let token_client = token::Client::new(&env, &token);
         token_client.transfer(
             &env.current_contract_address(),
             &escrow.client,
-            &escrow.amount,
+            &reclaim_amount,
         );
 
         // Update state to Refunded
@@ -272,7 +357,7 @@ impl EscrowContract {
             ReclaimedEvent {
                 id: engagement_id,
                 client: escrow.client.clone(),
-                amount: escrow.amount,
+                amount: reclaim_amount,
                 timestamp: current_time,
             },
         );
@@ -370,12 +455,18 @@ impl EscrowContract {
             panic!("Winner must be either client or artisan");
         }
 
-        // Transfer funds to the winner
+        // Transfer remaining funds to the winner.
+        // If materials were already released, only labor_amount is still in the contract.
+        let award_amount = if escrow.materials_released {
+            escrow.labor_amount
+        } else {
+            escrow.material_amount + escrow.labor_amount
+        };
         let token_client = token::Client::new(&env, &token);
         token_client.transfer(
             &env.current_contract_address(),
             &winner,
-            &escrow.amount,
+            &award_amount,
         );
 
         // Update status based on winner
@@ -398,7 +489,7 @@ impl EscrowContract {
             DisputeResolvedEvent {
                 id: engagement_id,
                 winner,
-                amount: escrow.amount,
+                amount: award_amount,
                 timestamp: current_time,
             },
         );
@@ -427,8 +518,10 @@ mod test_legacy {
         let deadline = env.ledger().timestamp() + 86400; // 24 hours from now
 
         // Initialize engagement
+        let material_amount: i128 = 600;
+        let labor_amount: i128 = 400;
         let engagement_id =
-            client.initialize(&client_address, &artisan_address, &amount, &deadline);
+            client.initialize(&client_address, &artisan_address, &material_amount, &labor_amount, &deadline);
 
         // Verify the returned ID is valid (should be 1 for first engagement)
         assert_eq!(engagement_id, 1);
@@ -443,7 +536,9 @@ mod test_legacy {
 
         assert_eq!(stored_escrow.client, client_address);
         assert_eq!(stored_escrow.artisan, artisan_address);
-        assert_eq!(stored_escrow.amount, amount);
+        assert_eq!(stored_escrow.material_amount, material_amount);
+        assert_eq!(stored_escrow.labor_amount, labor_amount);
+        assert!(!stored_escrow.materials_released);
         assert_eq!(stored_escrow.status, Status::Pending);
         assert_eq!(stored_escrow.deadline, deadline);
 
@@ -465,11 +560,12 @@ mod test_legacy {
         let client = EscrowContractClient::new(&env, &contract_id);
 
         let same_address = Address::generate(&env);
-        let amount: i128 = 1000;
+        let material_amount: i128 = 500;
+        let labor_amount: i128 = 500;
         let deadline = env.ledger().timestamp() + 86400;
 
         // This should panic because client == artisan
-        client.initialize(&same_address, &same_address, &amount, &deadline);
+        client.initialize(&same_address, &same_address, &material_amount, &labor_amount, &deadline);
     }
 
     #[test]
@@ -482,10 +578,11 @@ mod test_legacy {
         let client_address = Address::generate(&env);
         let artisan_address = Address::generate(&env);
         let zero_amount: i128 = 0;
+        let labor_amount: i128 = 500;
         let deadline = env.ledger().timestamp() + 86400;
 
-        // This should panic because amount is zero
-        client.initialize(&client_address, &artisan_address, &zero_amount, &deadline);
+        // This should panic because material_amount is zero
+        client.initialize(&client_address, &artisan_address, &zero_amount, &labor_amount, &deadline);
     }
 
     #[test]
@@ -498,13 +595,15 @@ mod test_legacy {
         let client_address = Address::generate(&env);
         let artisan_address = Address::generate(&env);
         let negative_amount: i128 = -100;
+        let labor_amount: i128 = 500;
         let deadline = env.ledger().timestamp() + 86400;
 
-        // This should panic because amount is negative
+        // This should panic because material_amount is negative
         client.initialize(
             &client_address,
             &artisan_address,
             &negative_amount,
+            &labor_amount,
             &deadline,
         );
     }
@@ -544,10 +643,14 @@ mod test_legacy {
         let escrow_amount: i128 = 500;
         let deadline = env.ledger().timestamp() + 86400; // 24 hours from now
 
+        let material_amount: i128 = 300;
+        let labor_amount: i128 = 200;
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
-            amount: escrow_amount,
+            material_amount,
+            labor_amount,
+            materials_released: false,
             status: Status::Pending,
             deadline,
         };
@@ -566,7 +669,7 @@ mod test_legacy {
         // Call deposit function as the client
         EscrowContractClient::new(&env, &contract_id).deposit(&engagement_id, &token_address);
 
-        // Verify contract's token balance increased
+        // Verify contract's token balance increased by the combined amount
         let final_contract_balance = token_client.balance(&contract_id);
         assert_eq!(final_contract_balance, escrow_amount);
 
@@ -581,7 +684,7 @@ mod test_legacy {
 
         // Verify other fields remain unchanged
         assert_eq!(updated_escrow.client, client_address);
-        assert_eq!(updated_escrow.amount, escrow_amount);
+        assert_eq!(updated_escrow.material_amount + updated_escrow.labor_amount, escrow_amount);
         assert_eq!(updated_escrow.deadline, deadline);
     }
 
@@ -608,13 +711,14 @@ mod test_legacy {
 
         // Create an escrow record owned by client_address
         let engagement_id = 1;
-        let escrow_amount: i128 = 500;
         let deadline = env.ledger().timestamp() + 86400;
 
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
-            amount: escrow_amount,
+            material_amount: 250,
+            labor_amount: 250,
+            materials_released: false,
             status: Status::Pending,
             deadline,
         };
@@ -658,13 +762,14 @@ mod test_legacy {
 
         // Create an escrow record that's already funded
         let engagement_id = 1;
-        let escrow_amount: i128 = 500;
         let deadline = env.ledger().timestamp() + 86400;
 
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
-            amount: escrow_amount,
+            material_amount: 250,
+            labor_amount: 250,
+            materials_released: false,
             status: Status::Funded, // Already funded
             deadline,
         };
@@ -718,7 +823,9 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
-            amount: 500,
+            material_amount: 250,
+            labor_amount: 250,
+            materials_released: false,
             status: Status::Pending,
             deadline: env.ledger().timestamp().saturating_sub(1),
         };
@@ -760,7 +867,9 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address.clone(),
-            amount,
+            material_amount: 500,
+            labor_amount: 500,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -796,7 +905,9 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
-            amount,
+            material_amount: 250,
+            labor_amount: 250,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -840,7 +951,9 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
-            amount,
+            material_amount: 250,
+            labor_amount: 250,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -905,7 +1018,9 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
-            amount,
+            material_amount: 50,
+            labor_amount: 50,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -955,7 +1070,9 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
-            amount,
+            material_amount: 50,
+            labor_amount: 50,
+            materials_released: false,
             status: Status::Pending,
             deadline,
         };
@@ -995,7 +1112,9 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
-            amount,
+            material_amount: 500,
+            labor_amount: 500,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -1044,7 +1163,9 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address.clone(),
-            amount,
+            material_amount: 500,
+            labor_amount: 500,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -1090,7 +1211,9 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
-            amount,
+            material_amount: 500,
+            labor_amount: 500,
+            materials_released: false,
             status: Status::Pending,
             deadline,
         };
@@ -1130,7 +1253,9 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
-            amount,
+            material_amount: 500,
+            labor_amount: 500,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
