@@ -3,10 +3,11 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
+import { Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
     if (isLoading) return;
@@ -14,16 +15,14 @@ export default function DashboardPage() {
       router.replace("/login?redirect=/dashboard");
       return;
     }
-    if (user?.role === "artisan") {
-      router.replace("/dashboard/bookings");
-    } else {
-      router.replace("/dashboard/bookings");
-    }
-  }, [isAuthenticated, isLoading, user?.role, router]);
+    // Always redirect to dashboard/bookings for default view
+    router.replace("/dashboard/bookings");
+  }, [isAuthenticated, isLoading, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <p className="text-gray-500">Redirecting…</p>
+    <div className="flex flex-col items-center justify-center p-20 text-gray-500">
+       <Loader2 className="w-8 h-8 animate-spin mb-4 text-slate-400" />
+       <p>Loading your workspace...</p>
     </div>
   );
 }
