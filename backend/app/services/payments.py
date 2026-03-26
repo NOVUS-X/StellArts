@@ -19,6 +19,7 @@ from stellar_sdk.exceptions import BadRequestError, BadResponseError
 
 from app.models.booking import Booking
 from app.models.payment import Payment, PaymentStatus
+from app.services.soroban import release_escrow_via_oracle
 
 # Stellar config
 HORIZON = os.getenv("STELLAR_HORIZON", "https://horizon-testnet.stellar.org")
@@ -367,3 +368,100 @@ def submit_signed_payment(db: Session, signed_xdr: str) -> dict[str, Any]:
         return {"status": "error", "message": str(e)}
     except Exception as e:
         return {"status": "error", "message": f"Invalid or rejected transaction: {e}"}
+
+
+def auto_release_milestone_payment(
+    db: Session,
+    *,
+    booking_id: str,
+    engagement_id: int,
+    token_address: str,
+    confidence_score: float,
+    test_results: str,
+    threshold: float,
+) -> dict[str, Any]:
+    """Trigger a Soroban escrow release when the confidence score is high enough."""
+    if confidence_score <= threshold:
+        return {
+            "status": "skipped",
+            "auto_released": False,
+            "reason": (
+                f"Confidence score {confidence_score:.2f} did not exceed the "
+                f"{threshold:.2f} auto-release threshold."
+            ),
+            "confidence_score": confidence_score,
+            "threshold": threshold,
+            "test_results": test_results,
+        }
+
+    try:
+        booking_uuid = uuid.UUID(booking_id)
+    except ValueError:
+        return {"status": "error", "message": "Booking not found"}
+
+    booking = db.query(Booking).filter(Booking.id == booking_uuid).first()
+    if not booking:
+        return {"status": "error", "message": "Booking not found"}
+
+    held_payment = (
+        db.query(Payment)
+        .filter(Payment.booking_id == booking_uuid, Payment.status == PaymentStatus.HELD)
+        .order_by(Payment.created_at.desc())
+        .first()
+    )
+    if not held_payment:
+        return {
+            "status": "error",
+            "message": "No held escrow payment found for this booking",
+        }
+
+    existing_release = (
+        db.query(Payment)
+        .filter(
+            Payment.booking_id == booking_uuid,
+            Payment.status == PaymentStatus.RELEASED,
+        )
+        .order_by(Payment.created_at.desc())
+        .first()
+    )
+    if existing_release:
+        return {
+            "status": "exists",
+            "auto_released": True,
+            "payment_id": str(existing_release.id),
+            "transaction_hash": existing_release.transaction_hash,
+            "confidence_score": confidence_score,
+            "threshold": threshold,
+            "test_results": test_results,
+            "client_email": booking.client.user.email,
+            "client_name": booking.client.user.full_name or "there",
+        }
+
+    soroban_result = release_escrow_via_oracle(engagement_id, token_address)
+    if not soroban_result.get("success"):
+        return {"status": "error", "message": "Oracle release transaction failed"}
+
+    memo = f"auto-release-{str(booking_uuid)[:15]}"[:MAX_MEMO_LENGTH]
+    record = _record_payment(
+        db,
+        booking_id,
+        soroban_result["hash"],
+        PaymentStatus.RELEASED,
+        Decimal(held_payment.amount),
+        os.getenv("ESCROW_CONTRACT_ID", "soroban-escrow"),
+        f"engagement:{engagement_id}",
+        memo,
+    )
+
+    return {
+        **record,
+        "auto_released": True,
+        "confidence_score": confidence_score,
+        "threshold": threshold,
+        "engagement_id": engagement_id,
+        "test_results": test_results,
+        "prepared_xdr": soroban_result.get("prepared_xdr"),
+        "signed_xdr": soroban_result.get("signed_xdr"),
+        "client_email": booking.client.user.email,
+        "client_name": booking.client.user.full_name or "there",
+    }

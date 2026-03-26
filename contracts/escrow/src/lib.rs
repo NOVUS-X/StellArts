@@ -34,6 +34,7 @@ pub enum DataKey {
     Escrow(u64),
     NextId,
     Arbitrator,
+    Oracle,
 }
 
 #[contracttype]
@@ -187,7 +188,7 @@ impl EscrowContract {
     /// Can only be called by the client and only when escrow is funded.
     /// Also verifies that the deadline has not passed; after the deadline the client
     /// must use `reclaim` to retrieve funds instead.
-    pub fn release(env: Env, engagement_id: u64, token: Address) {
+    pub fn release(env: Env, engagement_id: u64, token: Address, authority: Address) {
         let key = DataKey::Escrow(engagement_id);
         let mut escrow: Escrow = env
             .storage()
@@ -195,8 +196,18 @@ impl EscrowContract {
             .get(&key)
             .expect("Escrow not found");
 
-        // Auth: Require the client's signature
-        escrow.client.require_auth();
+        authority.require_auth();
+
+        let oracle: Option<Address> = env.storage().persistent().get(&DataKey::Oracle);
+        let is_client = authority == escrow.client;
+        let is_oracle = oracle
+            .as_ref()
+            .map(|configured_oracle| *configured_oracle == authority)
+            .unwrap_or(false);
+
+        if !is_client && !is_oracle {
+            panic!("Only the client or configured oracle can release funds");
+        }
 
         // Deadline check: prevent releasing funds after deadline has passed
         let current_time = env.ledger().timestamp();
@@ -223,6 +234,17 @@ impl EscrowContract {
         env.storage()
             .persistent()
             .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
+    }
+
+    /// Set the backend oracle address that may auto-release funded escrows.
+    pub fn set_oracle(env: Env, admin: Address, oracle: Address) {
+        admin.require_auth();
+
+        let oracle_key = DataKey::Oracle;
+        env.storage().persistent().set(&oracle_key, &oracle);
+        env.storage()
+            .persistent()
+            .extend_ttl(&oracle_key, TTL_THRESHOLD, NEXT_ID_TTL);
     }
 
     /// Allow the client to reclaim funds after the deadline has passed when an escrow is still funded.
@@ -372,11 +394,7 @@ impl EscrowContract {
 
         // Transfer funds to the winner
         let token_client = token::Client::new(&env, &token);
-        token_client.transfer(
-            &env.current_contract_address(),
-            &winner,
-            &escrow.amount,
-        );
+        token_client.transfer(&env.current_contract_address(), &winner, &escrow.amount);
 
         // Update status based on winner
         if winner == escrow.client {
@@ -772,7 +790,7 @@ mod test_legacy {
         token_client.transfer(&client_address, &contract_id, &amount);
 
         // Releasing after deadline should panic
-        client.release(&engagement_id, &token_address);
+        client.release(&engagement_id, &token_address, &client_address);
     }
 
     #[test]
@@ -1009,7 +1027,7 @@ mod test_legacy {
         token_client.transfer(&client_address, &contract_id, &amount);
 
         // release back to artist first
-        client.release(&engagement_id, &token_address);
+        client.release(&engagement_id, &token_address, &client_address);
         // attempt reclaim after it's been released
         client.reclaim(&engagement_id, &token_address);
     }
@@ -1062,7 +1080,7 @@ mod test_legacy {
         assert_eq!(token_client.balance(&artisan_address), 0);
         assert_eq!(token_client.balance(&contract_id), amount);
 
-        client.release(&engagement_id, &token_address);
+        client.release(&engagement_id, &token_address, &client_address);
 
         assert_eq!(token_client.balance(&artisan_address), amount);
         assert_eq!(token_client.balance(&contract_id), 0);
@@ -1101,7 +1119,7 @@ mod test_legacy {
                 .set(&DataKey::Escrow(engagement_id), &escrow);
         });
 
-        client.release(&engagement_id, &token_address);
+        client.release(&engagement_id, &token_address, &client_address);
     }
 
     #[test]
@@ -1143,7 +1161,7 @@ mod test_legacy {
 
         token_client.transfer(&client_address, &contract_id, &amount);
 
-        client.release(&engagement_id, &token_address);
-        client.release(&engagement_id, &token_address);
+        client.release(&engagement_id, &token_address, &client_address);
+        client.release(&engagement_id, &token_address, &client_address);
     }
 }
