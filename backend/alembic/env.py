@@ -17,7 +17,7 @@ from app.models.client import Client
 from app.models.booking import Booking
 from app.models.payment import Payment
 from app.models.review import Review
-from app.models.portfolio import PortfolioItem
+from app.models.portfolio import Portfolio
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

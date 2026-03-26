@@ -1,3 +1,4 @@
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     DECIMAL,
     Boolean,
@@ -31,6 +32,7 @@ class Artisan(Base):
     is_available = Column(Boolean, default=True)
     rating = Column(DECIMAL(3, 2), default=0.0)
     total_reviews = Column(Integer, default=0)
+    embedding = Column(Vector(1536), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
