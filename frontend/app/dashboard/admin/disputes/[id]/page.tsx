@@ -13,11 +13,14 @@ import {
   Gavel,
   User,
   ExternalLink,
-  Loader2
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function DisputeDetailPage() {
   const { id } = useParams();
@@ -158,26 +161,28 @@ export default function DisputeDetailPage() {
               <div className="space-y-3">
                 <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Before Project Start</p>
                 <div className="aspect-video relative rounded-xl overflow-hidden border border-border group">
-                  <img 
+                  <Image 
                     src={dispute.evidence.before_photo_url} 
                     alt="Before evidence" 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <ExternalLink className="w-6 h-6 text-white" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white z-10">
+                    <ExternalLink className="w-6 h-6" />
                   </div>
                 </div>
               </div>
               <div className="space-y-3">
                 <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground italic">After Claimed Completion</p>
                 <div className="aspect-video relative rounded-xl overflow-hidden border border-border group">
-                  <img 
+                  <Image 
                     src={dispute.evidence.after_photo_url} 
                     alt="After evidence" 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <ExternalLink className="w-6 h-6 text-white" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white z-10">
+                    <ExternalLink className="w-6 h-6" />
                   </div>
                 </div>
               </div>
@@ -252,17 +257,17 @@ export default function DisputeDetailPage() {
               />
             </div>
             <p className="mt-4 text-xs text-muted-foreground leading-relaxed italic">
-              "The high confidence score indicates that objective data (photos, SOW) aligns strongly with the artisan's claim of completion."
+              {"The high confidence score indicates that objective data (photos, SOW) aligns strongly with the artisan's claim of completion."}
             </p>
           </div>
 
           <div className="bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-900/50 p-6">
             <h3 className="font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
-              Arbitrator's Note
+              Arbitrator&apos;s Note
             </h3>
             <p className="text-sm text-amber-900/70 dark:text-amber-400/70 leading-relaxed">
-              Resolving this dispute will initiate an atomic on-chain transaction. Once the 'arbitrate' function is executed on Soroban, funds will be released immediately and the action cannot be reversed.
+              Resolving this dispute will initiate an atomic on-chain transaction. Once the &apos;arbitrate&apos; function is executed on Soroban, funds will be released immediately and the action cannot be reversed.
             </p>
           </div>
         </div>
