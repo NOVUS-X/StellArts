@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { motion } from "framer-motion";
-import { Wrench, Zap, Star, ArrowRight, Shield, Globe } from "lucide-react";
+import { Wrench, Zap, Star, ArrowRight, Shield } from "lucide-react";
 import Link from "next/link";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";

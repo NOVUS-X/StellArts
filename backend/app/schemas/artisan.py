@@ -11,7 +11,7 @@ class ArtisanItem(BaseModel):
     id: int
     business_name: str | None = None
     description: str | None = None
-    specialties: str | None = None
+    specialties: list[str] | None = None
     experience_years: int | None = None
     hourly_rate: float | None = None
     location: str | None = None
@@ -155,7 +155,7 @@ class NearbyArtisansRequest(BaseModel):
         ..., ge=-180, le=180, description="Search center longitude"
     )
     radius_km: float | None = Field(
-        10.0, ge=0.1, le=100, description="Search radius in kilometers"
+        10.0, ge=0.1, le=200, description="Search radius in kilometers"
     )
     specialties: list[str] | None = Field(None, description="Filter by specialties")
     min_rating: float | None = Field(
