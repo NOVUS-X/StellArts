@@ -102,9 +102,7 @@ def _build_local_analysis(sow: str, after_photos: Iterable[str]) -> dict[str, An
             f"Missing deliverables: {', '.join(missing) if missing else 'none'}."
         )
     elif missing:
-        summary = (
-            f"The evidence covers part of the SOW but is missing: {', '.join(missing)}."
-        )
+        summary = f"The evidence covers part of the SOW but is missing: {', '.join(missing)}."
     else:
         summary = "The evidence aligns with the stated scope of work."
 
