@@ -46,9 +46,6 @@ class BookingStatusUpdate(BaseModel):
     status: str = Field(..., description="New status for the booking")
 
 
-from pydantic import BaseModel, Field
-
-
 class BidCreate(BaseModel):
     """Schema for artisan to submit a counter-offer/bid"""
 

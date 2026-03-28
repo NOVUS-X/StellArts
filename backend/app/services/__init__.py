@@ -16,9 +16,7 @@ class NotificationService:
 
     @staticmethod
     async def find_top_matched_artisans(
-        db: Session,
-        booking: Booking,
-        limit: int = 5
+        db: Session, booking: Booking, limit: int = 5
     ) -> list[Artisan]:
         """
         Find top matched artisans based on service type and location.
@@ -51,7 +49,7 @@ class NotificationService:
             specialties=service_keywords,
             min_rating=3.0,
             is_available=True,
-            limit=limit
+            limit=limit,
         )
 
         result = await find_nearby_artisans_cached(db, request)
@@ -59,9 +57,7 @@ class NotificationService:
 
     @staticmethod
     def dispatch_smart_pitch(
-        artisan: Artisan,
-        booking: Booking,
-        pitch_message: str
+        artisan: Artisan, booking: Booking, pitch_message: str
     ) -> dict:
         """
         Dispatch smart pitch to an artisan.
@@ -75,7 +71,7 @@ class NotificationService:
             "estimated_cost": float(booking.estimated_cost),
             "location": booking.location,
             "status": "dispatched",
-            "dispatch_timestamp": "2026-03-28T10:49:00Z"
+            "dispatch_timestamp": "2026-03-28T10:49:00Z",
         }
 
         print(f"📢 Dispatching smart pitch to artisan {artisan.id}: {pitch_message}")
@@ -83,9 +79,7 @@ class NotificationService:
 
     @staticmethod
     async def dispatch_to_matched_artisans(
-        db: Session,
-        booking: Booking,
-        limit: int = 5
+        db: Session, booking: Booking, limit: int = 5
     ) -> list[dict]:
         """
         Find top matched artisans and dispatch smart pitches to all of them.
