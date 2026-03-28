@@ -1,7 +1,9 @@
 from decimal import Decimal
 from uuid import UUID
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.auth import (
@@ -22,6 +24,8 @@ from app.schemas.booking import (
     BookingResponse,
     BookingStatusUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/bookings")
 

@@ -286,16 +286,26 @@ impl EscrowContract {
     pub fn set_oracle(env: Env, admin: Address, oracle: Address) {
         admin.require_auth();
         env.storage().persistent().set(&DataKey::Oracle, &oracle);
-        env.storage().persistent().extend_ttl(&DataKey::Oracle, TTL_THRESHOLD, NEXT_ID_TTL);
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::Oracle, TTL_THRESHOLD, NEXT_ID_TTL);
     }
 
     /// Transition escrow status from Funded to InProgress
     pub fn start_job(env: Env, engagement_id: u64) {
-        let oracle: Address = env.storage().persistent().get(&DataKey::Oracle).expect("Oracle not set");
+        let oracle: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Oracle)
+            .expect("Oracle not set");
         oracle.require_auth();
 
         let key = DataKey::Escrow(engagement_id);
-        let mut escrow: Escrow = env.storage().persistent().get(&key).expect("Escrow not found");
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("Escrow not found");
 
         if escrow.status != Status::Funded {
             panic!("Escrow must be Funded to transition to InProgress");
@@ -303,7 +313,9 @@ impl EscrowContract {
 
         escrow.status = Status::InProgress;
         env.storage().persistent().set(&key, &escrow);
-        env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
     }
 
     /// Set the arbitrator address for resolving disputes
