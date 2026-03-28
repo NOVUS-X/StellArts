@@ -55,6 +55,20 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_PUBLISHABLE_KEY: str | None = None
 
+    # Google Calendar OAuth (read-only)
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
+
+    # Microsoft Outlook OAuth (read-only)
+    MICROSOFT_CLIENT_ID: str | None = None
+    MICROSOFT_CLIENT_SECRET: str | None = None
+
+    # OAuth shared settings
+    OAUTH_REDIRECT_URI: str = "http://localhost:8000/api/v1/calendar/callback"
+
+    # Calendar sync – how many days ahead to look for events
+    CALENDAR_SYNC_LOOKAHEAD_DAYS: int = 30
+
     # OpenAI
     OPENAI_API_KEY: str | None = None
     SEMANTIC_CACHE_TTL: int = 300  # seconds to cache semantic search results
