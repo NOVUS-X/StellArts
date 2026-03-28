@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     INGESTION_MIN_AUDIO_BYTES: int = 10_000
     INGESTION_MIN_BRIGHTNESS: float = 50.0
     INGESTION_MIN_SHARPNESS: float = 12.0
+    GEMINI_API_KEY: str | None = None
+    GEMINI_API_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
+    VISION_SCOPE_MODEL: str = "gemini-2.5-pro"
+    VISION_SCOPE_TIMEOUT_SECONDS: float = 60.0
 
     # Soroban Configuration
     SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"

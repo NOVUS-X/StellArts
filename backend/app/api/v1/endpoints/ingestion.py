@@ -6,9 +6,11 @@ from uuid import uuid4
 from fastapi import APIRouter, File, Form, UploadFile, WebSocket, WebSocketDisconnect, status
 
 from app.schemas.ingestion import VisionToScopeResponse
+from app.schemas.project_state import ProjectState, VisionExecutionRequest
 from app.services.analysis_queue import analysis_queue
 from app.services.ingestion_realtime import ingestion_connection_manager
 from app.services.media_ingestion import build_job_payload, media_ingestion_service
+from app.services.vision_scope_execution import VisionScopeExecutionNode
 
 router = APIRouter(prefix="/ingestion")
 
@@ -73,6 +75,26 @@ async def ingest_vision_to_scope(
     )
 
     return response
+
+
+@router.post(
+    "/vision-to-scope/execute",
+    response_model=ProjectState,
+    status_code=status.HTTP_200_OK,
+)
+async def execute_vision_to_scope(request: VisionExecutionRequest):
+    node = VisionScopeExecutionNode()
+    project_state = await node.execute(request.payload)
+
+    await ingestion_connection_manager.publish(
+        request.payload.session_id,
+        {
+            "event": "vision_to_scope.executed",
+            "payload": project_state.model_dump(mode="json"),
+        },
+    )
+
+    return project_state
 
 
 @router.websocket("/ws/{session_id}")
