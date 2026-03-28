@@ -4,7 +4,7 @@ Handles all interactions with Soroban contracts on the Stellar network.
 """
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from stellar_sdk import (
     Keypair,
@@ -12,9 +12,10 @@ from stellar_sdk import (
     SorobanServer,
     TransactionBuilder,
     scval,
+)
+from stellar_sdk import (
     xdr as stellar_xdr,
 )
-from stellar_sdk.exceptions import PrepareTransactionException, SorobanRpcError
 from stellar_sdk.soroban_rpc import SendTransactionStatus
 
 from app.core.config import settings
@@ -108,13 +109,17 @@ def invoke_contract_function(
                     "result": status_response.result_xdr,
                 }
             elif status_response.status == "FAILED":
-                error_msg = f"Transaction {tx_hash} failed: {status_response.result_xdr}"
+                error_msg = (
+                    f"Transaction {tx_hash} failed: {status_response.result_xdr}"
+                )
                 logger.error(error_msg)
                 raise RuntimeError(error_msg)
 
             time.sleep(2)
 
-        raise TimeoutError(f"Transaction {tx_hash} not confirmed within {timeout_seconds} seconds")
+        raise TimeoutError(
+            f"Transaction {tx_hash} not confirmed within {timeout_seconds} seconds"
+        )
 
     except Exception as e:
         logger.error(f"Error in invoke_contract_function: {str(e)}")
@@ -138,19 +143,21 @@ def initialize_escrow_contract(source_keypair: Keypair) -> dict[str, Any]:
     return {"success": True, "message": "Escrow contract initialized"}
 
 
-def get_reputation_stats(artisan_address: str, source_keypair: Keypair) -> tuple[int, int]:
+def get_reputation_stats(
+    artisan_address: str, source_keypair: Keypair
+) -> tuple[int, int]:
     """
     Get on-chain reputation stats for an artisan.
-    
+
     Args:
         artisan_address: Artisan's Stellar address
         source_keypair: Keypair of the transaction submitter
-    
+
     Returns:
         Tuple of (average_score_scaled_by_100, review_count)
     """
     args = [scval.to_address(artisan_address)]
-    
+
     invoke_contract_function(
         REPUTATION_CONTRACT_ID,
         "get_stats",
