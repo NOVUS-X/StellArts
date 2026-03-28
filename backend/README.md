@@ -7,6 +7,7 @@ A scalable, production-ready FastAPI backend for the Stellarts platform - connec
 - **FastAPI Framework**: Modern, fast web framework for building APIs
 - **Modular Architecture**: Clean separation of concerns with organized directory structure
 - **Database Integration**: PostgreSQL with SQLAlchemy ORM
+- **Semantic Search**: pgvector-powered artisan matching with OpenAI embeddings
 - **Authentication**: JWT-based authentication system
 - **API Versioning**: Versioned API endpoints for smooth upgrades
 - **Containerized**: Docker and docker-compose for easy deployment
@@ -196,6 +197,7 @@ docker-compose up -d api-prod db
 
 - `GET /` - Root endpoint with API information
 - `GET /api/v1/health` - Health check with database status
+- `GET /api/v1/search/semantic` - Semantic artisan search by natural-language query
 - `GET /docs` - Interactive API documentation
 
 ## Security
@@ -217,7 +219,14 @@ DATABASE_URL=postgresql://user:pass@host:port/db
 SECRET_KEY=secure-random-key
 DEBUG=False
 BACKEND_CORS_ORIGINS=["https://yourdomain.com"]
+OPENAI_API_KEY=your-openai-api-key
+SEMANTIC_CACHE_TTL=300
 ```
+
+### Semantic Search Notes
+
+- The local Docker database uses a pgvector-enabled image (`pgvector/pgvector:pg15`) so vector indexes and similarity operators are available.
+- Use `GET /api/v1/search/semantic?q=historic%20restoration` to test natural-language ranking.
 
 ### Production Checklist
 
