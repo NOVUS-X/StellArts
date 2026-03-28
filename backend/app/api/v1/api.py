@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import admin, artisan, auth, booking, health, payments, search, stats, user
+from app.api.v1.endpoints import admin, artisan, auth, booking, calendar, health, payments, scheduling, search, stats, user
 
 api_router = APIRouter()
 
@@ -14,3 +14,5 @@ api_router.include_router(admin.router, tags=["admin"])
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(stats.router, tags=["stats"])
 api_router.include_router(search.router, tags=["search"])
+api_router.include_router(calendar.router, tags=["calendar"])
+api_router.include_router(scheduling.router, tags=["scheduling"])
