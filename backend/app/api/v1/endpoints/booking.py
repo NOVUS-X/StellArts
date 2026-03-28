@@ -122,6 +122,23 @@ def create_booking(
     db.commit()
     db.refresh(new_booking)
 
+    # Dispatch smart pitches to matched artisans (async operation)
+    try:
+        import asyncio
+
+        from app.services import notification_service
+
+        # Run async dispatch in background (fire and forget)
+        asyncio.create_task(
+            notification_service.dispatch_to_matched_artisans(db, new_booking)
+        )
+    except ImportError:
+        # Notification service not available, continue without dispatch
+        pass
+    except Exception as e:
+        # Log error but don't fail booking creation
+        print(f"Failed to dispatch notifications: {e}")
+
     return new_booking
 
 

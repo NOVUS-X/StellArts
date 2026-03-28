@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from enum import Enum, StrEnum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -12,7 +12,7 @@ class RoleEnum(StrEnum):
     admin = "admin"
 
 
-class PublicRoleEnum(str, Enum):
+class PublicRoleEnum(StrEnum):
     client = "client"
     artisan = "artisan"
 
