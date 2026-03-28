@@ -12,7 +12,7 @@ class RoleEnum(str, Enum):
     admin = "admin"
 
 
-class PublicRoleEnum(str, Enum):
+class PublicRoleEnum(StrEnum):
     client = "client"
     artisan = "artisan"
 
