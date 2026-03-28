@@ -46,12 +46,14 @@ class BookingStatusUpdate(BaseModel):
     status: str = Field(..., description="New status for the booking")
 
 
-from pydantic import BaseModel, Field
-
 class BidCreate(BaseModel):
     """Schema for artisan to submit a counter-offer/bid"""
+
     bid_amount: float = Field(..., gt=0, description="The counter-offer amount")
-    justification: str | None = Field(None, description="Justification required if bid > 300% of range")
+    justification: str | None = Field(
+        None, description="Justification required if bid > 300% of range"
+    )
+
 
 class BookingResponse(BaseModel):
     """Schema for booking response"""

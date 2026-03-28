@@ -1,5 +1,5 @@
 from decimal import Decimal
-import re
+
 
 class AIService:
     """
@@ -7,7 +7,9 @@ class AIService:
     """
 
     @staticmethod
-    def calculate_bid_range(service_description: str, hourly_rate: Decimal, estimated_hours: float) -> dict:
+    def calculate_bid_range(
+        service_description: str, hourly_rate: Decimal, estimated_hours: float
+    ) -> dict:
         """
         Merge labor and materials into an optimal Bid Range.
         Heuristic: Basic material estimation based on service keywords.
@@ -20,7 +22,7 @@ class AIService:
             "carpentry": Decimal("120.00"),
             "cleaning": Decimal("20.00"),
         }
-        
+
         # Determine material cost based on keywords
         material_cost = Decimal("30.00")  # Default
         desc_lower = service_description.lower()
@@ -28,24 +30,30 @@ class AIService:
             if keyword in desc_lower:
                 material_cost = cost
                 break
-        
+
         labor_cost = Decimal(str(estimated_hours)) * hourly_rate
         total_estimated = labor_cost + material_cost
-        
+
         # Optimal Range: +/- 10%
         range_min = total_estimated * Decimal("0.9")
         range_max = total_estimated * Decimal("1.1")
-        
+
         return {
             "labor_cost": labor_cost,
             "material_cost": material_cost,
             "range_min": range_min,
             "range_max": range_max,
-            "total_estimated": total_estimated
+            "total_estimated": total_estimated,
         }
 
     @staticmethod
-    def generate_smart_pitch(service_description: str, material_cost: Decimal, labor_cost: Decimal, total_cost: Decimal, estimated_hours: float) -> str:
+    def generate_smart_pitch(
+        service_description: str,
+        material_cost: Decimal,
+        labor_cost: Decimal,
+        total_cost: Decimal,
+        estimated_hours: float,
+    ) -> str:
         """
         Draft custom push notifications/pitches.
         Example: "I estimate materials at $120. Claim this 4hr job for $600?"
@@ -59,5 +67,6 @@ class AIService:
         Returns True if the counter-offer is > 300% of the calculated max range.
         """
         return counter_offer > (range_max * Decimal("3.0"))
+
 
 ai_service = AIService()

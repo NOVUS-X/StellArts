@@ -16,7 +16,12 @@ from app.models.artisan import Artisan
 from app.models.booking import Booking, BookingStatus
 from app.models.client import Client
 from app.models.user import User
-from app.schemas.booking import BidCreate, BookingCreate, BookingResponse, BookingStatusUpdate
+from app.schemas.booking import (
+    BidCreate,
+    BookingCreate,
+    BookingResponse,
+    BookingStatusUpdate,
+)
 
 router = APIRouter(prefix="/bookings")
 
@@ -75,23 +80,23 @@ def create_booking(
 
     # Use AIService for dynamic bid range calculation and smart pitching
     from app.services.ai_service import ai_service
-    
+
     # Get artisan's hourly rate (default to 50 if not set)
     hourly_rate = artisan.hourly_rate or Decimal("50.00")
-    estimated_hours = booking_data.estimated_hours or 2.0  # Default to 2 hours if not provided
-    
+    estimated_hours = (
+        booking_data.estimated_hours or 2.0
+    )  # Default to 2 hours if not provided
+
     bid_data = ai_service.calculate_bid_range(
-        booking_data.service, 
-        hourly_rate, 
-        estimated_hours
+        booking_data.service, hourly_rate, estimated_hours
     )
-    
+
     pitch = ai_service.generate_smart_pitch(
         booking_data.service,
         bid_data["material_cost"],
         bid_data["labor_cost"],
         bid_data["total_estimated"],
-        estimated_hours
+        estimated_hours,
     )
 
     # Create the booking model instance with status = PENDING
@@ -116,6 +121,23 @@ def create_booking(
     db.add(new_booking)
     db.commit()
     db.refresh(new_booking)
+
+    # Dispatch smart pitches to matched artisans (async operation)
+    try:
+        import asyncio
+
+        from app.services import notification_service
+
+        # Run async dispatch in background (fire and forget)
+        asyncio.create_task(
+            notification_service.dispatch_to_matched_artisans(db, new_booking)
+        )
+    except ImportError:
+        # Notification service not available, continue without dispatch
+        pass
+    except Exception as e:
+        # Log error but don't fail booking creation
+        print(f"Failed to dispatch notifications: {e}")
 
     return new_booking
 
@@ -366,8 +388,8 @@ def submit_bid(
     booking.estimated_cost = Decimal(str(bid_data.bid_amount))
     if bid_data.justification:
         booking.notes = (
-            (booking.notes or "") + f"\n[Artisan Justification]: {bid_data.justification}"
-        )
+            booking.notes or ""
+        ) + f"\n[Artisan Justification]: {bid_data.justification}"
 
     db.commit()
     db.refresh(booking)
