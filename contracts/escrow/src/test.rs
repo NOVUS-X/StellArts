@@ -407,4 +407,257 @@ mod happy_path_tests {
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.status, Status::Refunded);
     }
-}
+    /// Test 12: Dispute - client initiates dispute on funded escrow
+    #[test]
+    fn test_dispute_from_client() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Initialize, mint, and deposit
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Verify initial state is Funded
+        assert_eq!(ctx.get_escrow(engagement_id).status, Status::Funded);
+
+        // Client initiates dispute
+        ctx.client_contract.dispute(&engagement_id, &client);
+
+        // Verify status transitioned to Disputed
+        let escrow = ctx.get_escrow(engagement_id);
+        assert_eq!(escrow.status, Status::Disputed);
+    }
+
+    /// Test 13: Dispute - artisan initiates dispute on funded escrow
+    #[test]
+    fn test_dispute_from_artisan() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Initialize, mint, and deposit
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Verify initial state is Funded
+        assert_eq!(ctx.get_escrow(engagement_id).status, Status::Funded);
+
+        // Artisan initiates dispute
+        ctx.client_contract.dispute(&engagement_id, &artisan);
+
+        // Verify status transitioned to Disputed
+        let escrow = ctx.get_escrow(engagement_id);
+        assert_eq!(escrow.status, Status::Disputed);
+    }
+
+    /// Test 14: Dispute from wrong state - attempt dispute on Pending escrow should fail
+    #[test]
+    #[should_panic(expected = "Escrow must be Funded to initiate a dispute")]
+    fn test_dispute_from_pending_state_fails() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Initialize but don't deposit (escrow remains Pending)
+        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount);
+
+        // Attempt to dispute Pending escrow should fail
+        ctx.client_contract.dispute(&engagement_id, &client);
+    }
+
+    /// Test 15: Double dispute rejection - second dispute on already disputed escrow should fail
+    #[test]
+    #[should_panic(expected = "Escrow must be Funded to initiate a dispute")]
+    fn test_double_dispute_rejection() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Initialize, mint, and deposit
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // First dispute succeeds
+        ctx.client_contract.dispute(&engagement_id, &client);
+        assert_eq!(ctx.get_escrow(engagement_id).status, Status::Disputed);
+
+        // Second dispute should fail
+        ctx.client_contract.dispute(&engagement_id, &client);
+    }
+
+    /// Test 16: Unauthorized dispute - third party cannot initiate dispute
+    #[test]
+    #[should_panic(expected = "Only client or artisan can initiate a dispute")]
+    fn test_unauthorized_dispute_attempt() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Initialize, mint, and deposit
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Third party attempts to dispute
+        let unauthorized = Address::generate(&ctx.env);
+        ctx.client_contract.dispute(&engagement_id, &unauthorized);
+    }
+
+    /// Test 17: Arbitrate - arbitrator resolves dispute in favor of client (refund)
+    #[test]
+    fn test_arbitrate_to_client() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let admin = Address::generate(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Set arbitrator
+        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
+
+        // Setup: Initialize, mint, and deposit
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Initiate dispute
+        ctx.client_contract.dispute(&engagement_id, &client);
+        assert_eq!(ctx.get_escrow(engagement_id).status, Status::Disputed);
+
+        // Get client balance before arbitration
+        let client_balance_before = ctx.token_client.balance(&client);
+
+        // Arbitrator resolves in favor of client
+        ctx.client_contract
+            .arbitrate(&engagement_id, &client, &ctx.token_address);
+
+        // Verify funds transferred to client
+        let client_balance_after = ctx.token_client.balance(&client);
+        assert_eq!(client_balance_after, client_balance_before + amount);
+
+        // Verify status transitioned to Refunded
+        let escrow = ctx.get_escrow(engagement_id);
+        assert_eq!(escrow.status, Status::Refunded);
+    }
+
+    /// Test 18: Arbitrate - arbitrator resolves dispute in favor of artisan (release)
+    #[test]
+    fn test_arbitrate_to_artisan() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let admin = Address::generate(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Set arbitrator
+        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
+
+        // Setup: Initialize, mint, and deposit
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Initiate dispute
+        ctx.client_contract.dispute(&engagement_id, &artisan);
+        assert_eq!(ctx.get_escrow(engagement_id).status, Status::Disputed);
+
+        // Get artisan balance before arbitration
+        let artisan_balance_before = ctx.token_client.balance(&artisan);
+
+        // Arbitrator resolves in favor of artisan
+        ctx.client_contract
+            .arbitrate(&engagement_id, &artisan, &ctx.token_address);
+
+        // Verify funds transferred to artisan
+        let artisan_balance_after = ctx.token_client.balance(&artisan);
+        assert_eq!(artisan_balance_after, artisan_balance_before + amount);
+
+        // Verify status transitioned to Released
+        let escrow = ctx.get_escrow(engagement_id);
+        assert_eq!(escrow.status, Status::Released);
+    }
+
+    /// Test 19: Unauthorized arbitrate - non-arbitrator cannot resolve disputes
+    #[test]
+    #[should_panic]
+    fn test_unauthorized_arbitrate_attempt() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let unauthorized = Address::generate(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Set arbitrator
+        let admin = Address::generate(&ctx.env);
+        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
+
+        // Setup: Initialize, mint, and deposit
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Initiate dispute
+        ctx.client_contract.dispute(&engagement_id, &client);
+
+        // Disable global mock auth and ensure only real arbitrator can call
+        ctx.env.set_auths(&[]);
+
+        // Unauthorized user attempts to arbitrate
+        ctx.client_contract
+            .arbitrate(&engagement_id, &client, &ctx.token_address);
+    }
+
+    /// Test 20: Arbitrate - invalid winner (third party) should fail
+    #[test]
+    #[should_panic(expected = "Winner must be either client or artisan")]
+    fn test_arbitrate_invalid_winner() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let invalid_winner = Address::generate(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Set arbitrator
+        let admin = Address::generate(&ctx.env);
+        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
+
+        // Setup: Initialize, mint, and deposit
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Initiate dispute
+        ctx.client_contract.dispute(&engagement_id, &client);
+
+        // Arbitrator tries to award funds to a third party
+        ctx.client_contract
+            .arbitrate(&engagement_id, &invalid_winner, &ctx.token_address);
+    }
+
+    /// Test 21: Arbitrate from non-disputed state should fail
+    #[test]
+    #[should_panic(expected = "Escrow must be in Disputed status to arbitrate")]
+    fn test_arbitrate_from_non_disputed_state_fails() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Set arbitrator
+        let admin = Address::generate(&ctx.env);
+        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
+
+        // Setup: Initialize, mint, and deposit (but don't dispute)
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Arbitrator tries to arbitrate on non-disputed escrow
+        ctx.client_contract
+            .arbitrate(&engagement_id, &client, &ctx.token_address);
+    }
+
+    /// Test 22: Arbitrator not set should fail
+    #[test]
+    #[should_panic(expected = "Arbitrator not set")]
+    fn test_arbitrate_without_arbitrator_set() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Initialize, mint, and deposit without setting arbitrator
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Initiate dispute
+        ctx.client_contract.dispute(&engagement_id, &client);
+
+        // Try to arbitrate without arbitrator set
+        ctx.client_contract
+            .arbitrate(&engagement_id, &client, &ctx.token_address);
+    }}
