@@ -100,7 +100,7 @@ impl ReputationContract {
 
     pub fn get_stats(env: Env, user: Address) -> (u64, u64) {
         let data = read_reputation(&env, &user);
-        if data.review_count == 0 {
+        if data.review_count === 0 {
             return (0, 0);
         }
         let average_scaled = (data.total_stars * 100) / data.review_count;
