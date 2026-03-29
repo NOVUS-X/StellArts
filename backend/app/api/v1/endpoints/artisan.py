@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import (
@@ -58,7 +59,7 @@ def get_artisan_counts(db: Session = Depends(get_db)):
         if not raw:
             continue
         try:
-            specs = _json.loads(raw)
+            specs = json.loads(raw)
             if isinstance(specs, list):
                 for s in specs:
                     key = str(s).strip().lower()
