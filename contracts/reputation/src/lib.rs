@@ -28,10 +28,7 @@ pub struct ReputationData {
 /// Returns default values (0 total_stars, 0 review_count) if user has no existing reputation
 pub fn read_reputation(env: &Env, user: &Address) -> ReputationData {
     let key = DataKey::Reputation(user.clone());
-    env.storage()
-        .persistent()
-        .get(&key)
-        .unwrap_or_default()
+    env.storage().persistent().get(&key).unwrap_or_default()
 }
 
 /// Helper function to write reputation data for a user
@@ -82,7 +79,7 @@ impl ReputationContract {
     /// Example: 9 total stars / 2 reviews = 4.5 average → returns (450, 2)
     pub fn get_stats(env: Env, user: Address) -> (u64, u64) {
         let data = read_reputation(&env, &user);
-        if data.review_count === 0 {
+        if data.review_count == 0 {
             return (0, 0);
         }
         let average_scaled = (data.total_stars * 100) / data.review_count;
@@ -203,7 +200,7 @@ mod tests {
         let client = ReputationContractClient::new(&env, &contract_id);
 
         let artisan = Address::generate(&env);
-        let _ = client.rate_artisan(&artisan, &2);
+        client.rate_artisan(&artisan, &2);
         let reputation = client.get_reputation(&artisan);
 
         // Verifies that read_reputation returns default values (0, 0) when no reputation exists
@@ -219,7 +216,7 @@ mod tests {
         let client = ReputationContractClient::new(&env, &contract_id);
 
         let artisan = Address::generate(&env);
-        let _ = client.rate_artisan(&artisan, &6);
+        client.rate_artisan(&artisan, &6);
     }
 
     #[test]
@@ -230,7 +227,7 @@ mod tests {
         let client = ReputationContractClient::new(&env, &contract_id);
 
         let artisan = Address::generate(&env);
-        let _ = client.rate_artisan(&artisan, &0);
+        client.rate_artisan(&artisan, &0);
     }
 
     #[test]
@@ -240,9 +237,9 @@ mod tests {
         let client = ReputationContractClient::new(&env, &contract_id);
 
         let artisan = Address::generate(&env);
-        let _ = client.rate_artisan(&artisan, &2);
-        let _ = client.rate_artisan(&artisan, &5);
-        let _ = client.rate_artisan(&artisan, &1);
+        client.rate_artisan(&artisan, &2);
+        client.rate_artisan(&artisan, &5);
+        client.rate_artisan(&artisan, &1);
         let reputation = client.get_reputation(&artisan);
 
         assert_eq!(reputation.total_stars, 8);
