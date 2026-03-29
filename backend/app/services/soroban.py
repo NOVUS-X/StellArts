@@ -174,7 +174,7 @@ def transition_to_in_progress(engagement_id: int) -> dict[str, Any]:
     """
     # Convert engagement_id to Soroban Uint64
     args = [scval.to_uint64(engagement_id)]
-    
+
     return invoke_contract_function(
         ESCROW_CONTRACT_ID,
         "start_job",

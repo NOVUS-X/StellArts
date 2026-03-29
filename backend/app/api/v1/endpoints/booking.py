@@ -1,6 +1,7 @@
+import asyncio
+import logging
 from decimal import Decimal
 from uuid import UUID
-import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -24,6 +25,10 @@ from app.schemas.booking import (
     BookingResponse,
     BookingStatusUpdate,
 )
+from app.services import notification_service
+from app.services.ai_service import ai_service
+from app.services.geolocation import geolocation_service
+from app.services.soroban import transition_to_in_progress
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +59,6 @@ def create_booking(
             ),
         )
     # Find or create the client profile for the current user
-    from app.models.client import Client
 
     client = db.query(Client).filter(Client.user_id == current_user.id).first()
 
@@ -65,7 +69,6 @@ def create_booking(
         db.flush()  # Get the client.id without committing yet
 
     # Verify that artisan_id exists in the database
-    from app.models.artisan import Artisan
 
     artisan = db.query(Artisan).filter(Artisan.id == booking_data.artisan_id).first()
 
@@ -83,7 +86,6 @@ def create_booking(
         )
 
     # Use AIService for dynamic bid range calculation and smart pitching
-    from app.services.ai_service import ai_service
 
     # Get artisan's hourly rate (default to 50 if not set)
     hourly_rate = artisan.hourly_rate or Decimal("50.00")
@@ -128,9 +130,6 @@ def create_booking(
 
     # Dispatch smart pitches to matched artisans (async operation)
     try:
-        import asyncio
-
-        from app.services import notification_service
 
         # Run async dispatch in background (fire and forget)
         asyncio.create_task(
@@ -157,8 +156,6 @@ def get_my_bookings(
     - Clients see bookings they created
     - Artisans see bookings assigned to them
     """
-    from app.models.artisan import Artisan
-    from app.models.client import Client
 
     bookings = []
 
@@ -375,7 +372,6 @@ def submit_bid(
         )
 
     # Enforce Guardrail
-    from app.services.ai_service import ai_service
 
     is_outlier = ai_service.check_guardrail(
         Decimal(str(bid_data.bid_amount)), booking.range_max or Decimal("0")
@@ -404,9 +400,11 @@ def submit_bid(
         "new_estimated_cost": float(booking.estimated_cost),
     }
 
+
 class LocationUpdate(BaseModel):
     latitude: float
     longitude: float
+
 
 @router.post("/{booking_id}/location")
 async def update_location(
@@ -420,7 +418,9 @@ async def update_location(
     If artisan is within 100m, transitions Soroban escrow to InProgress.
     """
     if current_user.role != "artisan":
-        raise HTTPException(status_code=403, detail="Only artisans can send location updates")
+        raise HTTPException(
+            status_code=403, detail="Only artisans can send location updates"
+        )
 
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
@@ -428,14 +428,18 @@ async def update_location(
 
     artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
     if not artisan or booking.artisan_id != artisan.id:
-        raise HTTPException(status_code=403, detail="You are not the assigned artisan for this booking")
+        raise HTTPException(
+            status_code=403,
+            detail="You are not the assigned artisan for this booking"
+        )
 
     # 1. Geocode job site location if coordinates are not available
     # For simplicity, we assume the booking.location string needs geocoding
-    from app.services.geolocation import geolocation_service
     job_geo = await geolocation_service.geocode_address(booking.location)
     if not job_geo:
-        raise HTTPException(status_code=400, detail="Could not verify job site coordinates")
+        raise HTTPException(
+            status_code=400, detail="Could not verify job site coordinates"
+        )
 
     # 2. Verify arrival (distance < 100m)
     distance_km = await geolocation_service.calculate_distance(
@@ -444,24 +448,23 @@ async def update_location(
         job_geo.latitude,
         job_geo.longitude
     )
-    
+
     # 100m = 0.1km
     is_arrived = distance_km <= 0.1
 
     if is_arrived and booking.status == BookingStatus.CONFIRMED:
         # 3. Transition Soroban escrow to InProgress
-        from app.services import soroban
         try:
-            # We use engagement_id from a mapping or similar. 
+            # We use engagement_id from a mapping or similar.
             # In this MVP, we use a mock engagement_id derived from booking.id (uint64)
             engagement_id = int(booking.id.int >> 64) % 1000000  # Mock logic
-            
-            soroban.transition_to_in_progress(engagement_id)
-            
+
+            transition_to_in_progress(engagement_id)
+
             # Update booking status in DB
             booking.status = BookingStatus.IN_PROGRESS
             db.commit()
-            
+
             return {
                 "status": "arrived",
                 "message": "Arrival verified! Job started on-chain.",
