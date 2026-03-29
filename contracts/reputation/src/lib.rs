@@ -28,10 +28,7 @@ pub struct ReputationData {
 /// Returns default values (0 total_stars, 0 review_count) if user has no existing reputation
 pub fn read_reputation(env: &Env, user: &Address) -> ReputationData {
     let key = DataKey::Reputation(user.clone());
-    env.storage()
-        .persistent()
-        .get(&key)
-        .unwrap_or_default()
+    env.storage().persistent().get(&key).unwrap_or_default()
 }
 
 /// Helper function to write reputation data for a user

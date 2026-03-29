@@ -410,11 +410,7 @@ impl EscrowContract {
 
         // Transfer funds to the winner
         let token_client = token::Client::new(&env, &token);
-        token_client.transfer(
-            &env.current_contract_address(),
-            &winner,
-            &escrow.amount,
-        );
+        token_client.transfer(&env.current_contract_address(), &winner, &escrow.amount);
 
         // Update status based on winner
         if winner == escrow.client {

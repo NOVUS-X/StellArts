@@ -660,4 +660,5 @@ mod happy_path_tests {
         // Try to arbitrate without arbitrator set
         ctx.client_contract
             .arbitrate(&engagement_id, &client, &ctx.token_address);
-    }}
+    }
+}

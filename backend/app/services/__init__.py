@@ -8,7 +8,7 @@ class NotificationService:
             "artisan_id": artisan.id,
             "booking_id": booking.id,
             "message": pitch_message,
-            "status": "dispatched"
+            "status": "dispatched",
         }
 
     @staticmethod
