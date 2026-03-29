@@ -17,6 +17,12 @@
     "noEmit": true,
     "incremental": true,
     "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    
+    
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
