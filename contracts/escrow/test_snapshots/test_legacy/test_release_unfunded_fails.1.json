@@ -526,7 +526,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Escrow is not funded' from contract function 'Symbol(release)'"
+                  "string": "caught panic 'Escrow is not funded or in progress' from contract function 'Symbol(release)'"
                 },
                 {
                   "u64": 1
