@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str | None = None
 
     # Soroban Configuration
+    # Optional vision model configuration for completion verification
+    VISION_API_URL: str | None = None
+    VISION_API_KEY: str | None = None
+    VISION_MODEL: str = "gpt-4o-mini"
+    JOB_COMPLETION_ACCEPTANCE_THRESHOLD: float = 0.75
+
+    # Soroban Configuration
     SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
     ESCROW_CONTRACT_ID: str | None = None
     REPUTATION_CONTRACT_ID: str | None = None

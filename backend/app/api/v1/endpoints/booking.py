@@ -9,6 +9,7 @@ from app.core.auth import (
     require_admin,
     require_client,
     require_client_or_artisan,
+    require_artisan,
 )
 from app.core.config import settings
 from app.db.session import get_db
@@ -18,10 +19,13 @@ from app.models.client import Client
 from app.models.user import User
 from app.schemas.booking import (
     BidCreate,
+    BookingCompletionVerificationRequest,
+    BookingCompletionVerificationResponse,
     BookingCreate,
     BookingResponse,
     BookingStatusUpdate,
 )
+from app.services.completion_verification import assess_booking_completion
 
 router = APIRouter(prefix="/bookings")
 
@@ -398,4 +402,64 @@ def submit_bid(
         "status": "success",
         "message": "Bid submitted successfully",
         "new_estimated_cost": float(booking.estimated_cost),
+    }
+
+
+@router.post(
+    "/{booking_id}/verify-completion",
+    response_model=BookingCompletionVerificationResponse,
+)
+async def verify_booking_completion(
+    booking_id: UUID,
+    verification_payload: BookingCompletionVerificationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_artisan),
+):
+    """Verify final work photos against the booking scope of work."""
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+
+    if not booking:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Booking with id {booking_id} not found",
+        )
+
+    artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
+    if not artisan or booking.artisan_id != artisan.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to verify completion for this booking",
+        )
+
+    if booking.status not in (BookingStatus.IN_PROGRESS, BookingStatus.COMPLETED):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Completion can only be verified for active or completed jobs",
+        )
+
+    sow_text = verification_payload.sow or booking.service
+    if booking.notes:
+        sow_text = f"{sow_text}\n{booking.notes}"
+
+    analysis = await assess_booking_completion(
+        scope_hash=verification_payload.scope_hash,
+        sow=sow_text,
+        after_photos=verification_payload.after_photos,
+    )
+
+    if analysis["verified"] and booking.status != BookingStatus.COMPLETED:
+        booking.status = BookingStatus.COMPLETED
+        db.commit()
+        db.refresh(booking)
+
+    return {
+        "booking_id": booking.id,
+        "status": booking.status.value,
+        "completion_confidence": analysis["completion_confidence"],
+        "verified": analysis["verified"],
+        "scope_hash": verification_payload.scope_hash,
+        "summary": analysis["summary"],
+        "matched_deliverables": analysis["matched_deliverables"],
+        "missing_deliverables": analysis["missing_deliverables"],
+        "fundamentally_wrong": analysis["fundamentally_wrong"],
     }
