@@ -30,9 +30,7 @@ def get_platform_stats(db: Session = Depends(get_db)):
         .scalar()
     ) or 0
 
-    average_rating = (
-        db.query(func.avg(Review.rating)).scalar()
-    )
+    average_rating = db.query(func.avg(Review.rating)).scalar()
 
     return {
         "artisan_count": artisan_count,
