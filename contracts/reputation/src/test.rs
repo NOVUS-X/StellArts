@@ -8,6 +8,7 @@ fn test_reputation_flow_integration() {
     let env = Env::default();
     let contract_id = env.register_contract(None, ReputationContract);
     let client = ReputationContractClient::new(&env, &contract_id);
+    env.mock_all_auths();
 
     // Create artisan address
     let artisan = Address::generate(&env);
@@ -17,16 +18,16 @@ fn test_reputation_flow_integration() {
     assert_eq!(initial_stats, (0, 0)); // (total_stars, review_count)
 
     // Scenario: User A submits a rating of 5 stars
-    let _user_a = Address::generate(&env);
-    client.rate_artisan(&artisan, &5);
+    let user_a = Address::generate(&env);
+    client.rate_artisan(&user_a, &artisan, &5);
 
     // Verify after first rating
     let stats_after_user_a = client.get_stats(&artisan);
     assert_eq!(stats_after_user_a, (500, 1)); // (average_scaled_by_100, review_count)
 
     // Scenario: User B submits a rating of 3 stars
-    let _user_b = Address::generate(&env);
-    client.rate_artisan(&artisan, &3);
+    let user_b = Address::generate(&env);
+    client.rate_artisan(&user_b, &artisan, &3);
 
     // Assert that get_stats returns an average of 4.0
     let final_stats = client.get_stats(&artisan);
@@ -48,11 +49,12 @@ fn test_edge_case_zero_stars() {
     let env = Env::default();
     let contract_id = env.register_contract(None, ReputationContract);
     let client = ReputationContractClient::new(&env, &contract_id);
+    env.mock_all_auths();
 
+    let caller = Address::generate(&env);
     let artisan = Address::generate(&env);
 
-    // Edge Case: Attempt to rate with 0 stars (should panic)
-    client.rate_artisan(&artisan, &0);
+    client.rate_artisan(&caller, &artisan, &0);
 }
 
 #[test]
@@ -61,11 +63,12 @@ fn test_edge_case_six_stars() {
     let env = Env::default();
     let contract_id = env.register_contract(None, ReputationContract);
     let client = ReputationContractClient::new(&env, &contract_id);
+    env.mock_all_auths();
 
+    let caller = Address::generate(&env);
     let artisan = Address::generate(&env);
 
-    // Edge Case: Attempt to rate with 6 stars (should panic)
-    client.rate_artisan(&artisan, &6);
+    client.rate_artisan(&caller, &artisan, &6);
 }
 
 #[test]
@@ -73,20 +76,19 @@ fn test_reputation_robustness_multiple_reviews() {
     let env = Env::default();
     let contract_id = env.register_contract(None, ReputationContract);
     let client = ReputationContractClient::new(&env, &contract_id);
+    env.mock_all_auths();
 
     let artisan = Address::generate(&env);
 
-    // Simulate a popular artisan receiving multiple reviews
     let ratings = [5, 4, 5, 3, 5, 4, 5, 5, 4, 3]; // 10 reviews
 
     for rating in ratings {
-        client.rate_artisan(&artisan, &rating);
+        let caller = Address::generate(&env);
+        client.rate_artisan(&caller, &artisan, &rating);
     }
 
     let stats = client.get_stats(&artisan);
     assert_eq!(stats.1, 10); // 10 reviews
-
-    // Calculate expected average: (5+4+5+3+5+4+5+5+4+3) / 10 = 4.3, scaled = 430
     assert_eq!(stats.0, 430); // 430 = 4.3 * 100
 
     // Verify average: 430 / 100 = 4.3
@@ -95,7 +97,8 @@ fn test_reputation_robustness_multiple_reviews() {
 
     // Verify no overflow with many reviews
     for _ in 0..100 {
-        client.rate_artisan(&artisan, &5);
+        let caller = Address::generate(&env);
+        client.rate_artisan(&caller, &artisan, &5);
     }
 
     let final_stats = client.get_stats(&artisan);
@@ -108,31 +111,31 @@ fn test_reputation_isolation_between_artisans() {
     let env = Env::default();
     let contract_id = env.register_contract(None, ReputationContract);
     let client = ReputationContractClient::new(&env, &contract_id);
+    env.mock_all_auths();
 
     let artisan1 = Address::generate(&env);
     let artisan2 = Address::generate(&env);
 
+    let caller1 = Address::generate(&env);
+    let caller2 = Address::generate(&env);
+    let caller3 = Address::generate(&env);
+    let caller4 = Address::generate(&env);
+
     // Rate artisan1
-    client.rate_artisan(&artisan1, &5);
-    client.rate_artisan(&artisan1, &3);
+    client.rate_artisan(&caller1, &artisan1, &5);
+    client.rate_artisan(&caller2, &artisan1, &3);
 
     // Rate artisan2
-    client.rate_artisan(&artisan2, &4);
-    client.rate_artisan(&artisan2, &4);
+    client.rate_artisan(&caller3, &artisan2, &4);
+    client.rate_artisan(&caller4, &artisan2, &4);
 
     let stats1 = client.get_stats(&artisan1);
     let stats2 = client.get_stats(&artisan2);
 
-    // Verify isolation: artisan1 has 8/2 = 4.0 average, scaled = 400
     assert_eq!(stats1, (400, 2));
-
-    // Verify isolation: artisan2 has 8/2 = 4.0 average, scaled = 400
     assert_eq!(stats2, (400, 2));
+    assert_ne!(artisan1, artisan2);
 
-    // But they should have different addresses (isolation)
-    assert_ne!(artisan1, artisan2); // Different addresses
-
-    // Both should have the same reputation values but stored separately
     let rep1 = client.get_reputation(&artisan1);
     let rep2 = client.get_reputation(&artisan2);
     assert_eq!(rep1.total_stars, 8);
@@ -140,13 +143,14 @@ fn test_reputation_isolation_between_artisans() {
     assert_eq!(rep1.review_count, 2);
     assert_eq!(rep2.review_count, 2);
 
-    // Verify that changing one doesn't affect the other
-    client.rate_artisan(&artisan1, &5);
+    let caller5 = Address::generate(&env);
+    client.rate_artisan(&caller5, &artisan1, &5);
+    
     let rep1_updated = client.get_reputation(&artisan1);
     let rep2_unchanged = client.get_reputation(&artisan2);
 
-    assert_eq!(rep1_updated.total_stars, 13); // 8 + 5
-    assert_eq!(rep1_updated.review_count, 3); // 2 + 1
-    assert_eq!(rep2_unchanged.total_stars, 8); // unchanged
-    assert_eq!(rep2_unchanged.review_count, 2); // unchanged
+    assert_eq!(rep1_updated.total_stars, 13);
+    assert_eq!(rep1_updated.review_count, 3);
+    assert_eq!(rep2_unchanged.total_stars, 8);
+    assert_eq!(rep2_unchanged.review_count, 2);
 }
