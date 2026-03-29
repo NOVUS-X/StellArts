@@ -130,7 +130,6 @@ def create_booking(
 
     # Dispatch smart pitches to matched artisans (async operation)
     try:
-
         # Run async dispatch in background (fire and forget)
         asyncio.create_task(
             notification_service.dispatch_to_matched_artisans(db, new_booking)
@@ -429,8 +428,7 @@ async def update_location(
     artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
     if not artisan or booking.artisan_id != artisan.id:
         raise HTTPException(
-            status_code=403,
-            detail="You are not the assigned artisan for this booking"
+            status_code=403, detail="You are not the assigned artisan for this booking"
         )
 
     # 1. Geocode job site location if coordinates are not available
@@ -446,7 +444,7 @@ async def update_location(
         Decimal(str(location_data.latitude)),
         Decimal(str(location_data.longitude)),
         job_geo.latitude,
-        job_geo.longitude
+        job_geo.longitude,
     )
 
     # 100m = 0.1km
@@ -468,19 +466,19 @@ async def update_location(
             return {
                 "status": "arrived",
                 "message": "Arrival verified! Job started on-chain.",
-                "distance_km": distance_km
+                "distance_km": distance_km,
             }
         except Exception as e:
             logger.error(f"Soroban transition error: {e}")
             return {
                 "status": "error",
                 "message": "Arrival verified but on-chain transition failed.",
-                "distance_km": distance_km
+                "distance_km": distance_km,
             }
 
     return {
         "status": "in_transit",
         "message": "Location updated",
         "distance_km": distance_km,
-        "arrived": is_arrived
+        "arrived": is_arrived,
     }

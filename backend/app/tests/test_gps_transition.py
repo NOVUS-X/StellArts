@@ -44,8 +44,13 @@ def mock_user():
 @patch("app.services.soroban.transition_to_in_progress")
 @pytest.mark.asyncio
 async def test_update_location_verified_arrival(
-    mock_soroban, mock_calc_dist, mock_geocode,
-    mock_db, mock_booking, mock_artisan, mock_user
+    mock_soroban,
+    mock_calc_dist,
+    mock_geocode,
+    mock_db,
+    mock_booking,
+    mock_artisan,
+    mock_user,
 ):
     # Setup mocks
     mock_geocode.return_value = MagicMock(
@@ -64,7 +69,7 @@ async def test_update_location_verified_arrival(
         booking_id=mock_booking.id,
         location_data=location_data,
         db=mock_db,
-        current_user=mock_user
+        current_user=mock_user,
     )
 
     assert result["status"] == "arrived"
@@ -78,8 +83,13 @@ async def test_update_location_verified_arrival(
 @patch("app.services.soroban.transition_to_in_progress")
 @pytest.mark.asyncio
 async def test_update_location_in_transit(
-    mock_soroban, mock_calc_dist, mock_geocode,
-    mock_db, mock_booking, mock_artisan, mock_user
+    mock_soroban,
+    mock_calc_dist,
+    mock_geocode,
+    mock_db,
+    mock_booking,
+    mock_artisan,
+    mock_user,
 ):
     # Setup mocks
     mock_geocode.return_value = MagicMock(
@@ -98,7 +108,7 @@ async def test_update_location_in_transit(
         booking_id=mock_booking.id,
         location_data=location_data,
         db=mock_db,
-        current_user=mock_user
+        current_user=mock_user,
     )
 
     assert result["status"] == "in_transit"
