@@ -39,14 +39,14 @@ def mock_user():
     return user
 
 
+@patch("app.api.v1.endpoints.booking.transition_to_in_progress")
 @patch("app.services.geolocation.geolocation_service.geocode_address")
 @patch("app.services.geolocation.geolocation_service.calculate_distance")
-@patch("app.services.soroban.transition_to_in_progress")
 @pytest.mark.asyncio
 async def test_update_location_verified_arrival(
-    mock_soroban,
     mock_calc_dist,
     mock_geocode,
+    mock_soroban,
     mock_db,
     mock_booking,
     mock_artisan,
@@ -78,14 +78,14 @@ async def test_update_location_verified_arrival(
     assert mock_booking.status == BookingStatus.IN_PROGRESS
 
 
+@patch("app.api.v1.endpoints.booking.transition_to_in_progress")
 @patch("app.services.geolocation.geolocation_service.geocode_address")
 @patch("app.services.geolocation.geolocation_service.calculate_distance")
-@patch("app.services.soroban.transition_to_in_progress")
 @pytest.mark.asyncio
 async def test_update_location_in_transit(
-    mock_soroban,
     mock_calc_dist,
     mock_geocode,
+    mock_soroban,
     mock_db,
     mock_booking,
     mock_artisan,
