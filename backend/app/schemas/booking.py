@@ -46,6 +46,15 @@ class BookingStatusUpdate(BaseModel):
     status: str = Field(..., description="New status for the booking")
 
 
+class BidCreate(BaseModel):
+    """Schema for artisan to submit a counter-offer/bid"""
+
+    bid_amount: float = Field(..., gt=0, description="The counter-offer amount")
+    justification: str | None = Field(
+        None, description="Justification required if bid > 300% of range"
+    )
+
+
 class BookingResponse(BaseModel):
     """Schema for booking response"""
 
@@ -58,6 +67,11 @@ class BookingResponse(BaseModel):
     date: datetime | None
     estimated_cost: float | None
     estimated_hours: float | None
+    labor_cost: float | None
+    material_cost: float | None
+    range_min: float | None
+    range_max: float | None
+    artisan_pitch: str | None
     status: str
     location: str | None
     notes: str | None

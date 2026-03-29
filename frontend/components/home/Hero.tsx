@@ -85,7 +85,9 @@ export default function Hero() {
 											Plumbers
 										</div>
 										<div className='text-xs text-gray-500'>
+
 											{counts ? formatCount(counts.plumbers) : "Near you"}
+
 										</div>
 									</CardContent>
 								</Card>
@@ -96,7 +98,9 @@ export default function Hero() {
 											Electricians
 										</div>
 										<div className='text-xs text-gray-500'>
+
 											{counts ? formatCount(counts.electricians) : "On demand"}
+
 										</div>
 									</CardContent>
 								</Card>
@@ -107,7 +111,9 @@ export default function Hero() {
 											Carpenters
 										</div>
 										<div className='text-xs text-gray-500'>
+
 											{counts ? formatCount(counts.carpenters) : "Verified"}
+
 										</div>
 									</CardContent>
 								</Card>
@@ -118,7 +124,9 @@ export default function Hero() {
 											Painters
 										</div>
 										<div className='text-xs text-gray-500'>
+
 											{counts ? formatCount(counts.painters) : "Top rated"}
+
 										</div>
 									</CardContent>
 								</Card>

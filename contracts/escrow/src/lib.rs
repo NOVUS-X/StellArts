@@ -25,17 +25,19 @@ pub struct Escrow {
 pub enum Status {
     Pending,
     Funded,
+    InProgress,
     Released,
     Refunded, // added for reclaimed/returned escrows
     Disputed,
 }
 
 #[contracttype]
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Escrow(u64),
     NextId,
     Arbitrator,
+    Oracle,
 }
 
 #[contracttype]
@@ -277,9 +279,9 @@ impl EscrowContract {
             panic!("Deadline has passed; cannot release funds");
         }
 
-        // Checks: Ensure the escrow status is Funded
-        if escrow.status != Status::Funded {
-            panic!("Escrow is not funded");
+        // Checks: Ensure the escrow status is Funded or InProgress
+        if escrow.status != Status::Funded && escrow.status != Status::InProgress {
+            panic!("Escrow is not funded or in progress");
         }
 
         // Logic: Transfer remaining funds to artisan.
@@ -365,6 +367,42 @@ impl EscrowContract {
         true
     }
 
+    /// Set the oracle address for verifying physical arrival
+    pub fn set_oracle(env: Env, admin: Address, oracle: Address) {
+        admin.require_auth();
+        env.storage().persistent().set(&DataKey::Oracle, &oracle);
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::Oracle, TTL_THRESHOLD, NEXT_ID_TTL);
+    }
+
+    /// Transition escrow status from Funded to InProgress
+    pub fn start_job(env: Env, engagement_id: u64) {
+        let oracle: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Oracle)
+            .expect("Oracle not set");
+        oracle.require_auth();
+
+        let key = DataKey::Escrow(engagement_id);
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("Escrow not found");
+
+        if escrow.status != Status::Funded {
+            panic!("Escrow must be Funded to transition to InProgress");
+        }
+
+        escrow.status = Status::InProgress;
+        env.storage().persistent().set(&key, &escrow);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
+    }
+
     /// Set the arbitrator address for resolving disputes
     /// Can only be called by an admin (typically contract deployer)
     /// This establishes the authority who can make arbitration decisions
@@ -398,9 +436,9 @@ impl EscrowContract {
             panic!("Only client or artisan can initiate a dispute");
         }
 
-        // State check: escrow must be Funded to dispute
-        if escrow.status != Status::Funded {
-            panic!("Escrow must be Funded to initiate a dispute");
+        // State check: escrow must be Funded or InProgress to dispute
+        if escrow.status != Status::Funded && escrow.status != Status::InProgress {
+            panic!("Escrow must be Funded or InProgress to initiate a dispute");
         }
 
         // Transition status to Disputed
@@ -468,6 +506,7 @@ impl EscrowContract {
             &winner,
             &award_amount,
         );
+        token_client.transfer(&env.current_contract_address(), &winner, &escrow.amount);
 
         // Update status based on winner
         if winner == escrow.client {
