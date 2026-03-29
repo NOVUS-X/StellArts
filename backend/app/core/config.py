@@ -63,6 +63,7 @@ class Settings(BaseSettings):
 
         # Soroban Configuration
     SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
+    SOROBAN_NETWORK_PASSPHRASE: str = "Test SDF Network ; September 2015"
     ESCROW_CONTRACT_ID: str | None = None
     REPUTATION_CONTRACT_ID: str | None = None
 

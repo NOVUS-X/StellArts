@@ -671,7 +671,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Escrow must be Funded to initiate a dispute' from contract function 'Symbol(dispute)'"
+                  "string": "caught panic 'Escrow must be Funded or InProgress to initiate a dispute' from contract function 'Symbol(dispute)'"
                 },
                 {
                   "u64": 1

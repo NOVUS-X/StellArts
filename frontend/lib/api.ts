@@ -163,7 +163,7 @@ export const api = {
     nearby: (
       lat: number,
       lon: number,
-      opts: { page?: number; page_size?: number } = {}
+      opts: { page?: number; page_size?: number; skill?: string; min_rating?: number; is_available?: boolean } = {}
     ) => {
       const params = new URLSearchParams({
         lat: String(lat),
@@ -171,6 +171,9 @@ export const api = {
         page: String(opts.page ?? 1),
         page_size: String(opts.page_size ?? 10),
       });
+      if (opts.skill) params.append("skill", opts.skill);
+      if (opts.min_rating !== undefined && opts.min_rating > 0) params.append("min_rating", String(opts.min_rating));
+      if (opts.is_available !== undefined) params.append("is_available", String(opts.is_available));
       return request<PaginatedArtisansResponse>(`/artisans/nearby?${params}`);
     },
     getProfile: (artisanId: number) =>
