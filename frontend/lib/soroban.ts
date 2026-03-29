@@ -1,12 +1,13 @@
 import { 
   TransactionBuilder, 
   Networks, 
-  Rpc, 
+  rpc, 
   xdr, 
   nativeToScVal, 
   Address,
-  Asset
-} from "stellar-sdk";
+  Asset,
+  Operation
+} from "@stellar/stellar-sdk";
 
 // These would normally be in a .env file
 const ESCROW_CONTRACT_ID = process.env.NEXT_PUBLIC_ESCROW_CONTRACT_ID || "CCBAW6E7G2PZ7U5Q3PZ7U5Q3PZ7U5Q3PZ7U5Q3PZ7U5Q3PZ7U5Q3PZ"; 
@@ -14,7 +15,7 @@ const NATIVE_TOKEN_ADDRESS = "CDLZFC3SYJYDZT7K67VZ7K67VZ7K67VZ7K67VZ7K67VZ7K67VZ
 const RPC_URL = "https://soroban-testnet.stellar.org";
 const NETWORK_PASSPHRASE = Networks.TESTNET;
 
-const rpc = new Rpc.Server(RPC_URL);
+const rpcServer = new rpc.Server(RPC_URL);
 
 /**
  * Builds a Soroban transaction to resolve a dispute.
@@ -29,7 +30,7 @@ export async function prepareArbitration(
   engagementId: number,
   winnerAddress: string
 ): Promise<string> {
-  const account = await rpc.getAccount(address);
+  const account = await rpcServer.getAccount(address);
   
   // Build the initial transaction
   const tx = new TransactionBuilder(account, {
@@ -37,8 +38,8 @@ export async function prepareArbitration(
     networkPassphrase: NETWORK_PASSPHRASE,
   })
     .addOperation(
-      xdr.Operation.invokeContractFunction({
-        contractId: ESCROW_CONTRACT_ID,
+      Operation.invokeContractFunction({
+        contract: ESCROW_CONTRACT_ID,
         function: "arbitrate",
         args: [
           nativeToScVal(engagementId, { type: "u64" }),
@@ -51,14 +52,14 @@ export async function prepareArbitration(
     .build();
 
   // Simulate to calculate fees and footprints
-  const sim = await rpc.simulateTransaction(tx);
+  const sim = await rpcServer.simulateTransaction(tx);
   
-  if (Rpc.Api.isSimulationError(sim)) {
+  if (rpc.Api.isSimulationError(sim)) {
     throw new Error(`Simulation failed: ${sim.error}`);
   }
 
   // Set the footprints and fees from simulation
-  const preparedTx = TransactionBuilder.prepareTransaction(tx, sim);
+  const preparedTx = await rpcServer.prepareTransaction(tx);
   
   return preparedTx.toXDR();
 }

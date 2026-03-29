@@ -14,6 +14,7 @@ import {
   Scale 
 } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export default function AdminDisputesPage() {
   const [searchTerm, setSearchTerm] = useState("");
