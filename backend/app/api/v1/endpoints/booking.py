@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from app.core.auth import (
     get_current_active_user,
     require_admin,
+    require_artisan,
     require_client,
     require_client_or_artisan,
-    require_artisan,
 )
 from app.core.config import settings
 from app.db.session import get_db
