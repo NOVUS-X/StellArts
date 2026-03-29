@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.inventory import InventoryCheckResultResponse
+
 
 class BookingCreate(BaseModel):
     """Schema for creating a new booking"""
@@ -77,3 +79,5 @@ class BookingResponse(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime | None
+    client_supply_override: bool = False
+    inventory_results: list[InventoryCheckResultResponse] = []

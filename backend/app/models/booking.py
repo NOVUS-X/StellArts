@@ -3,6 +3,7 @@ import uuid
 
 from sqlalchemy import (
     DECIMAL,
+    Boolean,
     Column,
     DateTime,
     Enum,
@@ -44,6 +45,8 @@ class Booking(Base):
     date = Column(DateTime(timezone=True))
     location = Column(String(500))
     notes = Column(Text)
+    client_supply_override = Column(Boolean, default=False, nullable=False)
+    artisan_device_token = Column(String(512), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

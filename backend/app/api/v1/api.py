@@ -6,6 +6,7 @@ from app.api.v1.endpoints import (
     auth,
     booking,
     health,
+    inventory,
     payments,
     stats,
     user,
@@ -22,3 +23,4 @@ api_router.include_router(artisan.router, tags=["artisans"])
 api_router.include_router(admin.router, tags=["admin"])
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(stats.router, tags=["stats"])
+api_router.include_router(inventory.router, tags=["inventory"])

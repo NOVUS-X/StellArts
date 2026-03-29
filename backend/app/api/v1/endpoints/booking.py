@@ -3,7 +3,7 @@ import logging
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -29,6 +29,7 @@ from app.services import notification_service
 from app.services.ai_service import ai_service
 from app.services.geolocation import geolocation_service
 from app.services.soroban import transition_to_in_progress
+from app.services.inventory.tasks import run_inventory_check
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +200,7 @@ def get_all_bookings(
 def update_booking_status(
     booking_id: UUID,
     status_payload: BookingStatusUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -333,6 +335,10 @@ def update_booking_status(
     booking.status = new_status
     db.commit()
     db.refresh(booking)
+
+    # Trigger background inventory check when booking goes IN_PROGRESS
+    if new_status == BookingStatus.IN_PROGRESS:
+        background_tasks.add_task(run_inventory_check, booking.id, db)
 
     return {
         "message": f"Booking {booking_id} status updated",

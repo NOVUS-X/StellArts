@@ -108,6 +108,20 @@ export interface BookingResponse {
   notes: string | null;
   created_at: string;
   updated_at: string | null;
+  client_supply_override?: boolean;
+}
+
+export interface InventoryCheckResult {
+  id: string;
+  booking_id: string;
+  bom_item_id: string;
+  store_id: string;
+  store_name: string;
+  store_address: string | null;
+  available: boolean;
+  pre_pay_url: string | null;
+  status: string;
+  checked_at: string;
 }
 
 interface TokenResponse {
@@ -172,6 +186,16 @@ export const api = {
       request<BookingResponse>("/bookings/create", {
         method: "POST",
         body: JSON.stringify(body),
+        token,
+      }),
+  },
+  inventory: {
+    getResults: (bookingId: string, token: string) =>
+      request<InventoryCheckResult[]>(`/inventory/${bookingId}/results`, { method: "GET", token }),
+    setSupplyOverride: (bookingId: string, value: boolean, token: string) =>
+      request<BookingResponse>(`/bookings/${bookingId}/supply-override`, {
+        method: "POST",
+        body: JSON.stringify({ client_supply_override: value }),
         token,
       }),
   },
