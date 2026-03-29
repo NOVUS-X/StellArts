@@ -22,3 +22,6 @@ api_router.include_router(artisan.router, tags=["artisans"])
 api_router.include_router(admin.router, tags=["admin"])
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(stats.router, tags=["stats"])
+from app.api.v1.endpoints import sow
+
+api_router.include_router(sow.router, tags=["sows"])
