@@ -22,11 +22,15 @@ from app.schemas.artisan import (
     ArtisanProfileCreate,
     ArtisanProfileResponse,
     ArtisanProfileUpdate,
+    AvailabilityUpdate,
     GeolocationRequest,
     GeolocationResponse,
     NearbyArtisansRequest,
     NearbyArtisansResponse,
     PaginatedArtisans,
+    PortfolioItemAdd,
+    PortfolioItemResponse,
+    PortfolioResponse,
 )
 from app.services.artisan import ArtisanService
 from app.services.artisan_service import find_nearby_artisans_cached
@@ -229,45 +233,73 @@ async def geocode_address(
 
 @router.put("/availability")
 def update_availability(
-    availability_data: dict,  # Consider defining a proper schema
+    availability_data: AvailabilityUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_artisan),
 ):
     """Update artisan availability - artisan only"""
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
+        )
+    artisan.is_available = availability_data.is_available
+    db.commit()
+    db.refresh(artisan)
     return {
         "message": "Availability updated successfully",
-        "artisan_id": current_user.id,
-        "availability": availability_data,
+        "artisan_id": artisan.id,
+        "is_available": artisan.is_available,
     }
 
 
-@router.get("/my-portfolio")
+@router.get("/my-portfolio", response_model=PortfolioResponse)
 def get_my_portfolio(
     db: Session = Depends(get_db), current_user: User = Depends(require_artisan)
 ):
     """Get current artisan's portfolio"""
-    # TODO: Implement Portfolio model and DB table
-    # For now, return empty list as functionality is not yet supported in DB
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
+        )
+    items = (
+        db.query(Portfolio)
+        .filter(Portfolio.artisan_id == artisan.id)
+        .order_by(Portfolio.created_at.desc())
+        .all()
+    )
     return {
-        "message": f"Portfolio for artisan {current_user.id}",
+        "artisan_id": artisan.id,
         "artisan_name": current_user.full_name,
-        "portfolio_items": [],
+        "portfolio_items": items,
     }
 
 
-@router.post("/portfolio/add")
+@router.post("/portfolio/add", response_model=PortfolioItemResponse, status_code=status.HTTP_201_CREATED)
 def add_portfolio_item(
-    portfolio_item: dict,  # Replace with actual schema
+    portfolio_item: PortfolioItemAdd,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_artisan),
 ):
     """Add portfolio item - artisan only"""
-    # TODO: Implement Portfolio model and DB table
-    return {
-        "message": "Portfolio item added successfully (simulation)",
-        "artisan_id": current_user.id,
-        "portfolio_item": portfolio_item,
-    }
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
+        )
+    new_item = Portfolio(
+        artisan_id=artisan.id,
+        title=portfolio_item.title,
+        image=portfolio_item.image,
+    )
+    db.add(new_item)
+    db.commit()
+    db.refresh(new_item)
+    return new_item
 
 
 @router.get("/my-bookings")
@@ -367,14 +399,21 @@ def get_artisan_profile(artisan_id: int, db: Session = Depends(get_db)):
     }
 
 
-@router.delete("/{artisan_id}")
+@router.delete("/{artisan_id}", status_code=status.HTTP_200_OK)
 def delete_artisan(
     artisan_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
     """Delete artisan account - admin only"""
+    artisan = db.query(Artisan).filter(Artisan.id == artisan_id).first()
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan not found"
+        )
+    db.delete(artisan)
+    db.commit()
     return {
-        "message": f"Artisan {artisan_id} deleted by admin {current_user.id}",
-        "deleted_by": current_user.full_name,
+        "message": f"Artisan {artisan_id} deleted successfully",
+        "deleted_by": current_user.id,
     }
