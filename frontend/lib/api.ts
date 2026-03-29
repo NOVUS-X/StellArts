@@ -171,5 +171,25 @@ export const api = {
         body: JSON.stringify(body),
         token,
       }),
+    updateStatus: (id: string, status: string, token: string) =>
+      request<BookingResponse>(`/bookings/${id}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status }),
+        token,
+      }),
+  },
+  payments: {
+    prepare: (bookingId: string, amount: number, token: string) =>
+      request<{ xdr: string; networkPassphrase: string }>("/payments/prepare", {
+        method: "POST",
+        body: JSON.stringify({ booking_id: bookingId, amount }),
+        token,
+      }),
+    submit: (bookingId: string, signedXdr: string, token: string) =>
+      request<{ success: boolean; hash: string }>("/payments/submit", {
+        method: "POST",
+        body: JSON.stringify({ booking_id: bookingId, signed_xdr: signedXdr }),
+        token,
+      }),
   },
 };

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useWallet } from '../../context/WalletContext';
 import { useAuth } from '../../context/AuthContext';
+import { motion } from 'framer-motion';
 
 function WalletButton() {
   const { address, isConnected, connect, disconnect } = useWallet();
@@ -13,14 +14,14 @@ function WalletButton() {
     const short = `${address.slice(0, 4)}...${address.slice(-4)}`;
     return (
       <div className="flex items-center gap-3">
-        <span className="text-sm font-mono text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+        <span className="text-sm font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-full">
           {short}
         </span>
         <Button
           variant="outline"
           size="sm"
           onClick={disconnect}
-          className="border-gray-300 text-gray-600"
+          className="glass border-white/10 text-white hover:bg-white/5"
         >
           Disconnect
         </Button>
@@ -31,7 +32,7 @@ function WalletButton() {
   return (
     <Button
       onClick={connect}
-      className="bg-blue-600 hover:bg-blue-700 text-white"
+      className="bg-primary hover:bg-primary/90 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all hover:scale-105"
     >
       Connect Wallet
     </Button>
@@ -42,55 +43,69 @@ export default function Navbar() {
   const { isAuthenticated, logout } = useAuth();
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 w-full">
-      <nav className=" mx-auto max-w-375 px-6 py-4">
+    <motion.header 
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/5 w-full"
+    >
+      <nav className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <div className="w-10 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Image src="/Stellarts.png" alt="Stellarts Logo" width={100} height={100} />
+          <Link href="/" className="flex items-center group">
+            <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform border border-white/10">
+              <Image src="/Stellarts.png" alt="Stellarts Logo" width={40} height={40} className="object-contain" />
             </div>
+            <span className="ml-3 text-xl font-bold text-white tracking-tight group-hover:text-primary transition-colors">StellArts</span>
           </Link>
+          
           <div className="hidden md:flex items-center space-x-8">
             <Link
               href="/#features"
-              className="text-gray-600 hover:text-blue-600 transition-colors"
+              className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
             >
               Features
             </Link>
             <Link
               href="/#use-cases"
-              className="text-gray-600 hover:text-blue-600 transition-colors"
+              className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
             >
               Use Cases
             </Link>
             <Link
               href="/#why-stellar"
-              className="text-gray-600 hover:text-blue-600 transition-colors"
+              className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
             >
               Why Stellar
             </Link>
             {isAuthenticated && (
               <Link
                 href="/dashboard"
-                className="text-gray-600 hover:text-blue-600 transition-colors"
+                className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
               >
                 Dashboard
               </Link>
             )}
+            
+            <div className="h-6 w-px bg-white/10 mx-2" />
+            
             <WalletButton />
-            {isAuthenticated && (
+            
+            {isAuthenticated ? (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={logout}
-                className="border-gray-300 text-gray-600"
+                className="glass border-white/10 text-white hover:bg-white/5"
               >
                 Log out
+              </Button>
+            ) : (
+              <Button asChild variant="ghost" className="text-white hover:bg-white/5">
+                <Link href="/login">Login</Link>
               </Button>
             )}
           </div>
         </div>
       </nav>
-    </header>
+    </motion.header>
   );
 }

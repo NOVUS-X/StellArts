@@ -12,10 +12,11 @@ from app.core.auth import (
 )
 
 # Import correct dependencies
-from app.db.session import get_db  # Or use app.db.database depending on your setup
+from app.db.session import get_db
 from app.models.artisan import Artisan
 from app.models.portfolio import Portfolio
 from app.models.user import User
+from app.models.booking import Booking
 from app.schemas.artisan import (
     ArtisanLocationUpdate,
     ArtisanOut,
@@ -227,18 +228,29 @@ async def geocode_address(
     return geo_result
 
 
-@router.put("/availability")
-def update_availability(
-    availability_data: dict,  # Consider defining a proper schema
+@router.put("/availability", response_model=ArtisanOut)
+async def update_availability(
+    availability_data: ArtisanProfileUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_artisan),
 ):
     """Update artisan availability - artisan only"""
-    return {
-        "message": "Availability updated successfully",
-        "artisan_id": current_user.id,
-        "availability": availability_data,
-    }
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
+        )
+    
+    updated_artisan = await service.update_artisan_profile(
+        artisan.id, ArtisanProfileUpdate(is_available=availability_data.is_available)
+    )
+    if not updated_artisan:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update availability",
+        )
+    return updated_artisan
 
 
 @router.get("/my-portfolio")
@@ -341,8 +353,6 @@ def get_artisan_profile(artisan_id: int, db: Session = Depends(get_db)):
     specialty_str = None
     if artisan.specialties:
         try:
-            import json
-
             specs = json.loads(artisan.specialties)
             if isinstance(specs, list):
                 # Take the first one as primary or join them
@@ -368,13 +378,19 @@ def get_artisan_profile(artisan_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{artisan_id}")
-def delete_artisan(
+async def delete_artisan(
     artisan_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
     """Delete artisan account - admin only"""
+    service = ArtisanService(db)
+    success = await service.delete_artisan(artisan_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan not found"
+        )
     return {
-        "message": f"Artisan {artisan_id} deleted by admin {current_user.id}",
+        "message": f"Artisan {artisan_id} deleted successfully",
         "deleted_by": current_user.full_name,
     }

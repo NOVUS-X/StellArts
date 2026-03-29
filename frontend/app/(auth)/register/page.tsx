@@ -4,15 +4,10 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "../../../components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../../components/ui/card";
+import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
+import { Shield, Sparkles } from "lucide-react";
 
 type Role = "client" | "artisan" | "admin";
 
@@ -58,130 +53,135 @@ function RegisterForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Create an account</CardTitle>
-          <CardDescription>
-            Join as a client to book artisans, or as an artisan to offer
-            services.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2 mb-6">
-            <Button
-              type="button"
-              variant={role === "client" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setRole("client")}
-            >
-              Client
-            </Button>
-            <Button
-              type="button"
-              variant={role === "artisan" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setRole("artisan")}
-            >
-              Artisan
-            </Button>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden px-4 py-12">
+      {/* Background Glows */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-[128px] -z-10" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-600/10 rounded-full blur-[128px] -z-10" />
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-lg glass-card p-8 md:p-12 rounded-[2rem] shadow-2xl relative"
+      >
+        <div className="mb-10 text-center">
+          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <Sparkles className="w-8 h-8 text-primary" />
           </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
-                {error}
-              </p>
-            )}
-            <div>
-              <label
-                htmlFor="fullName"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Full name
-              </label>
-              <input
-                id="fullName"
-                type="text"
-                autoComplete="name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Min 8 characters, 1 uppercase, 1 lowercase, 1 digit, 1 special
-                character.
-              </p>
-            </div>
-            <div>
-              <label
-                htmlFor="phone"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Phone (optional)
-              </label>
-              <input
-                id="phone"
-                type="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account…" : "Register"}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm text-gray-600">
-            Already have an account?{" "}
-            <Link href="/login" className="text-blue-600 hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+          <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
+          <p className="text-slate-400">Join the future of decentralized local services.</p>
+        </div>
+
+        <div className="flex p-1 bg-white/5 rounded-xl mb-8 border border-white/5">
+          <button
+            type="button"
+            onClick={() => setRole("client")}
+            className={`flex-1 py-3 rounded-lg text-sm font-medium transition-all ${
+              role === "client" ? "bg-primary text-white shadow-lg" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            I&apos;m a Client
+          </button>
+          <button
+            type="button"
+            onClick={() => setRole("artisan")}
+            className={`flex-1 py-3 rounded-lg text-sm font-medium transition-all ${
+              role === "artisan" ? "bg-primary text-white shadow-lg" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            I&apos;m an Artisan
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm"
+            >
+              {error}
+            </motion.div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-300 ml-1">Full Name</label>
+            <input
+              type="text"
+              autoComplete="name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="John Doe"
+              className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-white placeholder:text-slate-500 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-300 ml-1">Email Address</label>
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
+              className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-white placeholder:text-slate-500 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-300 ml-1">Password</label>
+            <input
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-white placeholder:text-slate-500 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-300 ml-1">Phone (Optional)</label>
+            <input
+              type="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+1 (555) 000-0000"
+              className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-white placeholder:text-slate-500 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+            />
+          </div>
+
+          <Button 
+            type="submit" 
+            className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-[0_0_20px_rgba(59,130,246,0.3)] mt-4" 
+            disabled={loading}
+          >
+            {loading ? "Creating account…" : "Get Started"}
+          </Button>
+        </form>
+
+        <p className="mt-8 text-center text-slate-400 text-sm">
+          Already have an account?{" "}
+          <Link href="/login" className="text-primary hover:text-primary/80 font-semibold transition-colors">
+            Sign in
+          </Link>
+        </p>
+
+        <div className="mt-8 pt-8 border-t border-white/5 flex items-center justify-center space-x-2 text-slate-500">
+          <Shield className="w-4 h-4" />
+          <span className="text-xs uppercase tracking-widest font-medium">Secured by Stellar</span>
+        </div>
+      </motion.div>
     </div>
   );
 }
 
 export default function RegisterPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-background text-white">Loading...</div>}>
       <RegisterForm />
     </Suspense>
   );
