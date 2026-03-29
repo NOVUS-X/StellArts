@@ -1,6 +1,6 @@
 'use client';
 
-import { Wrench, Twitter, Github, Linkedin } from 'lucide-react';
+import { Twitter, Github, Linkedin } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
