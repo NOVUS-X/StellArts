@@ -1,6 +1,10 @@
+import asyncio
+import logging
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.auth import (
@@ -15,7 +19,18 @@ from app.models.artisan import Artisan
 from app.models.booking import Booking, BookingStatus
 from app.models.client import Client
 from app.models.user import User
-from app.schemas.booking import BookingCreate, BookingResponse, BookingStatusUpdate
+from app.schemas.booking import (
+    BidCreate,
+    BookingCreate,
+    BookingResponse,
+    BookingStatusUpdate,
+)
+from app.services import notification_service
+from app.services.ai_service import ai_service
+from app.services.geolocation import geolocation_service
+from app.services.soroban import transition_to_in_progress
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/bookings")
 
@@ -44,7 +59,6 @@ def create_booking(
             ),
         )
     # Find or create the client profile for the current user
-    from app.models.client import Client
 
     client = db.query(Client).filter(Client.user_id == current_user.id).first()
 
@@ -55,7 +69,6 @@ def create_booking(
         db.flush()  # Get the client.id without committing yet
 
     # Verify that artisan_id exists in the database
-    from app.models.artisan import Artisan
 
     artisan = db.query(Artisan).filter(Artisan.id == booking_data.artisan_id).first()
 
@@ -72,13 +85,38 @@ def create_booking(
             detail="Cannot book with an inactive artisan",
         )
 
+    # Use AIService for dynamic bid range calculation and smart pitching
+
+    # Get artisan's hourly rate (default to 50 if not set)
+    hourly_rate = artisan.hourly_rate or Decimal("50.00")
+    estimated_hours = (
+        booking_data.estimated_hours or 2.0
+    )  # Default to 2 hours if not provided
+
+    bid_data = ai_service.calculate_bid_range(
+        booking_data.service, hourly_rate, estimated_hours
+    )
+
+    pitch = ai_service.generate_smart_pitch(
+        booking_data.service,
+        bid_data["material_cost"],
+        bid_data["labor_cost"],
+        bid_data["total_estimated"],
+        estimated_hours,
+    )
+
     # Create the booking model instance with status = PENDING
     new_booking = Booking(
         client_id=client.id,
         artisan_id=booking_data.artisan_id,
         service=booking_data.service,
-        estimated_hours=booking_data.estimated_hours,
-        estimated_cost=booking_data.estimated_cost,
+        estimated_hours=estimated_hours,
+        estimated_cost=bid_data["total_estimated"],
+        labor_cost=bid_data["labor_cost"],
+        material_cost=bid_data["material_cost"],
+        range_min=bid_data["range_min"],
+        range_max=bid_data["range_max"],
+        artisan_pitch=pitch,
         status=BookingStatus.PENDING,
         date=booking_data.date,
         location=booking_data.location,
@@ -89,6 +127,19 @@ def create_booking(
     db.add(new_booking)
     db.commit()
     db.refresh(new_booking)
+
+    # Dispatch smart pitches to matched artisans (async operation)
+    try:
+        # Run async dispatch in background (fire and forget)
+        asyncio.create_task(
+            notification_service.dispatch_to_matched_artisans(db, new_booking)
+        )
+    except ImportError:
+        # Notification service not available, continue without dispatch
+        pass
+    except Exception as e:
+        # Log error but don't fail booking creation
+        print(f"Failed to dispatch notifications: {e}")
 
     return new_booking
 
@@ -104,8 +155,6 @@ def get_my_bookings(
     - Clients see bookings they created
     - Artisans see bookings assigned to them
     """
-    from app.models.artisan import Artisan
-    from app.models.client import Client
 
     bookings = []
 
@@ -290,4 +339,146 @@ def update_booking_status(
         "updated_by": current_user.id,
         "new_status": booking.status.value,
         "status": booking.status.value,
+    }
+
+
+@router.post("/{booking_id}/bid")
+def submit_bid(
+    booking_id: UUID,
+    bid_data: BidCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_client_or_artisan),
+):
+    """
+    Submit a counter-offer (bid) for a booking - artisan only.
+    Enforces agentic guardrails: if bid > 300% of range_max, a justification is required.
+    """
+    if current_user.role != "artisan":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only artisans can submit bids",
+        )
+
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
+    if not artisan or booking.artisan_id != artisan.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not the assigned artisan for this booking",
+        )
+
+    # Enforce Guardrail
+
+    is_outlier = ai_service.check_guardrail(
+        Decimal(str(bid_data.bid_amount)), booking.range_max or Decimal("0")
+    )
+
+    if is_outlier and not bid_data.justification:
+        return {
+            "status": "flagged",
+            "message": "AI Alert: Your bid is >300% of the calculated market range. Please provide a justification prompt before showing the user.",
+            "requires_justification": True,
+        }
+
+    # Update booking with the new bid
+    booking.estimated_cost = Decimal(str(bid_data.bid_amount))
+    if bid_data.justification:
+        booking.notes = (
+            booking.notes or ""
+        ) + f"\n[Artisan Justification]: {bid_data.justification}"
+
+    db.commit()
+    db.refresh(booking)
+
+    return {
+        "status": "success",
+        "message": "Bid submitted successfully",
+        "new_estimated_cost": float(booking.estimated_cost),
+    }
+
+
+class LocationUpdate(BaseModel):
+    latitude: float
+    longitude: float
+
+
+@router.post("/{booking_id}/location")
+async def update_location(
+    booking_id: UUID,
+    location_data: LocationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_client_or_artisan),
+):
+    """
+    Update artisan location and verify arrival at job site.
+    If artisan is within 100m, transitions Soroban escrow to InProgress.
+    """
+    if current_user.role != "artisan":
+        raise HTTPException(
+            status_code=403, detail="Only artisans can send location updates"
+        )
+
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
+    if not artisan or booking.artisan_id != artisan.id:
+        raise HTTPException(
+            status_code=403, detail="You are not the assigned artisan for this booking"
+        )
+
+    # 1. Geocode job site location if coordinates are not available
+    # For simplicity, we assume the booking.location string needs geocoding
+    job_geo = await geolocation_service.geocode_address(booking.location)
+    if not job_geo:
+        raise HTTPException(
+            status_code=400, detail="Could not verify job site coordinates"
+        )
+
+    # 2. Verify arrival (distance < 100m)
+    distance_km = await geolocation_service.calculate_distance(
+        Decimal(str(location_data.latitude)),
+        Decimal(str(location_data.longitude)),
+        job_geo.latitude,
+        job_geo.longitude,
+    )
+
+    # 100m = 0.1km
+    is_arrived = distance_km <= 0.1
+
+    if is_arrived and booking.status == BookingStatus.CONFIRMED:
+        # 3. Transition Soroban escrow to InProgress
+        try:
+            # We use engagement_id from a mapping or similar.
+            # In this MVP, we use a mock engagement_id derived from booking.id (uint64)
+            engagement_id = int(booking.id.int >> 64) % 1000000  # Mock logic
+
+            transition_to_in_progress(engagement_id)
+
+            # Update booking status in DB
+            booking.status = BookingStatus.IN_PROGRESS
+            db.commit()
+
+            return {
+                "status": "arrived",
+                "message": "Arrival verified! Job started on-chain.",
+                "distance_km": distance_km,
+            }
+        except Exception as e:
+            logger.error(f"Soroban transition error: {e}")
+            return {
+                "status": "error",
+                "message": "Arrival verified but on-chain transition failed.",
+                "distance_km": distance_km,
+            }
+
+    return {
+        "status": "in_transit",
+        "message": "Location updated",
+        "distance_km": distance_km,
+        "arrived": is_arrived,
     }
