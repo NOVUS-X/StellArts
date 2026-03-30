@@ -1,7 +1,6 @@
-/// Comprehensive unit test suite for the Escrow contract happy path
-/// This module verifies the complete workflow: initialize engagement → mock token → mint tokens → deposit → release
-/// Each test step includes assertions on token balances and state transitions
-
+//! Comprehensive unit test suite for the Escrow contract happy path
+//! This module verifies the complete workflow: initialize engagement → mock token → mint tokens → deposit → release
+//! Each test step includes assertions on token balances and state transitions
 #[cfg(test)]
 mod happy_path_tests {
     use crate::{DataKey, Escrow, EscrowContract, EscrowContractClient, Status};
@@ -461,7 +460,7 @@ mod happy_path_tests {
 
     /// Test 14: Dispute from wrong state - attempt dispute on Pending escrow should fail
     #[test]
-    #[should_panic(expected = "Escrow must be Funded to initiate a dispute")]
+    #[should_panic(expected = "Escrow must be Funded or InProgress to initiate a dispute")]
     fn test_dispute_from_pending_state_fails() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
@@ -476,7 +475,7 @@ mod happy_path_tests {
 
     /// Test 15: Double dispute rejection - second dispute on already disputed escrow should fail
     #[test]
-    #[should_panic(expected = "Escrow must be Funded to initiate a dispute")]
+    #[should_panic(expected = "Escrow must be Funded or InProgress to initiate a dispute")]
     fn test_double_dispute_rejection() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
@@ -586,7 +585,7 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
-        let unauthorized = Address::generate(&ctx.env);
+        let _unauthorized = Address::generate(&ctx.env);
         let amount: i128 = 5000;
 
         // Setup: Set arbitrator
@@ -670,4 +669,5 @@ mod happy_path_tests {
         // Try to arbitrate without arbitrator set
         ctx.client_contract
             .arbitrate(&engagement_id, &client, &ctx.token_address);
-    }}
+    }
+}
