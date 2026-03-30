@@ -35,6 +35,8 @@ class Booking(Base):
     service = Column(Text, nullable=False)
     estimated_hours = Column(DECIMAL(5, 2))
     estimated_cost = Column(DECIMAL(10, 2))
+    labor_cost = Column(DECIMAL(10, 2), nullable=True)
+    material_cost = Column(DECIMAL(10, 2), nullable=True)
     status = Column(Enum(BookingStatus), default=BookingStatus.PENDING)
     date = Column(DateTime(timezone=True))
     location = Column(String(500))
