@@ -6,13 +6,14 @@
 mod happy_path_tests {
     use crate::{DataKey, Escrow, EscrowContract, EscrowContractClient, Status};
     use soroban_sdk::testutils::{Address as AddressTestUtils, Events, Ledger};
-    use soroban_sdk::{token, Address, Env};
+    use soroban_sdk::{token, Address, BytesN, Env};
 
     /// Test context holding common test objects
     struct TestContext {
         env: Env,
         contract_id: Address,
         token_address: Address,
+        scope_hash: BytesN<32>,
         client_contract: EscrowContractClient<'static>,
         token_client: token::Client<'static>,
         token_contract_client: token::StellarAssetClient<'static>,
@@ -31,11 +32,13 @@ mod happy_path_tests {
             let client_contract = EscrowContractClient::new(&env, &contract_id);
             let token_client = token::Client::new(&env, &token_address);
             let token_contract_client = token::StellarAssetClient::new(&env, &token_address);
+            let scope_hash = BytesN::from_array(&env, &[2u8; 32]);
 
             TestContext {
                 env,
                 contract_id,
                 token_address,
+                scope_hash,
                 client_contract,
                 token_client,
                 token_contract_client,
@@ -57,7 +60,7 @@ mod happy_path_tests {
         fn initialize_engagement(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
             let deadline = self.env.ledger().timestamp() + 86400;
             self.client_contract
-                .initialize(client, artisan, &amount, &deadline)
+                .initialize(client, artisan, &amount, &deadline, &self.scope_hash)
         }
 
         /// Mint tokens to an address
@@ -67,8 +70,11 @@ mod happy_path_tests {
 
         /// Deposit funds into an escrow
         fn deposit_funds(&self, engagement_id: u64) {
-            self.client_contract
-                .deposit(&engagement_id, &self.token_address);
+            self.client_contract.deposit(
+                &engagement_id,
+                &self.token_address,
+                &self.scope_hash,
+            );
         }
 
         /// Release funds from an escrow
@@ -370,9 +376,13 @@ mod happy_path_tests {
         // set a short deadline a few seconds in the future
         let now = ctx.env.ledger().timestamp();
         let deadline = now + 10;
-        let engagement_id = ctx
-            .client_contract
-            .initialize(&client, &artisan, &amount, &deadline);
+        let engagement_id = ctx.client_contract.initialize(
+            &client,
+            &artisan,
+            &amount,
+            &deadline,
+            &ctx.scope_hash,
+        );
 
         // fund and deposit before the deadline
         ctx.mint_tokens(&client, amount);

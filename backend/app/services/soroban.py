@@ -124,7 +124,17 @@ def invoke_contract_function(
 # Contract IDs
 ESCROW_CONTRACT_ID = settings.ESCROW_CONTRACT_ID
 REPUTATION_CONTRACT_ID = settings.REPUTATION_CONTRACT_ID
-BACKEND_SIGNER = Keypair.from_secret(settings.BACKEND_SECRET_KEY)
+
+
+def get_backend_stellar_signer() -> Keypair | None:
+    sk = settings.BACKEND_STELLAR_SECRET_KEY
+    if not sk:
+        return None
+    try:
+        return Keypair.from_secret(sk)
+    except Exception:
+        logger.warning("Invalid BACKEND_STELLAR_SECRET_KEY; Soroban signer disabled")
+        return None
 
 
 def initialize_escrow_contract(source_keypair: Keypair) -> dict[str, Any]:

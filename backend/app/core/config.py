@@ -55,10 +55,18 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_PUBLISHABLE_KEY: str | None = None
 
-        # Soroban Configuration
+    # Soroban Configuration
     SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
+    SOROBAN_NETWORK_PASSPHRASE: str = "Test SDF Network ; September 2015"
     ESCROW_CONTRACT_ID: str | None = None
     REPUTATION_CONTRACT_ID: str | None = None
+    BACKEND_STELLAR_SECRET_KEY: str | None = None
+
+    # SOW pinning (IPFS via Pinata JWT, or Arweave via Irys-compatible HTTP API)
+    SOW_STORAGE_BACKEND: str = "none"
+    PINATA_JWT: str | None = None
+    IRYS_NODE_URL: str | None = None
+    IRYS_API_TOKEN: str | None = None
 
     model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore"}
 

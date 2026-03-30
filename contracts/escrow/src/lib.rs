@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, BytesN, Env};
 
 // TTL constants for persistent storage (in ledgers)
 // Note: Each ledger is approximately 5 seconds
@@ -34,6 +34,8 @@ pub enum DataKey {
     Escrow(u64),
     NextId,
     Arbitrator,
+    /// SHA-256 (or agreed 32-byte commitment) of the user-approved SOW pinned off-chain.
+    ScopeHash(u64),
 }
 
 #[contracttype]
@@ -82,6 +84,7 @@ impl EscrowContract {
         artisan: Address,
         amount: i128,
         deadline: u64,
+        scope_hash: BytesN<32>,
     ) -> u64 {
         // Validation: client cannot be the same as artisan
         if client == artisan {
@@ -91,6 +94,11 @@ impl EscrowContract {
         // Validation: amount must be positive
         if amount <= 0 {
             panic!("Amount must be greater than zero");
+        }
+
+        let zero_scope = BytesN::from_array(&env, &[0u8; 32]);
+        if scope_hash == zero_scope {
+            panic!("Invalid scope hash");
         }
 
         // Generate unique engagement ID
@@ -125,6 +133,12 @@ impl EscrowContract {
             .persistent()
             .extend_ttl(&escrow_key, TTL_THRESHOLD, ESCROW_TTL);
 
+        let scope_key = DataKey::ScopeHash(engagement_id);
+        env.storage().persistent().set(&scope_key, &scope_hash);
+        env.storage()
+            .persistent()
+            .extend_ttl(&scope_key, TTL_THRESHOLD, ESCROW_TTL);
+
         // Emit event
         env.events().publish(
             (),
@@ -138,9 +152,16 @@ impl EscrowContract {
         engagement_id
     }
 
+    /// Returns the immutable scope hash committed at initialization for an engagement.
+    pub fn get_scope_hash(env: Env, engagement_id: u64) -> Option<BytesN<32>> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::ScopeHash(engagement_id))
+    }
+
     /// Deposit funds into escrow for a specific engagement
     /// The client must have previously authorized the escrow contract to spend tokens
-    pub fn deposit(env: Env, engagement_id: u64, token: Address) {
+    pub fn deposit(env: Env, engagement_id: u64, token: Address, scope_hash: BytesN<32>) {
         // Load the escrow record
         let key = DataKey::Escrow(engagement_id);
         let mut escrow: Escrow = env
@@ -148,6 +169,16 @@ impl EscrowContract {
             .persistent()
             .get(&key)
             .unwrap_or_else(|| panic!("Escrow not found for engagement {}", engagement_id));
+
+        let scope_key = DataKey::ScopeHash(engagement_id);
+        let stored: BytesN<32> = env
+            .storage()
+            .persistent()
+            .get(&scope_key)
+            .unwrap_or_else(|| panic!("Scope hash not set for engagement {}", engagement_id));
+        if stored != scope_hash {
+            panic!("Scope hash mismatch; cannot fund escrow");
+        }
 
         // Deadline enforcement: cannot deposit after the deadline has passed
         let current_time = env.ledger().timestamp();
@@ -412,7 +443,7 @@ mod test;
 mod test_legacy {
     use super::*;
     use soroban_sdk::testutils::{Events, Ledger};
-    use soroban_sdk::{testutils::Address as _, Address, Env, IntoVal};
+    use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, IntoVal};
 
     #[test]
     fn test_initialize_engagement() {
@@ -427,8 +458,13 @@ mod test_legacy {
         let deadline = env.ledger().timestamp() + 86400; // 24 hours from now
 
         // Initialize engagement
-        let engagement_id =
-            client.initialize(&client_address, &artisan_address, &amount, &deadline);
+        let engagement_id = client.initialize(
+            &client_address,
+            &artisan_address,
+            &amount,
+            &deadline,
+            &BytesN::from_array(&env, &[1u8; 32]),
+        );
 
         // Verify the returned ID is valid (should be 1 for first engagement)
         assert_eq!(engagement_id, 1);
@@ -455,6 +491,64 @@ mod test_legacy {
                 .unwrap_or(1)
         });
         assert_eq!(next_id, 2); // Should be incremented to 2
+
+        let stored_scope = client.get_scope_hash(&engagement_id);
+        assert!(stored_scope.is_some());
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid scope hash")]
+    fn test_initialize_rejects_zero_scope_hash() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, EscrowContract);
+        let client = EscrowContractClient::new(&env, &contract_id);
+        let client_address = Address::generate(&env);
+        let artisan_address = Address::generate(&env);
+        let amount: i128 = 100;
+        let deadline = env.ledger().timestamp() + 86400;
+        let zero = BytesN::from_array(&env, &[0u8; 32]);
+        client.initialize(&client_address, &artisan_address, &amount, &deadline, &zero);
+    }
+
+    #[test]
+    #[should_panic(expected = "Scope hash mismatch; cannot fund escrow")]
+    fn test_deposit_rejects_wrong_scope_hash() {
+        let env = Env::default();
+        env.mock_all_auths_allowing_non_root_auth();
+        let contract_id = env.register_contract(None, EscrowContract);
+        let client_address = Address::generate(&env);
+        let artisan_address = Address::generate(&env);
+        let token_admin = Address::generate(&env);
+        let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_contract.address();
+        let token_contract_client =
+            soroban_sdk::token::StellarAssetClient::new(&env, &token_address);
+        token_contract_client.mint(&client_address, &1000i128);
+
+        let engagement_id = 1u64;
+        let escrow = Escrow {
+            client: client_address.clone(),
+            artisan: artisan_address,
+            amount: 500,
+            status: Status::Pending,
+            deadline: env.ledger().timestamp() + 86400,
+        };
+        env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
+        });
+
+        let wrong = BytesN::from_array(&env, &[9u8; 32]);
+        EscrowContractClient::new(&env, &contract_id).deposit(
+            &engagement_id,
+            &token_address,
+            &wrong,
+        );
     }
 
     #[test]
@@ -469,7 +563,13 @@ mod test_legacy {
         let deadline = env.ledger().timestamp() + 86400;
 
         // This should panic because client == artisan
-        client.initialize(&same_address, &same_address, &amount, &deadline);
+        client.initialize(
+            &same_address,
+            &same_address,
+            &amount,
+            &deadline,
+            &BytesN::from_array(&env, &[1u8; 32]),
+        );
     }
 
     #[test]
@@ -485,7 +585,13 @@ mod test_legacy {
         let deadline = env.ledger().timestamp() + 86400;
 
         // This should panic because amount is zero
-        client.initialize(&client_address, &artisan_address, &zero_amount, &deadline);
+        client.initialize(
+            &client_address,
+            &artisan_address,
+            &zero_amount,
+            &deadline,
+            &BytesN::from_array(&env, &[1u8; 32]),
+        );
     }
 
     #[test]
@@ -506,6 +612,7 @@ mod test_legacy {
             &artisan_address,
             &negative_amount,
             &deadline,
+            &BytesN::from_array(&env, &[1u8; 32]),
         );
     }
 
@@ -554,9 +661,13 @@ mod test_legacy {
 
         // Store the escrow in contract storage
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
 
         // Check initial token balance of contract (should be 0)
@@ -564,7 +675,11 @@ mod test_legacy {
         assert_eq!(initial_contract_balance, 0);
 
         // Call deposit function as the client
-        EscrowContractClient::new(&env, &contract_id).deposit(&engagement_id, &token_address);
+        EscrowContractClient::new(&env, &contract_id).deposit(
+            &engagement_id,
+            &token_address,
+            &BytesN::from_array(&env, &[1u8; 32]),
+        );
 
         // Verify contract's token balance increased
         let final_contract_balance = token_client.balance(&contract_id);
@@ -620,9 +735,13 @@ mod test_legacy {
         };
 
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
 
         // Mock auth for the WRONG address — unauthorized_address is not the client
@@ -631,13 +750,22 @@ mod test_legacy {
             invoke: &soroban_sdk::testutils::MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "deposit",
-                args: (engagement_id, token_address.clone()).into_val(&env),
+                args: (
+                    engagement_id,
+                    token_address.clone(),
+                    BytesN::from_array(&env, &[1u8; 32]),
+                )
+                    .into_val(&env),
                 sub_invokes: &[],
             },
         }]);
 
         // This must panic — unauthorized_address cannot satisfy escrow.client.require_auth()
-        client.deposit(&engagement_id, &token_address);
+        client.deposit(
+            &engagement_id,
+            &token_address,
+            &BytesN::from_array(&env, &[1u8; 32]),
+        );
     }
 
     #[test]
@@ -671,9 +799,13 @@ mod test_legacy {
 
         // Store the escrow
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
 
         // Try to deposit (should panic due to status check, but first need auth)
@@ -682,12 +814,21 @@ mod test_legacy {
             invoke: &soroban_sdk::testutils::MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "deposit",
-                args: (engagement_id, token_address.clone()).into_val(&env),
+                args: (
+                    engagement_id,
+                    token_address.clone(),
+                    BytesN::from_array(&env, &[1u8; 32]),
+                )
+                    .into_val(&env),
                 sub_invokes: &[],
             },
         }]);
 
-        _client.deposit(&engagement_id, &token_address);
+        _client.deposit(
+            &engagement_id,
+            &token_address,
+            &BytesN::from_array(&env, &[1u8; 32]),
+        );
     }
 
     // New tests for deadline and reclaim behavior
@@ -723,13 +864,21 @@ mod test_legacy {
             deadline: env.ledger().timestamp().saturating_sub(1),
         };
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
 
         // Attempt deposit - should panic due to expired deadline
-        client.deposit(&engagement_id, &token_address);
+        client.deposit(
+            &engagement_id,
+            &token_address,
+            &BytesN::from_array(&env, &[1u8; 32]),
+        );
     }
 
     #[test]
@@ -765,9 +914,13 @@ mod test_legacy {
             deadline,
         };
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
         token_client.transfer(&client_address, &contract_id, &amount);
 
@@ -801,9 +954,13 @@ mod test_legacy {
             deadline,
         };
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
         // ensure contract holds some funds so reclaim would succeed if deadline passed
         let token_client = soroban_sdk::token::Client::new(&env, &token_address);
@@ -845,9 +1002,13 @@ mod test_legacy {
             deadline,
         };
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
         token_contract_client.mint(&client_address, &amount);
         token_client.transfer(&client_address, &contract_id, &amount);
@@ -910,9 +1071,13 @@ mod test_legacy {
             deadline,
         };
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
         let token_client = soroban_sdk::token::Client::new(&env, &token_address);
         let token_contract_client =
@@ -960,9 +1125,13 @@ mod test_legacy {
             deadline,
         };
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
 
         client.reclaim(&engagement_id, &token_address);
@@ -1001,9 +1170,13 @@ mod test_legacy {
         };
 
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
 
         token_client.transfer(&client_address, &contract_id, &amount);
@@ -1051,9 +1224,13 @@ mod test_legacy {
 
         // Store the escrow
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
 
         // Transfer tokens to contract (simulating funded escrow)
@@ -1096,9 +1273,13 @@ mod test_legacy {
         };
 
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
 
         client.release(&engagement_id, &token_address);
@@ -1136,9 +1317,13 @@ mod test_legacy {
         };
 
         env.as_contract(&contract_id, || {
+            let sc = BytesN::from_array(&env, &[1u8; 32]);
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(engagement_id), &escrow);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ScopeHash(engagement_id), &sc);
         });
 
         token_client.transfer(&client_address, &contract_id, &amount);
