@@ -95,7 +95,7 @@ jobs:
         REDIS_PORT: 6379
         SECRET_KEY: test-secret-key
         DEBUG: True
-        STELLAR_ESCROW_PUBLIC: "GDUMMY"
+        ESCROW_CONTRACT_ID: "CDUMMY"
       run: |
         pytest ${{ env.WORKING_DIR }}/app/tests/ -v --cov=${{ env.WORKING_DIR }}/app --cov-report=xml
     
@@ -142,7 +142,7 @@ jobs:
           -e REDIS_HOST=test-redis \
           -e REDIS_PORT=6379 \
           -e SECRET_KEY=test-secret-key \
-          -e STELLAR_ESCROW_PUBLIC=GDUMMY \
+          -e ESCROW_CONTRACT_ID=CDUMMY \
           -e DEBUG=True \
           -p 8000:8000 \
           stellarts-api:test

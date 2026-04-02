@@ -24,7 +24,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.90.0"
+          toolchain: "stable"
           targets: wasm32-unknown-unknown
           components: clippy, rustfmt
 
@@ -62,7 +62,7 @@ jobs:
 
       - name: Run tests
         working-directory: contracts
-        run: cargo test --verbose
+        run: cargo test --verbose --features testutils
 
       - name: Build contracts
         working-directory: contracts
