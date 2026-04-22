@@ -14,6 +14,7 @@ import {
 import { api, type BookingResponse } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
 import { Calendar, ArrowLeft } from "lucide-react";
+import EscrowStepper, { type EscrowStatus } from "../../../components/bookings/EscrowStepper";
 
 export default function DashboardBookingsPage() {
   const router = useRouter();
@@ -106,12 +107,27 @@ export default function DashboardBookingsPage() {
                       {b.status}
                     </span>
                   </p>
-                  <Link
-                    href={`/artisans/${b.artisan_id}`}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    View artisan
-                  </Link>
+                  
+                  <EscrowStepper 
+                    bookingId={b.id} 
+                    initialStatus={
+                      b.status === "completed" ? "RELEASED" : 
+                      (b.status as EscrowStatus) === "FUNDED" ? "FUNDED" : 
+                      (b.status as EscrowStatus) === "DISPUTED" ? "DISPUTED" : 
+                      "HELD"
+                    }
+                    serviceName={b.service}
+                    amount={b.estimated_cost ?? 0}
+                  />
+
+                  <div className="pt-2">
+                    <Link
+                      href={`/artisans/${b.artisan_id}`}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      View artisan
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
             ))}
