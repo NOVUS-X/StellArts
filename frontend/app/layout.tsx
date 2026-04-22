@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { WalletProvider } from '../context/WalletContext';
 import { AuthProvider } from '../context/AuthContext';
+import { CurrencyProvider } from '../context/CurrencyContext';
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -44,7 +45,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <WalletProvider>{children}</WalletProvider>
+          <WalletProvider>
+            <CurrencyProvider>
+              {children}
+            </CurrencyProvider>
+          </WalletProvider>
         </AuthProvider>
       </body>
     </html>

@@ -11,6 +11,7 @@ import {
 } from "../../components/ui/card";
 import { api, type ArtisanItem } from "../../lib/api";
 import { Wrench, MapPin, Star, Sparkles } from "lucide-react";
+import Price from "../../components/ui/Price";
 
 const DEFAULT_LAT = 51.5074;
 const DEFAULT_LON = -0.1278;
@@ -240,7 +241,7 @@ export default function ArtisansPage() {
                             )}
                             {a.hourly_rate != null && (
                               <p className="text-sm font-semibold text-gray-700">
-                                ${Number(a.hourly_rate).toFixed(0)}/hr
+                                <Price amount={Number(a.hourly_rate)} />/hr
                               </p>
                             )}
                           </div>
