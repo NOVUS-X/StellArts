@@ -83,7 +83,7 @@
     "vitest": "^2.1.8"
   },
   "overrides": {
-    "react": "$react",
-    "react-dom": "$react-dom"
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   }
 }
