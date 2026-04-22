@@ -20,6 +20,13 @@ pub struct Escrow {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeadlineExtension {
+    pub new_deadline: u64,
+    pub proposer: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Status {
     Pending,
     Funded,
@@ -33,6 +40,7 @@ pub enum Status {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Escrow(u64),
+    DeadlineExtension(u64),
     NextId,
     Arbitrator,
     Oracle,
@@ -280,6 +288,59 @@ impl EscrowContract {
         );
 
         true
+    }
+
+    /// Mutually approve and apply an escrow deadline extension.
+    pub fn extend_deadline(env: Env, engagement_id: u64, approver: Address, new_deadline: u64) {
+        let key = DataKey::Escrow(engagement_id);
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("Escrow not found");
+
+        approver.require_auth();
+
+        if approver != escrow.client && approver != escrow.artisan {
+            panic!("Only client or artisan can approve deadline extension");
+        }
+
+        if escrow.status != Status::Funded && escrow.status != Status::InProgress {
+            panic!("Escrow must be Funded or InProgress to extend deadline");
+        }
+
+        if new_deadline <= escrow.deadline {
+            panic!("New deadline must be greater than current deadline");
+        }
+
+        let extension_key = DataKey::DeadlineExtension(engagement_id);
+        let pending: Option<DeadlineExtension> = env.storage().persistent().get(&extension_key);
+
+        if let Some(extension) = pending {
+            if extension.proposer == approver {
+                panic!("Same party cannot approve deadline extension twice");
+            }
+
+            if extension.new_deadline != new_deadline {
+                panic!("Pending deadline extension does not match requested deadline");
+            }
+
+            escrow.deadline = new_deadline;
+            env.storage().persistent().set(&key, &escrow);
+            env.storage()
+                .persistent()
+                .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
+            env.storage().persistent().remove(&extension_key);
+        } else {
+            let extension = DeadlineExtension {
+                new_deadline,
+                proposer: approver,
+            };
+            env.storage().persistent().set(&extension_key, &extension);
+            env.storage()
+                .persistent()
+                .extend_ttl(&extension_key, TTL_THRESHOLD, ESCROW_TTL);
+        }
     }
 
     /// Set the oracle address for verifying physical arrival
