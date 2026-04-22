@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useWallet } from '../../context/WalletContext';
 import { useAuth } from '../../context/AuthContext';
+import CurrencySelector from './CurrencySelector';
 
 function WalletButton() {
   const { address, isConnected, connect, disconnect } = useWallet();
@@ -77,6 +78,7 @@ export default function Navbar() {
                 Dashboard
               </Link>
             )}
+            <CurrencySelector />
             <WalletButton />
             {isAuthenticated && (
               <Button

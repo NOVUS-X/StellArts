@@ -13,6 +13,7 @@ import {
 import { api, type ArtisanProfileResponse } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
 import { ArrowLeft, MapPin, Star, Wrench } from "lucide-react";
+import Price from "../../../components/ui/Price";
 
 export default function ArtisanProfilePage() {
   const params = useParams();
@@ -113,7 +114,7 @@ export default function ArtisanProfilePage() {
                   )}
                   {profile.rate != null && (
                     <span className="font-semibold text-gray-900">
-                      ${Number(profile.rate).toFixed(0)}/hr
+                      <Price amount={Number(profile.rate)} />/hr
                     </span>
                   )}
                 </div>

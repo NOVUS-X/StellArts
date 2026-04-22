@@ -14,6 +14,7 @@ import {
 import { api, type BookingResponse } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
 import { Calendar, ArrowLeft } from "lucide-react";
+import Price from "../../../components/ui/Price";
 import EscrowStepper, { type EscrowStatus } from "../../../components/bookings/EscrowStepper";
 
 export default function DashboardBookingsPage() {
@@ -90,7 +91,7 @@ export default function DashboardBookingsPage() {
                   <p className="text-sm">
                     Cost:{" "}
                     {b.estimated_cost != null
-                      ? `$${Number(b.estimated_cost).toFixed(2)}`
+                      ? <Price amount={Number(b.estimated_cost)} />
                       : "—"}
                   </p>
                   <p className="text-sm">
