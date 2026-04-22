@@ -406,6 +406,100 @@ mod happy_path_tests {
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.status, Status::Refunded);
     }
+
+    #[test]
+    fn test_extend_deadline_client_proposes_artisan_confirms() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let original_deadline = ctx.get_escrow(engagement_id).deadline;
+        let new_deadline = original_deadline + 3600;
+
+        ctx.client_contract
+            .extend_deadline(&engagement_id, &client, &new_deadline);
+        assert_eq!(ctx.get_escrow(engagement_id).deadline, original_deadline);
+
+        ctx.client_contract
+            .extend_deadline(&engagement_id, &artisan, &new_deadline);
+        assert_eq!(ctx.get_escrow(engagement_id).deadline, new_deadline);
+    }
+
+    #[test]
+    fn test_extend_deadline_artisan_proposes_client_confirms() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let original_deadline = ctx.get_escrow(engagement_id).deadline;
+        let new_deadline = original_deadline + 7200;
+
+        ctx.client_contract
+            .extend_deadline(&engagement_id, &artisan, &new_deadline);
+        assert_eq!(ctx.get_escrow(engagement_id).deadline, original_deadline);
+
+        ctx.client_contract
+            .extend_deadline(&engagement_id, &client, &new_deadline);
+        assert_eq!(ctx.get_escrow(engagement_id).deadline, new_deadline);
+    }
+
+    #[test]
+    #[should_panic(expected = "Only client or artisan can approve deadline extension")]
+    fn test_extend_deadline_unauthorized_caller_fails() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let unauthorized = Address::generate(&ctx.env);
+        let amount: i128 = 5000;
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let new_deadline = ctx.get_escrow(engagement_id).deadline + 3600;
+
+        ctx.client_contract
+            .extend_deadline(&engagement_id, &unauthorized, &new_deadline);
+    }
+
+    #[test]
+    #[should_panic(expected = "Same party cannot approve deadline extension twice")]
+    fn test_extend_deadline_same_party_approves_twice_fails() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let new_deadline = ctx.get_escrow(engagement_id).deadline + 3600;
+
+        ctx.client_contract
+            .extend_deadline(&engagement_id, &client, &new_deadline);
+        ctx.client_contract
+            .extend_deadline(&engagement_id, &client, &new_deadline);
+    }
+
+    #[test]
+    #[should_panic(expected = "Pending deadline extension does not match requested deadline")]
+    fn test_extend_deadline_mismatched_deadline_fails() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let original_deadline = ctx.get_escrow(engagement_id).deadline;
+
+        ctx.client_contract
+            .extend_deadline(&engagement_id, &client, &(original_deadline + 3600));
+        ctx.client_contract
+            .extend_deadline(&engagement_id, &artisan, &(original_deadline + 7200));
+    }
+
+    #[test]
+    #[should_panic(expected = "New deadline must be greater than current deadline")]
+    fn test_extend_deadline_non_increasing_deadline_fails() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let current_deadline = ctx.get_escrow(engagement_id).deadline;
+
+        ctx.client_contract
+            .extend_deadline(&engagement_id, &client, &current_deadline);
+    }
+
     /// Test 12: Dispute - client initiates dispute on funded escrow
     #[test]
     fn test_dispute_from_client() {
