@@ -17,6 +17,7 @@ os.environ.setdefault("REQUIRE_EMAIL_VERIFICATION", "False")
 
 # Ensure tests run with email verification enforcement disabled by default
 from app.core.config import settings as _settings
+from app.core.rate_limit import limiter, reset_failed_submissions
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
@@ -35,6 +36,16 @@ def override_get_db():
         yield db
     finally:
         db.close()
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """Reset in-memory rate limit state between tests so they don't interfere."""
+    limiter.reset()
+    reset_failed_submissions()
+    yield
+    limiter.reset()
+    reset_failed_submissions()
 
 
 @pytest.fixture(scope="function")
