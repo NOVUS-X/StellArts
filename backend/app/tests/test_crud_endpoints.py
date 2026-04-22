@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 def get_auth_headers(client, email, password, role):
     # Register
     client.post(
@@ -95,3 +98,60 @@ def test_artisan_profile_crud(client):
     assert resp.status_code == 200
     # The new response structure is flat (not wrapped in "profile") and "specialty" is processed
     assert resp.json()["specialty"] == "painting"  # First item in list
+
+
+def test_artisan_availability_update_online_offline_and_last_active(client):
+    headers = get_auth_headers(client, "available@test.com", "Pass123!", "artisan")
+    profile_data = {
+        "business_name": "Availability Biz",
+        "specialties": ["painting"],
+        "latitude": 40.0,
+        "longitude": -74.0,
+    }
+    resp = client.post("api/v1/artisans/profile", json=profile_data, headers=headers)
+    assert resp.status_code == 200
+
+    offline_resp = client.patch(
+        "api/v1/artisans/availability",
+        json={"is_available": False},
+        headers=headers,
+    )
+    assert offline_resp.status_code == 200
+    offline_data = offline_resp.json()
+    assert offline_data["is_available"] is False
+    assert offline_data["last_active"] is not None
+    offline_last_active = datetime.fromisoformat(
+        offline_data["last_active"].replace("Z", "+00:00")
+    )
+
+    online_resp = client.patch(
+        "api/v1/artisans/availability",
+        json={"is_available": True},
+        headers=headers,
+    )
+    assert online_resp.status_code == 200
+    online_data = online_resp.json()
+    assert online_data["is_available"] is True
+    online_last_active = datetime.fromisoformat(
+        online_data["last_active"].replace("Z", "+00:00")
+    )
+    assert online_last_active >= offline_last_active
+
+
+def test_artisan_availability_requires_authentication(client):
+    resp = client.patch(
+        "api/v1/artisans/availability",
+        json={"is_available": False},
+    )
+    assert resp.status_code in (401, 403)
+
+
+def test_artisan_availability_rejects_non_artisan(client):
+    headers = get_auth_headers(client, "not-artisan@test.com", "Pass123!", "client")
+
+    resp = client.patch(
+        "api/v1/artisans/availability",
+        json={"is_available": False},
+        headers=headers,
+    )
+    assert resp.status_code == 403

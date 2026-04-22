@@ -90,6 +90,10 @@ class MockRedisGeo:
 
         return results
 
+    async def scan_iter(self, match=None):
+        if False:
+            yield None
+
     def _calculate_distance_m(self, lat1, lon1, lat2, lon2):
         R = 6371000  # Earth radius in meters
         phi1 = math.radians(lat1)
@@ -117,6 +121,7 @@ def mock_redis():
     mock.hset.side_effect = mock_geo.hset
     mock.delete.side_effect = mock_geo.delete
     mock.zrem.side_effect = mock_geo.zrem
+    mock.scan_iter.side_effect = mock_geo.scan_iter
 
     return mock
 
@@ -241,3 +246,78 @@ async def test_geolocation_search_filtering(db_session, mock_redis):
         assert (
             artisan_b.id not in max_found_ids
         ), "Artisan B (~111km) should be excluded even at max radius (100km)"
+
+
+@pytest.mark.asyncio
+async def test_availability_update_immediately_affects_nearby_search(
+    db_session, mock_redis
+):
+    with patch("app.core.cache.cache.redis", mock_redis):
+        service = ArtisanService(db_session)
+
+        user_a = User(
+            email="artisan_online@test.com",
+            hashed_password=get_password_hash("pass"),
+            role="artisan",
+            full_name="Online Artisan",
+        )
+        user_b = User(
+            email="artisan_toggle@test.com",
+            hashed_password=get_password_hash("pass"),
+            role="artisan",
+            full_name="Toggle Artisan",
+        )
+        db_session.add(user_a)
+        db_session.add(user_b)
+        db_session.commit()
+        db_session.refresh(user_a)
+        db_session.refresh(user_b)
+
+        profile_a = ArtisanProfileCreate(
+            business_name="Online Business",
+            specialties=["plumbing"],
+            latitude=Decimal("40.0"),
+            longitude=Decimal("-74.0"),
+        )
+        profile_b = ArtisanProfileCreate(
+            business_name="Toggle Business",
+            specialties=["plumbing"],
+            latitude=Decimal("40.001"),
+            longitude=Decimal("-74.0"),
+        )
+
+        artisan_a = await service.create_artisan_profile(user_a.id, profile_a)
+        artisan_b = await service.create_artisan_profile(user_b.id, profile_b)
+        assert artisan_a is not None
+        assert artisan_b is not None
+
+        request = NearbyArtisansRequest(
+            latitude=Decimal("40.0"),
+            longitude=Decimal("-74.0"),
+            radius_km=5.0,
+            limit=10,
+        )
+
+        initial_response = await service.find_nearby_artisans(request)
+        initial_ids = [artisan["id"] for artisan in initial_response["artisans"]]
+        assert initial_ids == [artisan_a.id, artisan_b.id]
+
+        offline_artisan = await service.update_artisan_availability(artisan_b.id, False)
+        assert offline_artisan is not None
+        assert offline_artisan.is_available is False
+        assert offline_artisan.last_active is not None
+        offline_last_active = offline_artisan.last_active
+
+        offline_response = await service.find_nearby_artisans(request)
+        offline_ids = [artisan["id"] for artisan in offline_response["artisans"]]
+        assert offline_ids == [artisan_a.id]
+
+        online_artisan = await service.update_artisan_availability(artisan_b.id, True)
+        assert online_artisan is not None
+        assert online_artisan.is_available is True
+        assert online_artisan.last_active is not None
+
+        online_response = await service.find_nearby_artisans(request)
+        online_ids = [artisan["id"] for artisan in online_response["artisans"]]
+        assert online_ids == [artisan_a.id, artisan_b.id]
+        assert online_artisan.last_active >= offline_last_active

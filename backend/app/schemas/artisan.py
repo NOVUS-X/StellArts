@@ -108,6 +108,10 @@ class ArtisanProfileUpdate(BaseModel):
     is_available: bool | None = None
 
 
+class ArtisanAvailabilityUpdate(BaseModel):
+    is_available: bool
+
+
 # Output Schema
 class ArtisanOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -124,6 +128,7 @@ class ArtisanOut(BaseModel):
     longitude: Decimal | None = None
     is_verified: bool = False
     is_available: bool = True
+    last_active: datetime | None = None
     rating: Decimal | None = None
     total_reviews: int = 0
     created_at: datetime
