@@ -132,3 +132,33 @@
     --chart-5: 340 75% 55%;
   }
 }
+
+@layer utilities {
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 45%, #e5e7eb 100%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  }
+
+  .skeleton-wave {
+    background: linear-gradient(
+      110deg,
+      rgba(255, 255, 255, 0) 18%,
+      rgba(255, 255, 255, 0.65) 50%,
+      rgba(255, 255, 255, 0) 82%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.7s linear infinite;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
