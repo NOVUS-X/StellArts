@@ -14,6 +14,9 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("DATABASE_URL", SQLALCHEMY_DATABASE_URL)
 # Disable email verification enforcement during tests by default
 os.environ.setdefault("REQUIRE_EMAIL_VERIFICATION", "False")
+# Disable rate limiting in tests so repeated calls from the TestClient don't
+# exhaust the per-endpoint quota across tests.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 # Ensure tests run with email verification enforcement disabled by default
 from app.core.config import settings as _settings

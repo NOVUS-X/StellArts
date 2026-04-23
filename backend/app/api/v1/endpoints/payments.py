@@ -2,13 +2,14 @@
 import uuid
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from stellar_sdk import TransactionEnvelope
 
 from app.core.auth import require_client
 from app.core.config import settings
+from app.core.rate_limit import PAYMENT_FAILURE_LIMIT, PAYMENT_LIMIT, limiter
 from app.db.session import get_db
 from app.models.booking import Booking
 from app.models.user import User
@@ -53,7 +54,9 @@ class RefundRequest(BaseModel):
 
 
 @router.post("/prepare", summary="Prepare unsigned payment XDR for client signing")
+@limiter.limit(PAYMENT_LIMIT)
 def prepare(
+    request: Request,
     req: PrepareRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_client),
@@ -88,7 +91,9 @@ def prepare(
 
 
 @router.post("/submit", summary="Submit signed payment XDR from wallet")
+@limiter.limit(PAYMENT_LIMIT)
 def submit(
+    request: Request,
     req: SubmitRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_client),
@@ -113,6 +118,9 @@ def submit(
             memo_text = memo_text.decode()
         booking_token = memo_text.replace("hold-", "")
     except Exception:
+        # Invalid XDR counts as a failed submission; apply the stricter limit
+        # so attackers can't use this endpoint to probe the Stellar network.
+        _enforce_failure_limit(request)
         raise HTTPException(
             status_code=400, detail="Invalid signed transaction XDR"
         ) from None
@@ -128,6 +136,7 @@ def submit(
             if str(row[0]).startswith(booking_token)
         ]
         if len(candidates) != 1:
+            _enforce_failure_limit(request)
             raise HTTPException(
                 status_code=400,
                 detail="Unable to resolve booking from transaction memo",
@@ -152,12 +161,14 @@ def submit(
 
     res = submit_signed_payment(db, req.signed_xdr)
     if res.get("status") == "error":
+        _enforce_failure_limit(request)
         raise HTTPException(status_code=400, detail=res.get("message"))
     return res
 
 
 @router.post("/release", summary="Release escrow to artisan")
-def release(req: ReleaseRequest, db: Session = Depends(get_db)):
+@limiter.limit(PAYMENT_LIMIT)
+def release(request: Request, req: ReleaseRequest, db: Session = Depends(get_db)):
     res = release_payment(db, req.booking_id, req.artisan_public, req.amount)
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message"))
@@ -165,8 +176,32 @@ def release(req: ReleaseRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/refund", summary="Refund escrow to client")
-def refund(req: RefundRequest, db: Session = Depends(get_db)):
+@limiter.limit(PAYMENT_LIMIT)
+def refund(request: Request, req: RefundRequest, db: Session = Depends(get_db)):
     res = refund_payment(db, req.booking_id, req.client_public, req.amount)
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message"))
     return res
+
+
+def _enforce_failure_limit(request: Request) -> None:
+    """Apply a stricter rate limit for failed payment submissions.
+
+    Uses the same underlying ``slowapi`` storage so repeated failures from the
+    same client (invalid XDR or rejected Stellar transactions) quickly trip
+    the ``PAYMENT_FAILURE_LIMIT`` threshold and are rejected with HTTP 429
+    well before the normal ``PAYMENT_LIMIT`` is exhausted.
+    """
+    from limits import parse_many
+
+    key = limiter._key_func(request)
+    scope = "payments:submit:failure"
+    for item in parse_many(PAYMENT_FAILURE_LIMIT):
+        if not limiter._limiter.hit(item, key, scope):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    "Too many failed payment submissions. "
+                    "Please wait before trying again."
+                ),
+            )
