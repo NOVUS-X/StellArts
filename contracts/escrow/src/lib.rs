@@ -428,9 +428,7 @@ impl EscrowContract {
             }
 
             // Both parties agree: store a simple bool flag
-            env.storage()
-                .persistent()
-                .set(&early_reclaim_key, &true);
+            env.storage().persistent().set(&early_reclaim_key, &true);
             env.storage()
                 .persistent()
                 .extend_ttl(&early_reclaim_key, TTL_THRESHOLD, ESCROW_TTL);
@@ -700,8 +698,14 @@ mod test_legacy {
         let deadline = env.ledger().timestamp() + 86400; // 24 hours from now
 
         // Initialize engagement
-        let engagement_id =
-            client.initialize(&client_address, &artisan_address, &arbitrator_address, &token_address, &amount, &deadline);
+        let engagement_id = client.initialize(
+            &client_address,
+            &artisan_address,
+            &arbitrator_address,
+            &token_address,
+            &amount,
+            &deadline,
+        );
 
         // Verify the returned ID is valid (should be 1 for first engagement)
         assert_eq!(engagement_id, 1);
@@ -745,7 +749,14 @@ mod test_legacy {
         let deadline = env.ledger().timestamp() + 86400;
 
         // This should panic because client == artisan
-        client.initialize(&same_address, &same_address, &arbitrator_address, &token_address, &amount, &deadline);
+        client.initialize(
+            &same_address,
+            &same_address,
+            &arbitrator_address,
+            &token_address,
+            &amount,
+            &deadline,
+        );
     }
 
     #[test]
@@ -763,7 +774,14 @@ mod test_legacy {
         let deadline = env.ledger().timestamp() + 86400;
 
         // This should panic because amount is zero
-        client.initialize(&client_address, &artisan_address, &arbitrator_address, &token_address, &zero_amount, &deadline);
+        client.initialize(
+            &client_address,
+            &artisan_address,
+            &arbitrator_address,
+            &token_address,
+            &zero_amount,
+            &deadline,
+        );
     }
 
     #[test]

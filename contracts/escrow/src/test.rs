@@ -57,14 +57,31 @@ mod happy_path_tests {
 
         /// Initialize an engagement with the default arbitrator and token
         fn initialize_engagement(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
-            self.initialize_engagement_with_arbitrator(client, artisan, &self.default_arbitrator.clone(), amount)
+            self.initialize_engagement_with_arbitrator(
+                client,
+                artisan,
+                &self.default_arbitrator.clone(),
+                amount,
+            )
         }
 
         /// Initialize an engagement with a specific arbitrator and the default token
-        fn initialize_engagement_with_arbitrator(&self, client: &Address, artisan: &Address, arbitrator: &Address, amount: i128) -> u64 {
+        fn initialize_engagement_with_arbitrator(
+            &self,
+            client: &Address,
+            artisan: &Address,
+            arbitrator: &Address,
+            amount: i128,
+        ) -> u64 {
             let deadline = self.env.ledger().timestamp() + 86400;
-            self.client_contract
-                .initialize(client, artisan, arbitrator, &self.token_address, &amount, &deadline)
+            self.client_contract.initialize(
+                client,
+                artisan,
+                arbitrator,
+                &self.token_address,
+                &amount,
+                &deadline,
+            )
         }
 
         /// Mint tokens to an address
@@ -377,9 +394,14 @@ mod happy_path_tests {
         // set a short deadline a few seconds in the future
         let now = ctx.env.ledger().timestamp();
         let deadline = now + 10;
-        let engagement_id = ctx
-            .client_contract
-            .initialize(&client, &artisan, &ctx.default_arbitrator, &ctx.token_address, &amount, &deadline);
+        let engagement_id = ctx.client_contract.initialize(
+            &client,
+            &artisan,
+            &ctx.default_arbitrator,
+            &ctx.token_address,
+            &amount,
+            &deadline,
+        );
 
         // fund and deposit before the deadline
         ctx.mint_tokens(&client, amount);
@@ -609,7 +631,8 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
-        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        let engagement_id =
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -642,7 +665,8 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
-        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        let engagement_id =
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -676,7 +700,8 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
-        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        let engagement_id =
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -701,7 +726,8 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
-        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        let engagement_id =
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -723,7 +749,8 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit (but don't dispute)
-        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        let engagement_id =
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -741,7 +768,8 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
-        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        let engagement_id =
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -756,8 +784,12 @@ mod happy_path_tests {
         // Arbitrator resolves: 60% to client (3000), 40% to artisan (2000)
         let client_share: i128 = 3000;
         let artisan_share: i128 = 2000;
-        ctx.client_contract
-            .resolve_dispute(&engagement_id, &client_share, &artisan_share, &ctx.token_address);
+        ctx.client_contract.resolve_dispute(
+            &engagement_id,
+            &client_share,
+            &artisan_share,
+            &ctx.token_address,
+        );
 
         // Verify funds distributed correctly
         assert_eq!(
@@ -791,7 +823,8 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
-        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        let engagement_id =
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -812,7 +845,8 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
-        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        let engagement_id =
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -836,12 +870,17 @@ mod happy_path_tests {
                 break;
             }
         }
-        assert!(found, "expected a DisputeResolvedEvent from the escrow contract");
+        assert!(
+            found,
+            "expected a DisputeResolvedEvent from the escrow contract"
+        );
     }
 
     /// Test 26: Reclaim fails during grace period without mutual approval
     #[test]
-    #[should_panic(expected = "Grace period has not passed; both parties must approve early reclaim")]
+    #[should_panic(
+        expected = "Grace period has not passed; both parties must approve early reclaim"
+    )]
     fn test_reclaim_fails_during_grace_period() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
@@ -849,9 +888,14 @@ mod happy_path_tests {
 
         let now = ctx.env.ledger().timestamp();
         let deadline = now + 10;
-        let engagement_id = ctx
-            .client_contract
-            .initialize(&client, &artisan, &ctx.default_arbitrator, &ctx.token_address, &amount, &deadline);
+        let engagement_id = ctx.client_contract.initialize(
+            &client,
+            &artisan,
+            &ctx.default_arbitrator,
+            &ctx.token_address,
+            &amount,
+            &deadline,
+        );
 
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
@@ -873,9 +917,14 @@ mod happy_path_tests {
 
         let now = ctx.env.ledger().timestamp();
         let deadline = now + 10;
-        let engagement_id = ctx
-            .client_contract
-            .initialize(&client, &artisan, &ctx.default_arbitrator, &ctx.token_address, &amount, &deadline);
+        let engagement_id = ctx.client_contract.initialize(
+            &client,
+            &artisan,
+            &ctx.default_arbitrator,
+            &ctx.token_address,
+            &amount,
+            &deadline,
+        );
 
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
@@ -902,9 +951,14 @@ mod happy_path_tests {
 
         let now = ctx.env.ledger().timestamp();
         let deadline = now + 10;
-        let engagement_id = ctx
-            .client_contract
-            .initialize(&client, &artisan, &ctx.default_arbitrator, &ctx.token_address, &amount, &deadline);
+        let engagement_id = ctx.client_contract.initialize(
+            &client,
+            &artisan,
+            &ctx.default_arbitrator,
+            &ctx.token_address,
+            &amount,
+            &deadline,
+        );
 
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
