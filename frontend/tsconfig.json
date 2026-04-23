@@ -21,7 +21,7 @@
     "paths": {
       "@/*": ["./*"]
     },
-    
+    "ignoreDeprecations": "6.0",
     
     "resolveJsonModule": true,
     "isolatedModules": true,
