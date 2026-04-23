@@ -17,6 +17,7 @@ from app.models.artisan import Artisan
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.artisan import (
+    ArtisanAvailabilityUpdate,
     ArtisanLocationUpdate,
     ArtisanOut,
     ArtisanProfileCreate,
@@ -227,18 +228,30 @@ async def geocode_address(
     return geo_result
 
 
-@router.put("/availability")
-def update_availability(
-    availability_data: dict,  # Consider defining a proper schema
+@router.patch("/availability", response_model=ArtisanOut)
+async def update_availability(
+    availability_data: ArtisanAvailabilityUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_artisan),
 ):
     """Update artisan availability - artisan only"""
-    return {
-        "message": "Availability updated successfully",
-        "artisan_id": current_user.id,
-        "availability": availability_data,
-    }
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
+        )
+
+    updated_artisan = await service.update_artisan_availability(
+        artisan.id, availability_data.is_available
+    )
+    if not updated_artisan:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update availability",
+        )
+
+    return updated_artisan
 
 
 @router.get("/my-portfolio")
