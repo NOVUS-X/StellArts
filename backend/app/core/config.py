@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings
-
-
 class Settings(BaseSettings):
     # API
     API_V1_STR: str = "/api/v1"
@@ -56,19 +54,15 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str | None = None
 
     # Soroban Configuration
-    # Optional vision model configuration for completion verification
-    VISION_API_URL: str | None = None
-    VISION_API_KEY: str | None = None
-    VISION_MODEL: str = "gpt-4o-mini"
-    JOB_COMPLETION_ACCEPTANCE_THRESHOLD: float = 0.75
-
-    # Soroban Configuration
     SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
     SOROBAN_NETWORK_PASSPHRASE: str = "Test SDF Network ; September 2015"
     ESCROW_CONTRACT_ID: str | None = None
     REPUTATION_CONTRACT_ID: str | None = None
+    
+    # Webhook Listener Configuration
+    WEBHOOK_LISTENER_ENABLED: bool = True
+    EVENT_STREAM_INTERVAL: int = 5  # seconds between poll retries
+    EVENT_CURSOR_TTL: int = 86400  # 24 hours in seconds
 
     model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore"}
-
-
 settings = Settings()
