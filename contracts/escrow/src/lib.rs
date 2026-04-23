@@ -470,8 +470,6 @@ impl EscrowContract {
             .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
     }
 
-
-
     /// Initiate a dispute on a funded escrow
     /// Can be called by either the client or artisan
     /// Transitions the escrow from Funded to Disputed status
