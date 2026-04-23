@@ -26,6 +26,18 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
     NEARBY_CACHE_TTL: int = 60  # Seconds to cache nearby-artisan search results
 
+    # Rate limiting (slowapi syntax, e.g. "5/minute").  Lower thresholds are
+    # used for /submit and especially for *failed* /submit attempts to avoid
+    # spamming the Stellar network with bogus transactions.
+    RATE_LIMIT_PAYMENTS_PREPARE: str = "10/minute"
+    RATE_LIMIT_PAYMENTS_SUBMIT: str = "5/minute"
+    RATE_LIMIT_PAYMENTS_SUBMIT_FAILED: str = "3/minute"
+    RATE_LIMIT_PAYMENTS_RELEASE: str = "5/minute"
+    RATE_LIMIT_PAYMENTS_REFUND: str = "5/minute"
+    # Storage backend for slowapi counters.  None => in-process memory (default).
+    # Set to a redis://... URL to share limits across workers.
+    RATE_LIMIT_STORAGE_URI: str | None = None
+
     # CORS
     BACKEND_CORS_ORIGINS: list[AnyHttpUrl] = []
 
