@@ -592,9 +592,9 @@ mod happy_path_tests {
         ctx.client_contract.dispute(&engagement_id, &unauthorized);
     }
 
-    /// Test 17: Arbitrate - arbitrator resolves dispute in favor of client (refund)
+    /// Test 17: Resolve dispute - arbitrator resolves dispute fully in favor of client (refund)
     #[test]
-    fn test_arbitrate_to_client() {
+    fn test_resolve_dispute_full_to_client() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
@@ -611,12 +611,12 @@ mod happy_path_tests {
         ctx.client_contract.dispute(&engagement_id, &client);
         assert_eq!(ctx.get_escrow(engagement_id).status, Status::Disputed);
 
-        // Get client balance before arbitration
+        // Get client balance before resolution
         let client_balance_before = ctx.token_client.balance(&client);
 
-        // Arbitrator resolves in favor of client
+        // Arbitrator resolves: 100% to client, 0% to artisan
         ctx.client_contract
-            .arbitrate(&engagement_id, &client, &ctx.token_address);
+            .resolve_dispute(&engagement_id, &amount, &0, &ctx.token_address);
 
         // Verify funds transferred to client
         let client_balance_after = ctx.token_client.balance(&client);
@@ -627,9 +627,9 @@ mod happy_path_tests {
         assert_eq!(escrow.status, Status::Refunded);
     }
 
-    /// Test 18: Arbitrate - arbitrator resolves dispute in favor of artisan (release)
+    /// Test 18: Resolve dispute - arbitrator resolves dispute fully in favor of artisan (release)
     #[test]
-    fn test_arbitrate_to_artisan() {
+    fn test_resolve_dispute_full_to_artisan() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
@@ -646,12 +646,12 @@ mod happy_path_tests {
         ctx.client_contract.dispute(&engagement_id, &artisan);
         assert_eq!(ctx.get_escrow(engagement_id).status, Status::Disputed);
 
-        // Get artisan balance before arbitration
+        // Get artisan balance before resolution
         let artisan_balance_before = ctx.token_client.balance(&artisan);
 
-        // Arbitrator resolves in favor of artisan
+        // Arbitrator resolves: 0% to client, 100% to artisan
         ctx.client_contract
-            .arbitrate(&engagement_id, &artisan, &ctx.token_address);
+            .resolve_dispute(&engagement_id, &0, &amount, &ctx.token_address);
 
         // Verify funds transferred to artisan
         let artisan_balance_after = ctx.token_client.balance(&artisan);
@@ -662,10 +662,10 @@ mod happy_path_tests {
         assert_eq!(escrow.status, Status::Released);
     }
 
-    /// Test 19: Unauthorized arbitrate - non-arbitrator cannot resolve disputes
+    /// Test 19: Unauthorized resolve_dispute - non-arbitrator cannot resolve disputes
     #[test]
     #[should_panic]
-    fn test_unauthorized_arbitrate_attempt() {
+    fn test_unauthorized_resolve_dispute_attempt() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
@@ -685,19 +685,18 @@ mod happy_path_tests {
         // Disable global mock auth and ensure only real arbitrator can call
         ctx.env.set_auths(&[]);
 
-        // Unauthorized user attempts to arbitrate
+        // Unauthorized user attempts to resolve dispute
         ctx.client_contract
-            .arbitrate(&engagement_id, &client, &ctx.token_address);
+            .resolve_dispute(&engagement_id, &amount, &0, &ctx.token_address);
     }
 
-    /// Test 20: Arbitrate - invalid winner (third party) should fail
+    /// Test 20: Resolve dispute - distribution amounts that don't sum to escrow amount should fail
     #[test]
-    #[should_panic(expected = "Winner must be either client or artisan")]
-    fn test_arbitrate_invalid_winner() {
+    #[should_panic(expected = "Distribution amounts must equal the escrowed amount")]
+    fn test_resolve_dispute_invalid_amounts() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
-        let invalid_winner = Address::generate(&ctx.env);
         let amount: i128 = 5000;
 
         // Setup: Set arbitrator
@@ -710,15 +709,15 @@ mod happy_path_tests {
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
 
-        // Arbitrator tries to award funds to a third party
+        // Try to distribute incorrect total (3000 + 3000 != 5000)
         ctx.client_contract
-            .arbitrate(&engagement_id, &invalid_winner, &ctx.token_address);
+            .resolve_dispute(&engagement_id, &3000, &3000, &ctx.token_address);
     }
 
-    /// Test 21: Arbitrate from non-disputed state should fail
+    /// Test 21: Resolve dispute from non-disputed state should fail
     #[test]
-    #[should_panic(expected = "Escrow must be in Disputed status to arbitrate")]
-    fn test_arbitrate_from_non_disputed_state_fails() {
+    #[should_panic(expected = "Escrow must be in Disputed status to resolve")]
+    fn test_resolve_dispute_from_non_disputed_state_fails() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
@@ -731,15 +730,15 @@ mod happy_path_tests {
         // Setup: Initialize, mint, and deposit (but don't dispute)
         let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
 
-        // Arbitrator tries to arbitrate on non-disputed escrow
+        // Arbitrator tries to resolve non-disputed escrow
         ctx.client_contract
-            .arbitrate(&engagement_id, &client, &ctx.token_address);
+            .resolve_dispute(&engagement_id, &amount, &0, &ctx.token_address);
     }
 
     /// Test 22: Arbitrator not set should fail
     #[test]
     #[should_panic(expected = "Arbitrator not set")]
-    fn test_arbitrate_without_arbitrator_set() {
+    fn test_resolve_dispute_without_arbitrator_set() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
@@ -750,8 +749,121 @@ mod happy_path_tests {
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
 
-        // Try to arbitrate without arbitrator set
+        // Try to resolve without arbitrator set
         ctx.client_contract
-            .arbitrate(&engagement_id, &client, &ctx.token_address);
+            .resolve_dispute(&engagement_id, &amount, &0, &ctx.token_address);
+    }
+
+    /// Test 23: Resolve dispute with split distribution (e.g. 60/40)
+    #[test]
+    fn test_resolve_dispute_split_distribution() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let admin = Address::generate(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Set arbitrator
+        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
+
+        // Setup: Initialize, mint, and deposit
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Initiate dispute
+        ctx.client_contract.dispute(&engagement_id, &client);
+        assert_eq!(ctx.get_escrow(engagement_id).status, Status::Disputed);
+
+        // Record balances before
+        let client_balance_before = ctx.token_client.balance(&client);
+        let artisan_balance_before = ctx.token_client.balance(&artisan);
+
+        // Arbitrator resolves: 60% to client (3000), 40% to artisan (2000)
+        let client_share: i128 = 3000;
+        let artisan_share: i128 = 2000;
+        ctx.client_contract
+            .resolve_dispute(&engagement_id, &client_share, &artisan_share, &ctx.token_address);
+
+        // Verify funds distributed correctly
+        assert_eq!(
+            ctx.token_client.balance(&client),
+            client_balance_before + client_share,
+            "Client should receive their share"
+        );
+        assert_eq!(
+            ctx.token_client.balance(&artisan),
+            artisan_balance_before + artisan_share,
+            "Artisan should receive their share"
+        );
+        assert_eq!(
+            ctx.token_client.balance(&ctx.contract_id),
+            0,
+            "Contract should have no tokens after resolution"
+        );
+
+        // Verify status is Resolved (split)
+        let escrow = ctx.get_escrow(engagement_id);
+        assert_eq!(escrow.status, Status::Resolved);
+    }
+
+    /// Test 24: Resolve dispute with negative amount should fail
+    #[test]
+    #[should_panic(expected = "Distribution amounts must be non-negative")]
+    fn test_resolve_dispute_negative_amount_fails() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let admin = Address::generate(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Set arbitrator
+        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
+
+        // Setup: Initialize, mint, and deposit
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Initiate dispute
+        ctx.client_contract.dispute(&engagement_id, &client);
+
+        // Try negative client_amount
+        ctx.client_contract
+            .resolve_dispute(&engagement_id, &(-1000), &6000, &ctx.token_address);
+    }
+
+    /// Test 25: Resolve dispute emits correct event with distribution details
+    #[test]
+    fn test_resolve_dispute_event_emitted() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let admin = Address::generate(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Setup: Set arbitrator
+        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
+
+        // Setup: Initialize, mint, and deposit
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Initiate dispute
+        ctx.client_contract.dispute(&engagement_id, &client);
+
+        // Resolve with split: 2000 to client, 3000 to artisan
+        ctx.client_contract
+            .resolve_dispute(&engagement_id, &2000, &3000, &ctx.token_address);
+
+        // Verify at least one event from the escrow contract was emitted
+        let raw_events: soroban_sdk::Vec<(
+            Address,
+            soroban_sdk::Vec<soroban_sdk::Val>,
+            soroban_sdk::Val,
+        )> = ctx.env.events().all();
+        let mut found = false;
+        for (addr, _, _) in raw_events.into_iter() {
+            if addr == ctx.contract_id {
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "expected a DisputeResolvedEvent from the escrow contract");
     }
 }

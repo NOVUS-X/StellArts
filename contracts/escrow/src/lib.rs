@@ -34,6 +34,7 @@ pub enum Status {
     Released,
     Refunded, // added for reclaimed/returned escrows
     Disputed,
+    Resolved, // dispute resolved with split distribution
 }
 
 #[contracttype]
@@ -74,8 +75,8 @@ pub struct DisputeInitiatedEvent {
 #[contracttype]
 pub struct DisputeResolvedEvent {
     pub id: u64,
-    pub winner: Address,
-    pub amount: i128,
+    pub client_amount: i128,
+    pub artisan_amount: i128,
     pub timestamp: u64,
 }
 
@@ -436,10 +437,17 @@ impl EscrowContract {
         );
     }
 
-    /// Resolve a dispute by the arbitrator
+    /// Resolve a dispute by the arbitrator (admin)
     /// Only callable by the stored arbitrator address
-    /// Transfers funds to the winner and updates escrow status accordingly
-    pub fn arbitrate(env: Env, engagement_id: u64, winner: Address, token: Address) {
+    /// Supports split distribution: funds can be divided between client and artisan
+    /// The sum of client_amount and artisan_amount must equal the escrowed amount
+    pub fn resolve_dispute(
+        env: Env,
+        engagement_id: u64,
+        client_amount: i128,
+        artisan_amount: i128,
+        token: Address,
+    ) {
         // Load the arbitrator address
         let arbitrator_key = DataKey::Arbitrator;
         let arbitrator: Address = env
@@ -461,23 +469,48 @@ impl EscrowContract {
 
         // State check: escrow must be in Disputed status
         if escrow.status != Status::Disputed {
-            panic!("Escrow must be in Disputed status to arbitrate");
+            panic!("Escrow must be in Disputed status to resolve");
         }
 
-        // Validation: winner must be either client or artisan
-        if winner != escrow.client && winner != escrow.artisan {
-            panic!("Winner must be either client or artisan");
+        // Validation: amounts must be non-negative
+        if client_amount < 0 || artisan_amount < 0 {
+            panic!("Distribution amounts must be non-negative");
         }
 
-        // Transfer funds to the winner
+        // Validation: distribution must equal total escrow amount
+        if client_amount + artisan_amount != escrow.amount {
+            panic!("Distribution amounts must equal the escrowed amount");
+        }
+
+        // Transfer funds according to distribution
         let token_client = token::Client::new(&env, &token);
-        token_client.transfer(&env.current_contract_address(), &winner, &escrow.amount);
 
-        // Update status based on winner
-        if winner == escrow.client {
+        if client_amount > 0 {
+            token_client.transfer(
+                &env.current_contract_address(),
+                &escrow.client,
+                &client_amount,
+            );
+        }
+
+        if artisan_amount > 0 {
+            token_client.transfer(
+                &env.current_contract_address(),
+                &escrow.artisan,
+                &artisan_amount,
+            );
+        }
+
+        // Update status based on distribution
+        if artisan_amount == 0 {
+            // 100% to client = refund
             escrow.status = Status::Refunded;
-        } else {
+        } else if client_amount == 0 {
+            // 100% to artisan = release
             escrow.status = Status::Released;
+        } else {
+            // Split distribution
+            escrow.status = Status::Resolved;
         }
 
         // Save updated escrow
@@ -492,8 +525,8 @@ impl EscrowContract {
             (),
             DisputeResolvedEvent {
                 id: engagement_id,
-                winner,
-                amount: escrow.amount,
+                client_amount,
+                artisan_amount,
                 timestamp: current_time,
             },
         );
