@@ -13,7 +13,7 @@ import {
 } from "../../../components/ui/card";
 import { api, type BookingResponse } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
-import { Calendar, ArrowLeft } from "lucide-react";
+import { Calendar, ArrowLeft, Image as ImageIcon } from "lucide-react";
 import Price from "../../../components/ui/Price";
 import EscrowStepper, { type EscrowStatus } from "../../../components/bookings/EscrowStepper";
 
@@ -53,7 +53,18 @@ export default function DashboardBookingsPage() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Dashboard
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Bookings</h1>
+
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-3xl font-bold text-gray-900">My Bookings</h1>
+          <Link
+            href="/dashboard/portfolio"
+            className="inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium"
+          >
+            <ImageIcon className="w-4 h-4" />
+            My Portfolio
+          </Link>
+        </div>
+
         <p className="text-gray-600 mb-8">
           View and manage your booking requests.
         </p>
