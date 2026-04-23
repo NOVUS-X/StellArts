@@ -55,16 +55,16 @@ mod happy_path_tests {
             })
         }
 
-        /// Initialize an engagement with the default arbitrator
+        /// Initialize an engagement with the default arbitrator and token
         fn initialize_engagement(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
             self.initialize_engagement_with_arbitrator(client, artisan, &self.default_arbitrator.clone(), amount)
         }
 
-        /// Initialize an engagement with a specific arbitrator
+        /// Initialize an engagement with a specific arbitrator and the default token
         fn initialize_engagement_with_arbitrator(&self, client: &Address, artisan: &Address, arbitrator: &Address, amount: i128) -> u64 {
             let deadline = self.env.ledger().timestamp() + 86400;
             self.client_contract
-                .initialize(client, artisan, arbitrator, &amount, &deadline)
+                .initialize(client, artisan, arbitrator, &self.token_address, &amount, &deadline)
         }
 
         /// Mint tokens to an address
@@ -379,7 +379,7 @@ mod happy_path_tests {
         let deadline = now + 10;
         let engagement_id = ctx
             .client_contract
-            .initialize(&client, &artisan, &ctx.default_arbitrator, &amount, &deadline);
+            .initialize(&client, &artisan, &ctx.default_arbitrator, &ctx.token_address, &amount, &deadline);
 
         // fund and deposit before the deadline
         ctx.mint_tokens(&client, amount);
@@ -851,7 +851,7 @@ mod happy_path_tests {
         let deadline = now + 10;
         let engagement_id = ctx
             .client_contract
-            .initialize(&client, &artisan, &ctx.default_arbitrator, &amount, &deadline);
+            .initialize(&client, &artisan, &ctx.default_arbitrator, &ctx.token_address, &amount, &deadline);
 
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
@@ -875,7 +875,7 @@ mod happy_path_tests {
         let deadline = now + 10;
         let engagement_id = ctx
             .client_contract
-            .initialize(&client, &artisan, &ctx.default_arbitrator, &amount, &deadline);
+            .initialize(&client, &artisan, &ctx.default_arbitrator, &ctx.token_address, &amount, &deadline);
 
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
@@ -904,7 +904,7 @@ mod happy_path_tests {
         let deadline = now + 10;
         let engagement_id = ctx
             .client_contract
-            .initialize(&client, &artisan, &ctx.default_arbitrator, &amount, &deadline);
+            .initialize(&client, &artisan, &ctx.default_arbitrator, &ctx.token_address, &amount, &deadline);
 
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
