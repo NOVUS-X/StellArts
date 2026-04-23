@@ -14,6 +14,7 @@ const GRACE_PERIOD: u64 = 86_400; // 24 hours in seconds - artisan protection wi
 pub struct Escrow {
     pub client: Address,
     pub artisan: Address,
+    pub arbitrator: Address,
     pub amount: i128,
     pub status: Status,
     pub deadline: u64,
@@ -51,7 +52,6 @@ pub enum DataKey {
     DeadlineExtension(u64),
     EarlyReclaim(u64),
     NextId,
-    Arbitrator,
     Oracle,
 }
 
@@ -94,17 +94,23 @@ pub struct EscrowContract;
 #[contractimpl]
 impl EscrowContract {
     /// Initialize a new escrow engagement
-    /// Creates a new escrow record with Pending status
+    /// Creates a new escrow record with Pending status and a per-escrow arbitrator
     pub fn initialize(
         env: Env,
         client: Address,
         artisan: Address,
+        arbitrator: Address,
         amount: i128,
         deadline: u64,
     ) -> u64 {
         // Validation: client cannot be the same as artisan
         if client == artisan {
             panic!("Client and artisan cannot be the same address");
+        }
+
+        // Validation: arbitrator must be a distinct third party
+        if arbitrator == client || arbitrator == artisan {
+            panic!("Arbitrator must be different from client and artisan");
         }
 
         // Validation: amount must be positive
@@ -128,10 +134,11 @@ impl EscrowContract {
             .persistent()
             .extend_ttl(&next_id_key, TTL_THRESHOLD, NEXT_ID_TTL);
 
-        // Create new escrow record
+        // Create new escrow record with per-escrow arbitrator
         let escrow = Escrow {
             client: client.clone(),
             artisan: artisan.clone(),
+            arbitrator,
             amount,
             status: Status::Pending,
             deadline,
@@ -463,19 +470,7 @@ impl EscrowContract {
             .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
     }
 
-    /// Set the arbitrator address for resolving disputes
-    /// Can only be called by an admin (typically contract deployer)
-    /// This establishes the authority who can make arbitration decisions
-    pub fn set_arbitrator(env: Env, admin: Address, arbitrator: Address) {
-        admin.require_auth();
 
-        // Store the arbitrator address
-        let arbitrator_key = DataKey::Arbitrator;
-        env.storage().persistent().set(&arbitrator_key, &arbitrator);
-        env.storage()
-            .persistent()
-            .extend_ttl(&arbitrator_key, TTL_THRESHOLD, NEXT_ID_TTL);
-    }
 
     /// Initiate a dispute on a funded escrow
     /// Can be called by either the client or artisan
@@ -520,8 +515,8 @@ impl EscrowContract {
         );
     }
 
-    /// Resolve a dispute by the arbitrator (admin)
-    /// Only callable by the stored arbitrator address
+    /// Resolve a dispute by the per-escrow arbitrator
+    /// Only callable by the arbitrator assigned at escrow initialization
     /// Supports split distribution: funds can be divided between client and artisan
     /// The sum of client_amount and artisan_amount must equal the escrowed amount
     pub fn resolve_dispute(
@@ -531,17 +526,6 @@ impl EscrowContract {
         artisan_amount: i128,
         token: Address,
     ) {
-        // Load the arbitrator address
-        let arbitrator_key = DataKey::Arbitrator;
-        let arbitrator: Address = env
-            .storage()
-            .persistent()
-            .get(&arbitrator_key)
-            .expect("Arbitrator not set");
-
-        // Auth: Require the arbitrator's authorization
-        arbitrator.require_auth();
-
         // Load escrow
         let key = DataKey::Escrow(engagement_id);
         let mut escrow: Escrow = env
@@ -549,6 +533,9 @@ impl EscrowContract {
             .persistent()
             .get(&key)
             .expect("Escrow not found");
+
+        // Auth: Require the per-escrow arbitrator's authorization
+        escrow.arbitrator.require_auth();
 
         // State check: escrow must be in Disputed status
         if escrow.status != Status::Disputed {
@@ -634,12 +621,13 @@ mod test_legacy {
         // Create test addresses
         let client_address = Address::generate(&env);
         let artisan_address = Address::generate(&env);
+        let arbitrator_address = Address::generate(&env);
         let amount: i128 = 1000;
         let deadline = env.ledger().timestamp() + 86400; // 24 hours from now
 
         // Initialize engagement
         let engagement_id =
-            client.initialize(&client_address, &artisan_address, &amount, &deadline);
+            client.initialize(&client_address, &artisan_address, &arbitrator_address, &amount, &deadline);
 
         // Verify the returned ID is valid (should be 1 for first engagement)
         assert_eq!(engagement_id, 1);
@@ -676,11 +664,12 @@ mod test_legacy {
         let client = EscrowContractClient::new(&env, &contract_id);
 
         let same_address = Address::generate(&env);
+        let arbitrator_address = Address::generate(&env);
         let amount: i128 = 1000;
         let deadline = env.ledger().timestamp() + 86400;
 
         // This should panic because client == artisan
-        client.initialize(&same_address, &same_address, &amount, &deadline);
+        client.initialize(&same_address, &same_address, &arbitrator_address, &amount, &deadline);
     }
 
     #[test]
@@ -692,11 +681,12 @@ mod test_legacy {
 
         let client_address = Address::generate(&env);
         let artisan_address = Address::generate(&env);
+        let arbitrator_address = Address::generate(&env);
         let zero_amount: i128 = 0;
         let deadline = env.ledger().timestamp() + 86400;
 
         // This should panic because amount is zero
-        client.initialize(&client_address, &artisan_address, &zero_amount, &deadline);
+        client.initialize(&client_address, &artisan_address, &arbitrator_address, &zero_amount, &deadline);
     }
 
     #[test]
@@ -708,6 +698,7 @@ mod test_legacy {
 
         let client_address = Address::generate(&env);
         let artisan_address = Address::generate(&env);
+        let arbitrator_address = Address::generate(&env);
         let negative_amount: i128 = -100;
         let deadline = env.ledger().timestamp() + 86400;
 
@@ -715,6 +706,7 @@ mod test_legacy {
         client.initialize(
             &client_address,
             &artisan_address,
+            &arbitrator_address,
             &negative_amount,
             &deadline,
         );
@@ -758,6 +750,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
+            arbitrator: Address::generate(&env),
             amount: escrow_amount,
             status: Status::Pending,
             deadline,
@@ -825,6 +818,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
+            arbitrator: Address::generate(&env),
             amount: escrow_amount,
             status: Status::Pending,
             deadline,
@@ -875,6 +869,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
+            arbitrator: Address::generate(&env),
             amount: escrow_amount,
             status: Status::Funded, // Already funded
             deadline,
@@ -929,6 +924,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
+            arbitrator: Address::generate(&env),
             amount: 500,
             status: Status::Pending,
             deadline: env.ledger().timestamp().saturating_sub(1),
@@ -971,6 +967,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address.clone(),
+            arbitrator: Address::generate(&env),
             amount,
             status: Status::Funded,
             deadline,
@@ -1007,6 +1004,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
+            arbitrator: Address::generate(&env),
             amount,
             status: Status::Funded,
             deadline,
@@ -1051,6 +1049,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
+            arbitrator: Address::generate(&env),
             amount,
             status: Status::Funded,
             deadline,
@@ -1116,6 +1115,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
+            arbitrator: Address::generate(&env),
             amount,
             status: Status::Funded,
             deadline,
@@ -1166,6 +1166,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
+            arbitrator: Address::generate(&env),
             amount,
             status: Status::Pending,
             deadline,
@@ -1206,6 +1207,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
+            arbitrator: Address::generate(&env),
             amount,
             status: Status::Funded,
             deadline,
@@ -1255,6 +1257,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address.clone(),
+            arbitrator: Address::generate(&env),
             amount,
             status: Status::Funded,
             deadline,
@@ -1301,6 +1304,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
+            arbitrator: Address::generate(&env),
             amount,
             status: Status::Pending,
             deadline,
@@ -1341,6 +1345,7 @@ mod test_legacy {
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
+            arbitrator: Address::generate(&env),
             amount,
             status: Status::Funded,
             deadline,

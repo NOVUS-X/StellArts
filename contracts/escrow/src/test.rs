@@ -12,6 +12,7 @@ mod happy_path_tests {
         env: Env,
         contract_id: Address,
         token_address: Address,
+        default_arbitrator: Address,
         client_contract: EscrowContractClient<'static>,
         token_client: token::Client<'static>,
         token_contract_client: token::StellarAssetClient<'static>,
@@ -26,6 +27,7 @@ mod happy_path_tests {
             let token_admin = Address::generate(&env);
             let token_contract = env.register_stellar_asset_contract_v2(token_admin);
             let token_address = token_contract.address();
+            let default_arbitrator = Address::generate(&env);
 
             let client_contract = EscrowContractClient::new(&env, &contract_id);
             let token_client = token::Client::new(&env, &token_address);
@@ -35,6 +37,7 @@ mod happy_path_tests {
                 env,
                 contract_id,
                 token_address,
+                default_arbitrator,
                 client_contract,
                 token_client,
                 token_contract_client,
@@ -52,11 +55,16 @@ mod happy_path_tests {
             })
         }
 
-        /// Initialize an engagement
+        /// Initialize an engagement with the default arbitrator
         fn initialize_engagement(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
+            self.initialize_engagement_with_arbitrator(client, artisan, &self.default_arbitrator.clone(), amount)
+        }
+
+        /// Initialize an engagement with a specific arbitrator
+        fn initialize_engagement_with_arbitrator(&self, client: &Address, artisan: &Address, arbitrator: &Address, amount: i128) -> u64 {
             let deadline = self.env.ledger().timestamp() + 86400;
             self.client_contract
-                .initialize(client, artisan, &amount, &deadline)
+                .initialize(client, artisan, arbitrator, &amount, &deadline)
         }
 
         /// Mint tokens to an address
@@ -371,7 +379,7 @@ mod happy_path_tests {
         let deadline = now + 10;
         let engagement_id = ctx
             .client_contract
-            .initialize(&client, &artisan, &amount, &deadline);
+            .initialize(&client, &artisan, &ctx.default_arbitrator, &amount, &deadline);
 
         // fund and deposit before the deadline
         ctx.mint_tokens(&client, amount);
@@ -598,14 +606,12 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
-        let admin = Address::generate(&ctx.env);
         let amount: i128 = 5000;
 
-        // Setup: Set arbitrator
-        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
-
-        // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        // Setup: Initialize with per-escrow arbitrator, mint, and deposit
+        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        ctx.mint_tokens(&client, amount);
+        ctx.deposit_funds(engagement_id);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -633,14 +639,12 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
-        let admin = Address::generate(&ctx.env);
         let amount: i128 = 5000;
 
-        // Setup: Set arbitrator
-        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
-
-        // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        // Setup: Initialize with per-escrow arbitrator, mint, and deposit
+        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        ctx.mint_tokens(&client, amount);
+        ctx.deposit_funds(engagement_id);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &artisan);
@@ -669,15 +673,12 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
-        let _unauthorized = Address::generate(&ctx.env);
         let amount: i128 = 5000;
 
-        // Setup: Set arbitrator
-        let admin = Address::generate(&ctx.env);
-        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
-
-        // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        // Setup: Initialize with per-escrow arbitrator, mint, and deposit
+        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        ctx.mint_tokens(&client, amount);
+        ctx.deposit_funds(engagement_id);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -699,12 +700,10 @@ mod happy_path_tests {
         let arbitrator = Address::generate(&ctx.env);
         let amount: i128 = 5000;
 
-        // Setup: Set arbitrator
-        let admin = Address::generate(&ctx.env);
-        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
-
-        // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        // Setup: Initialize with per-escrow arbitrator, mint, and deposit
+        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        ctx.mint_tokens(&client, amount);
+        ctx.deposit_funds(engagement_id);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -723,51 +722,28 @@ mod happy_path_tests {
         let arbitrator = Address::generate(&ctx.env);
         let amount: i128 = 5000;
 
-        // Setup: Set arbitrator
-        let admin = Address::generate(&ctx.env);
-        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
-
-        // Setup: Initialize, mint, and deposit (but don't dispute)
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        // Setup: Initialize with per-escrow arbitrator, mint, and deposit (but don't dispute)
+        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        ctx.mint_tokens(&client, amount);
+        ctx.deposit_funds(engagement_id);
 
         // Arbitrator tries to resolve non-disputed escrow
         ctx.client_contract
             .resolve_dispute(&engagement_id, &amount, &0, &ctx.token_address);
     }
 
-    /// Test 22: Arbitrator not set should fail
-    #[test]
-    #[should_panic(expected = "Arbitrator not set")]
-    fn test_resolve_dispute_without_arbitrator_set() {
-        let ctx = TestContext::new();
-        let (client, artisan) = create_addresses(&ctx.env);
-        let amount: i128 = 5000;
-
-        // Setup: Initialize, mint, and deposit without setting arbitrator
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
-
-        // Initiate dispute
-        ctx.client_contract.dispute(&engagement_id, &client);
-
-        // Try to resolve without arbitrator set
-        ctx.client_contract
-            .resolve_dispute(&engagement_id, &amount, &0, &ctx.token_address);
-    }
-
-    /// Test 23: Resolve dispute with split distribution (e.g. 60/40)
+    /// Test 22: Resolve dispute with split distribution (e.g. 60/40)
     #[test]
     fn test_resolve_dispute_split_distribution() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
-        let admin = Address::generate(&ctx.env);
         let amount: i128 = 5000;
 
-        // Setup: Set arbitrator
-        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
-
-        // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        // Setup: Initialize with per-escrow arbitrator, mint, and deposit
+        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        ctx.mint_tokens(&client, amount);
+        ctx.deposit_funds(engagement_id);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -805,21 +781,19 @@ mod happy_path_tests {
         assert_eq!(escrow.status, Status::Resolved);
     }
 
-    /// Test 24: Resolve dispute with negative amount should fail
+    /// Test 23: Resolve dispute with negative amount should fail
     #[test]
     #[should_panic(expected = "Distribution amounts must be non-negative")]
     fn test_resolve_dispute_negative_amount_fails() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
-        let admin = Address::generate(&ctx.env);
         let amount: i128 = 5000;
 
-        // Setup: Set arbitrator
-        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
-
-        // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        // Setup: Initialize with per-escrow arbitrator, mint, and deposit
+        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        ctx.mint_tokens(&client, amount);
+        ctx.deposit_funds(engagement_id);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -829,20 +803,18 @@ mod happy_path_tests {
             .resolve_dispute(&engagement_id, &(-1000), &6000, &ctx.token_address);
     }
 
-    /// Test 25: Resolve dispute emits correct event with distribution details
+    /// Test 24: Resolve dispute emits correct event with distribution details
     #[test]
     fn test_resolve_dispute_event_emitted() {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let arbitrator = Address::generate(&ctx.env);
-        let admin = Address::generate(&ctx.env);
         let amount: i128 = 5000;
 
-        // Setup: Set arbitrator
-        ctx.client_contract.set_arbitrator(&admin, &arbitrator);
-
-        // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        // Setup: Initialize with per-escrow arbitrator, mint, and deposit
+        let engagement_id = ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+        ctx.mint_tokens(&client, amount);
+        ctx.deposit_funds(engagement_id);
 
         // Initiate dispute
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -879,7 +851,7 @@ mod happy_path_tests {
         let deadline = now + 10;
         let engagement_id = ctx
             .client_contract
-            .initialize(&client, &artisan, &amount, &deadline);
+            .initialize(&client, &artisan, &ctx.default_arbitrator, &amount, &deadline);
 
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
@@ -903,7 +875,7 @@ mod happy_path_tests {
         let deadline = now + 10;
         let engagement_id = ctx
             .client_contract
-            .initialize(&client, &artisan, &amount, &deadline);
+            .initialize(&client, &artisan, &ctx.default_arbitrator, &amount, &deadline);
 
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
@@ -932,7 +904,7 @@ mod happy_path_tests {
         let deadline = now + 10;
         let engagement_id = ctx
             .client_contract
-            .initialize(&client, &artisan, &amount, &deadline);
+            .initialize(&client, &artisan, &ctx.default_arbitrator, &amount, &deadline);
 
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
