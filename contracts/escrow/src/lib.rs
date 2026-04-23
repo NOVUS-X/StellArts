@@ -7,6 +7,7 @@ use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
 const ESCROW_TTL: u32 = 1_036_800; // ~60 days
 const NEXT_ID_TTL: u32 = 6_220_800; // ~1 year
 const TTL_THRESHOLD: u32 = 17_280; // ~1 day - triggers extension when TTL drops below this
+const GRACE_PERIOD: u64 = 86_400; // 24 hours in seconds - artisan protection window after deadline
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -39,9 +40,16 @@ pub enum Status {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EarlyReclaimApproval {
+    pub proposer: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Escrow(u64),
     DeadlineExtension(u64),
+    EarlyReclaim(u64),
     NextId,
     Arbitrator,
     Oracle,
@@ -236,7 +244,11 @@ impl EscrowContract {
             .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
     }
 
-    /// Allow the client to reclaim funds after the deadline has passed when an escrow is still funded.
+    /// Allow the client to reclaim funds after the deadline + grace period has passed,
+    /// or after the deadline if both parties have mutually approved an early reclaim.
+    ///
+    /// The grace period (24 hours) protects artisans from malicious reclaims when work
+    /// is nearly finished. Both parties can bypass it via `approve_early_reclaim()`.
     ///
     /// Transfers the amount back to the client, updates the status to `Refunded`, and emits a
     /// [`ReclaimedEvent`]. Returns `true` on success.
@@ -256,10 +268,29 @@ impl EscrowContract {
             panic!("Escrow must be Funded to reclaim");
         }
 
-        // Deadline check: ensure deadline has already passed
+        // Deadline + grace period check
         let current_time = env.ledger().timestamp();
         if current_time <= escrow.deadline {
             panic!("Deadline has not passed; cannot reclaim yet");
+        }
+
+        // Check if we're still within the grace period
+        let grace_deadline = escrow.deadline + GRACE_PERIOD;
+        if current_time <= grace_deadline {
+            // Within grace period: only allow if both parties approved early reclaim
+            let early_reclaim_key = DataKey::EarlyReclaim(engagement_id);
+            let has_early_approval: bool = env
+                .storage()
+                .persistent()
+                .get::<DataKey, bool>(&early_reclaim_key)
+                .unwrap_or(false);
+
+            if !has_early_approval {
+                panic!("Grace period has not passed; both parties must approve early reclaim");
+            }
+
+            // Clean up the early reclaim approval
+            env.storage().persistent().remove(&early_reclaim_key);
         }
 
         // Transfer funds back to client
@@ -289,6 +320,58 @@ impl EscrowContract {
         );
 
         true
+    }
+
+    /// Mutually approve an early reclaim during the grace period.
+    /// Both client and artisan must call this function to approve.
+    /// Once both approve, the client can call `reclaim()` during the grace period.
+    pub fn approve_early_reclaim(env: Env, engagement_id: u64, approver: Address) {
+        let key = DataKey::Escrow(engagement_id);
+        let escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("Escrow not found");
+
+        approver.require_auth();
+
+        // Only client or artisan can approve
+        if approver != escrow.client && approver != escrow.artisan {
+            panic!("Only client or artisan can approve early reclaim");
+        }
+
+        // State check: must be funded
+        if escrow.status != Status::Funded {
+            panic!("Escrow must be Funded to approve early reclaim");
+        }
+
+        let early_reclaim_key = DataKey::EarlyReclaim(engagement_id);
+        let pending: Option<EarlyReclaimApproval> =
+            env.storage().persistent().get(&early_reclaim_key);
+
+        if let Some(approval) = pending {
+            // Second approver — must be different party
+            if approval.proposer == approver {
+                panic!("Same party cannot approve early reclaim twice");
+            }
+
+            // Both parties agree: store a simple bool flag
+            env.storage()
+                .persistent()
+                .set(&early_reclaim_key, &true);
+            env.storage()
+                .persistent()
+                .extend_ttl(&early_reclaim_key, TTL_THRESHOLD, ESCROW_TTL);
+        } else {
+            // First approver — store the proposal
+            let approval = EarlyReclaimApproval { proposer: approver };
+            env.storage()
+                .persistent()
+                .set(&early_reclaim_key, &approval);
+            env.storage()
+                .persistent()
+                .extend_ttl(&early_reclaim_key, TTL_THRESHOLD, ESCROW_TTL);
+        }
     }
 
     /// Mutually approve and apply an escrow deadline extension.
@@ -950,7 +1033,7 @@ mod test_legacy {
         let contract_id = env.register_contract(None, EscrowContract);
         let client = EscrowContractClient::new(&env, &contract_id);
 
-        // Setup funded escrow with past deadline
+        // Setup funded escrow with past deadline + grace period
         let client_address = Address::generate(&env);
         let artisan_address = Address::generate(&env);
         let token_admin = Address::generate(&env);
@@ -960,11 +1043,11 @@ mod test_legacy {
         let token_contract_client =
             soroban_sdk::token::StellarAssetClient::new(&env, &token_address);
 
-        // ensure ledger time > 0 to avoid underflow
-        env.ledger().set_timestamp(1);
+        // Set deadline in the past and timestamp beyond deadline + GRACE_PERIOD (86400s)
+        let deadline = 100;
+        env.ledger().set_timestamp(deadline + 86400 + 1);
         let engagement_id = 1;
         let amount: i128 = 500;
-        let deadline = env.ledger().timestamp().saturating_sub(1);
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,
@@ -1025,11 +1108,11 @@ mod test_legacy {
         let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
         let token_address = token_contract.address();
 
-        // set up funded, expired escrow
+        // set up funded, expired escrow past grace period
         let engagement_id = 1;
         let amount: i128 = 100;
-        env.ledger().set_timestamp(1);
-        let deadline = env.ledger().timestamp().saturating_sub(1);
+        let deadline = 100;
+        env.ledger().set_timestamp(deadline + 86400 + 1);
         let escrow = Escrow {
             client: client_address.clone(),
             artisan: artisan_address,

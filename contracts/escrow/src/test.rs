@@ -378,8 +378,8 @@ mod happy_path_tests {
         ctx.deposit_funds(engagement_id);
         assert_eq!(ctx.get_escrow(engagement_id).status, Status::Funded);
 
-        // fast-forward ledger past the deadline
-        ctx.env.ledger().set_timestamp(deadline + 1);
+        // fast-forward ledger past the deadline + GRACE_PERIOD (86400 seconds)
+        ctx.env.ledger().set_timestamp(deadline + 86400 + 1);
 
         // now reclaim should succeed and return funds to client
         let client_balance_before = ctx.token_client.balance(&client);
@@ -865,5 +865,128 @@ mod happy_path_tests {
             }
         }
         assert!(found, "expected a DisputeResolvedEvent from the escrow contract");
+    }
+
+    /// Test 26: Reclaim fails during grace period without mutual approval
+    #[test]
+    #[should_panic(expected = "Grace period has not passed; both parties must approve early reclaim")]
+    fn test_reclaim_fails_during_grace_period() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+
+        let now = ctx.env.ledger().timestamp();
+        let deadline = now + 10;
+        let engagement_id = ctx
+            .client_contract
+            .initialize(&client, &artisan, &amount, &deadline);
+
+        ctx.mint_tokens(&client, amount);
+        ctx.deposit_funds(engagement_id);
+
+        // Fast-forward past deadline but within grace period (deadline + 1 hour)
+        ctx.env.ledger().set_timestamp(deadline + 3600);
+
+        // Should panic: still within 24h grace period
+        ctx.client_contract
+            .reclaim(&engagement_id, &ctx.token_address);
+    }
+
+    /// Test 27: Reclaim succeeds after deadline + grace period
+    #[test]
+    fn test_reclaim_succeeds_after_grace_period() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+
+        let now = ctx.env.ledger().timestamp();
+        let deadline = now + 10;
+        let engagement_id = ctx
+            .client_contract
+            .initialize(&client, &artisan, &amount, &deadline);
+
+        ctx.mint_tokens(&client, amount);
+        ctx.deposit_funds(engagement_id);
+
+        // Fast-forward past deadline + GRACE_PERIOD (86400 seconds)
+        ctx.env.ledger().set_timestamp(deadline + 86400 + 1);
+
+        let client_balance_before = ctx.token_client.balance(&client);
+        ctx.client_contract
+            .reclaim(&engagement_id, &ctx.token_address);
+        let client_balance_after = ctx.token_client.balance(&client);
+        assert_eq!(client_balance_after, client_balance_before + amount);
+
+        let escrow = ctx.get_escrow(engagement_id);
+        assert_eq!(escrow.status, Status::Refunded);
+    }
+
+    /// Test 28: Early reclaim with mutual approval during grace period
+    #[test]
+    fn test_early_reclaim_with_mutual_approval() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+
+        let now = ctx.env.ledger().timestamp();
+        let deadline = now + 10;
+        let engagement_id = ctx
+            .client_contract
+            .initialize(&client, &artisan, &amount, &deadline);
+
+        ctx.mint_tokens(&client, amount);
+        ctx.deposit_funds(engagement_id);
+
+        // Fast-forward past deadline but within grace period
+        ctx.env.ledger().set_timestamp(deadline + 100);
+
+        // Both parties approve early reclaim
+        ctx.client_contract
+            .approve_early_reclaim(&engagement_id, &client);
+        ctx.client_contract
+            .approve_early_reclaim(&engagement_id, &artisan);
+
+        // Now reclaim should succeed during grace period
+        let client_balance_before = ctx.token_client.balance(&client);
+        ctx.client_contract
+            .reclaim(&engagement_id, &ctx.token_address);
+        let client_balance_after = ctx.token_client.balance(&client);
+        assert_eq!(client_balance_after, client_balance_before + amount);
+
+        let escrow = ctx.get_escrow(engagement_id);
+        assert_eq!(escrow.status, Status::Refunded);
+    }
+
+    /// Test 29: Unauthorized early reclaim approval fails
+    #[test]
+    #[should_panic(expected = "Only client or artisan can approve early reclaim")]
+    fn test_early_reclaim_unauthorized_fails() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let unauthorized = Address::generate(&ctx.env);
+        let amount: i128 = 5000;
+
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Third party attempts to approve early reclaim
+        ctx.client_contract
+            .approve_early_reclaim(&engagement_id, &unauthorized);
+    }
+
+    /// Test 30: Same party cannot approve early reclaim twice
+    #[test]
+    #[should_panic(expected = "Same party cannot approve early reclaim twice")]
+    fn test_early_reclaim_same_party_twice_fails() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        // Client approves twice
+        ctx.client_contract
+            .approve_early_reclaim(&engagement_id, &client);
+        ctx.client_contract
+            .approve_early_reclaim(&engagement_id, &client);
     }
 }
