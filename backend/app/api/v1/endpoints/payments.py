@@ -60,9 +60,7 @@ class RefundRequest(BaseModel):
 # will now return 404 (FastAPI simply won't register it).
 
 
-@router.post(
-    "/prepare", summary="Prepare unsigned payment XDR for client signing"
-)
+@router.post("/prepare", summary="Prepare unsigned payment XDR for client signing")
 def prepare(
     req: PrepareRequest,
     db: Session = Depends(get_db),
@@ -82,9 +80,7 @@ def prepare(
     try:
         b_id = uuid.UUID(req.booking_id)
     except ValueError:
-        raise HTTPException(
-            status_code=404, detail="Booking not found"
-        ) from None
+        raise HTTPException(status_code=404, detail="Booking not found") from None
 
     booking = db.query(Booking).filter(Booking.id == b_id).first()
     if not booking:
@@ -93,9 +89,7 @@ def prepare(
     if booking.client.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "You are not authorized to prepare payment for this booking"
-            ),
+            detail=("You are not authorized to prepare payment for this booking"),
         )
 
     return prepare_payment(req.booking_id, req.amount, req.client_public)
@@ -153,9 +147,7 @@ def submit(
     try:
         booking_uuid = uuid.UUID(str(booking_id))
     except ValueError:
-        raise HTTPException(
-            status_code=404, detail="Booking not found"
-        ) from None
+        raise HTTPException(status_code=404, detail="Booking not found") from None
 
     booking = db.query(Booking).filter(Booking.id == booking_uuid).first()
     if not booking:
@@ -257,12 +249,8 @@ def refund(req: RefundRequest, db: Session = Depends(get_db)):
     response_model=PaymentAuditListResponse,
 )
 def get_payment_audits(
-    booking_id: Optional[str] = Query(
-        None, description="Filter by booking ID"
-    ),
-    payment_id: Optional[str] = Query(
-        None, description="Filter by payment ID"
-    ),
+    booking_id: Optional[str] = Query(None, description="Filter by booking ID"),
+    payment_id: Optional[str] = Query(None, description="Filter by payment ID"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
@@ -280,28 +268,21 @@ def get_payment_audits(
             booking_uuid = uuid.UUID(booking_id)
             query = query.filter(PaymentAudit.booking_id == booking_uuid)
         except ValueError:
-            raise HTTPException(
-                status_code=400, detail="Invalid booking ID format"
-            )
+            raise HTTPException(status_code=400, detail="Invalid booking ID format")
 
     if payment_id:
         try:
             payment_uuid = uuid.UUID(payment_id)
             query = query.filter(PaymentAudit.payment_id == payment_uuid)
         except ValueError:
-            raise HTTPException(
-                status_code=400, detail="Invalid payment ID format"
-            )
+            raise HTTPException(status_code=400, detail="Invalid payment ID format")
 
     # Get total count
     total = query.count()
 
     # Get paginated results, ordered by creation date (newest first)
     audits = (
-        query.order_by(PaymentAudit.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
+        query.order_by(PaymentAudit.created_at.desc()).offset(skip).limit(limit).all()
     )
 
     return PaymentAuditListResponse(
@@ -325,28 +306,21 @@ def get_booking_payment_audits(
     try:
         booking_uuid = uuid.UUID(booking_id)
     except ValueError:
-        raise HTTPException(
-            status_code=400, detail="Invalid booking ID format"
-        )
+        raise HTTPException(status_code=400, detail="Invalid booking ID format")
 
     # Verify booking exists
     booking = db.query(Booking).filter(Booking.id == booking_uuid).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
 
-    query = db.query(PaymentAudit).filter(
-        PaymentAudit.booking_id == booking_uuid
-    )
+    query = db.query(PaymentAudit).filter(PaymentAudit.booking_id == booking_uuid)
 
     # Get total count
     total = query.count()
 
     # Get paginated results, ordered by creation date (newest first)
     audits = (
-        query.order_by(PaymentAudit.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
+        query.order_by(PaymentAudit.created_at.desc()).offset(skip).limit(limit).all()
     )
 
     return PaymentAuditListResponse(

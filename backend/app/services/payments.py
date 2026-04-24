@@ -107,9 +107,7 @@ def _create_audit_log(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.error(
-            f"Failed to create audit log for booking {booking_id}: {e}"
-        )
+        logger.error(f"Failed to create audit log for booking {booking_id}: {e}")
         db.rollback()
 
 
@@ -221,9 +219,7 @@ def release_payment(
     if not held:
         return {
             "status": "error",
-            "message": (
-                "No held payment for booking or already released/refunded"
-            ),
+            "message": ("No held payment for booking or already released/refunded"),
         }
 
     already_released = (
@@ -290,8 +286,7 @@ def release_payment(
             to_acc=artisan_public,
             memo=memo,
             description=(
-                f"Payment release failed for booking {booking_id}: "
-                f"{str(e)}"
+                f"Payment release failed for booking {booking_id}: " f"{str(e)}"
             ),
         )
         return {"status": "error", "message": str(e)}
@@ -308,8 +303,7 @@ def release_payment(
             to_acc=artisan_public,
             memo=memo,
             description=(
-                f"Payment release failed for booking {booking_id}: "
-                f"{str(e)}"
+                f"Payment release failed for booking {booking_id}: " f"{str(e)}"
             ),
         )
         return {
@@ -336,9 +330,7 @@ def refund_payment(
     if not held:
         return {
             "status": "error",
-            "message": (
-                "No held payment for booking or already released/refunded"
-            ),
+            "message": ("No held payment for booking or already released/refunded"),
         }
 
     already_refunded = (
@@ -502,9 +494,7 @@ def submit_signed_payment(db: Session, signed_xdr: str) -> dict[str, Any]:
             if len(candidates) != 1:
                 return {
                     "status": "error",
-                    "message": (
-                        "Unable to resolve booking from transaction memo"
-                    ),
+                    "message": ("Unable to resolve booking from transaction memo"),
                 }
             booking_id = candidates[0]
 
