@@ -194,3 +194,40 @@ def transition_to_in_progress(engagement_id: int) -> dict[str, Any]:
         args,
         BACKEND_SIGNER,
     )
+
+
+def submit_reputation_on_chain(artisan_address: str, stars: int) -> dict[str, Any]:
+    """
+    Submit a rating to the on-chain reputation contract.
+    
+    Args:
+        artisan_address: Artisan's Stellar address
+        stars: Rating from 1-5
+        
+    Returns:
+        Dictionary with transaction hash and status
+        
+    Raises:
+        RuntimeError: If the on-chain submission fails
+    """
+    if not (1 <= stars <= 5):
+        raise ValueError(f"Stars must be between 1 and 5, got {stars}")
+    
+    logger.info(f"Submitting reputation update for artisan {artisan_address}: {stars} stars")
+    
+    # Convert arguments to SCVal
+    args = [
+        scval.to_address(artisan_address),
+        scval.to_uint64(stars),
+    ]
+    
+    # Invoke the rate_artisan function on the reputation contract
+    result = invoke_contract_function(
+        REPUTATION_CONTRACT_ID,
+        "rate_artisan",
+        args,
+        BACKEND_SIGNER,
+    )
+    
+    logger.info(f"Successfully submitted reputation on-chain. TX hash: {result.get('hash')}")
+    return result

@@ -19,6 +19,7 @@ from app.db.session import get_db
 from app.models.artisan import Artisan
 from app.models.booking import Booking, BookingStatus
 from app.models.client import Client
+from app.models.notification import NotificationType
 from app.models.user import User
 from app.schemas.booking import (
     BidCreate,
@@ -32,11 +33,42 @@ from app.services import notification_service
 from app.services.ai_service import ai_service
 from app.services.completion_verification import assess_booking_completion
 from app.services.geolocation import geolocation_service
+from app.services.notifications import notification_service as notif_service
 from app.services.soroban import transition_to_in_progress
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/bookings")
+
+
+def _enrich_booking_with_artisan_name(booking: Booking) -> dict:
+    """Add artisan_name to booking response"""
+    booking_dict = {
+        "id": booking.id,
+        "client_id": booking.client_id,
+        "artisan_id": booking.artisan_id,
+        "service": booking.service,
+        "date": booking.date,
+        "estimated_cost": float(booking.estimated_cost) if booking.estimated_cost else None,
+        "estimated_hours": float(booking.estimated_hours) if booking.estimated_hours else None,
+        "labor_cost": float(booking.labor_cost) if hasattr(booking, 'labor_cost') and booking.labor_cost else None,
+        "material_cost": float(booking.material_cost) if hasattr(booking, 'material_cost') and booking.material_cost else None,
+        "range_min": float(booking.range_min) if hasattr(booking, 'range_min') and booking.range_min else None,
+        "range_max": float(booking.range_max) if hasattr(booking, 'range_max') and booking.range_max else None,
+        "artisan_pitch": booking.artisan_pitch if hasattr(booking, 'artisan_pitch') else None,
+        "status": booking.status.value if hasattr(booking.status, 'value') else booking.status,
+        "location": booking.location,
+        "notes": booking.notes,
+        "created_at": booking.created_at,
+        "updated_at": booking.updated_at,
+        "artisan_name": None,
+    }
+    
+    # Get artisan name
+    if booking.artisan and booking.artisan.user:
+        booking_dict["artisan_name"] = booking.artisan.user.username
+    
+    return booking_dict
 
 
 @router.post(
@@ -184,7 +216,8 @@ def get_my_bookings(
                 .all()
             )
 
-    return bookings
+    # Enrich bookings with artisan_name
+    return [_enrich_booking_with_artisan_name(booking) for booking in bookings]
 
 
 @router.get("/all", response_model=list[BookingResponse])
@@ -337,6 +370,56 @@ def update_booking_status(
     booking.status = new_status
     db.commit()
     db.refresh(booking)
+
+    # Create notifications based on the status change
+    if new_status == BookingStatus.CONFIRMED:
+        # Notify client that their booking was accepted
+        notif_service.create_notification(
+            db=db,
+            user_id=booking.client.user_id,
+            notification_type=NotificationType.BOOKING_CONFIRMED,
+            title="Booking Accepted!",
+            message=f"Your booking for {booking.service} has been accepted by the artisan.",
+            reference_id=booking.id,
+        )
+    elif new_status == BookingStatus.IN_PROGRESS:
+        # Notify client that work has started
+        notif_service.create_notification(
+            db=db,
+            user_id=booking.client.user_id,
+            notification_type=NotificationType.BOOKING_STARTED,
+            title="Work Started",
+            message=f"The artisan has started working on your booking: {booking.service}.",
+            reference_id=booking.id,
+        )
+    elif new_status == BookingStatus.COMPLETED:
+        # Notify artisan that booking was marked complete
+        notif_service.create_notification(
+            db=db,
+            user_id=booking.artisan.user_id,
+            notification_type=NotificationType.BOOKING_COMPLETED,
+            title="Booking Completed",
+            message=f"Your booking for {booking.service} has been marked as completed.",
+            reference_id=booking.id,
+        )
+    elif new_status == BookingStatus.CANCELLED:
+        # Notify both parties about cancellation
+        notif_service.create_notification(
+            db=db,
+            user_id=booking.client.user_id,
+            notification_type=NotificationType.BOOKING_CANCELLED,
+            title="Booking Cancelled",
+            message=f"Your booking for {booking.service} has been cancelled.",
+            reference_id=booking.id,
+        )
+        notif_service.create_notification(
+            db=db,
+            user_id=booking.artisan.user_id,
+            notification_type=NotificationType.BOOKING_CANCELLED,
+            title="Booking Cancelled",
+            message=f"A booking for {booking.service} has been cancelled.",
+            reference_id=booking.id,
+        )
 
     return {
         "message": f"Booking {booking_id} status updated",

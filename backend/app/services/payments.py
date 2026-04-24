@@ -18,7 +18,7 @@ from stellar_sdk import (
 from stellar_sdk.exceptions import BadRequestError, BadResponseError
 
 from app.models.booking import Booking
-from app.models.payment import Payment, PaymentStatus
+from app.models.payment import Payment, PaymentStatus, PaymentAudit, PaymentAuditEventType
 
 # Stellar config
 HORIZON = os.getenv("STELLAR_HORIZON", "https://horizon-testnet.stellar.org")
@@ -58,6 +58,52 @@ if not ESCROW_PUBLIC or not StrKey.is_valid_ed25519_public_key(ESCROW_PUBLIC):
 MAX_MEMO_LENGTH = 28
 
 # ---------------------------
+# Audit Logging
+# ---------------------------
+
+
+def _create_audit_log(
+    db: Session,
+    booking_id: str,
+    event_type: PaymentAuditEventType,
+    payment_id: str | None = None,
+    old_status: PaymentStatus | None = None,
+    new_status: PaymentStatus | None = None,
+    transaction_hash: str | None = None,
+    amount: Decimal | None = None,
+    from_acc: str | None = None,
+    to_acc: str | None = None,
+    memo: str | None = None,
+    description: str | None = None,
+) -> None:
+    """Create an immutable audit log entry for a payment event."""
+    try:
+        booking_uuid = uuid.UUID(booking_id)
+        payment_uuid = uuid.UUID(payment_id) if payment_id else None
+        
+        audit = PaymentAudit(
+            payment_id=payment_uuid,
+            booking_id=booking_uuid,
+            event_type=event_type,
+            old_status=old_status,
+            new_status=new_status,
+            transaction_hash=transaction_hash,
+            amount=amount,
+            from_account=from_acc,
+            to_account=to_acc,
+            memo=memo,
+            description=description,
+        )
+        db.add(audit)
+        db.commit()
+    except Exception as e:
+        # Log error but don't fail the payment operation
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to create audit log for booking {booking_id}: {e}")
+        db.rollback()
+
+# ---------------------------
 # Utilities
 # ---------------------------
 
@@ -76,8 +122,10 @@ def _record_payment(
     from_acc: str,
     to_acc: str,
     memo: str,
+    event_type: PaymentAuditEventType = PaymentAuditEventType.PAYMENT_HELD,
+    old_status: PaymentStatus | None = None,
 ) -> dict[str, Any]:
-    """Insert payment record into DB and commit."""
+    """Insert payment record into DB and commit with audit logging."""
     booking_uuid = uuid.UUID(booking_id)
     payment = Payment(
         booking_id=booking_uuid,
@@ -91,6 +139,23 @@ def _record_payment(
     db.add(payment)
     db.commit()
     db.refresh(payment)
+    
+    # Create audit log
+    _create_audit_log(
+        db=db,
+        booking_id=booking_id,
+        event_type=event_type,
+        payment_id=str(payment.id),
+        old_status=old_status,
+        new_status=status,
+        transaction_hash=tx_hash,
+        amount=amount,
+        from_acc=from_acc,
+        to_acc=to_acc,
+        memo=memo,
+        description=f"Payment {status.value} for booking {booking_id}",
+    )
+    
     return {
         "status": "success",
         "payment_id": str(payment.id),
@@ -181,7 +246,7 @@ def release_payment(
     try:
         resp = server.submit_transaction(tx)
         tx_hash = resp["hash"]
-        return _record_payment(
+        result = _record_payment(
             db,
             booking_id,
             tx_hash,
@@ -190,11 +255,40 @@ def release_payment(
             ESCROW_PUBLIC,
             artisan_public,
             memo,
+            event_type=PaymentAuditEventType.PAYMENT_RELEASED,
+            old_status=PaymentStatus.HELD,
         )
+        return result
     except (BadRequestError, BadResponseError) as e:
         db.rollback()
+        # Log failed release attempt
+        _create_audit_log(
+            db=db,
+            booking_id=booking_id,
+            event_type=PaymentAuditEventType.PAYMENT_FAILED,
+            old_status=PaymentStatus.HELD,
+            new_status=PaymentStatus.FAILED,
+            amount=amount,
+            from_acc=ESCROW_PUBLIC,
+            to_acc=artisan_public,
+            memo=memo,
+            description=f"Payment release failed for booking {booking_id}: {str(e)}",
+        )
         return {"status": "error", "message": str(e)}
     except Exception as e:
+        # Log failed release attempt
+        _create_audit_log(
+            db=db,
+            booking_id=booking_id,
+            event_type=PaymentAuditEventType.PAYMENT_FAILED,
+            old_status=PaymentStatus.HELD,
+            new_status=PaymentStatus.FAILED,
+            amount=amount,
+            from_acc=ESCROW_PUBLIC,
+            to_acc=artisan_public,
+            memo=memo,
+            description=f"Payment release failed for booking {booking_id}: {str(e)}",
+        )
         return {
             "status": "error",
             "message": f"Database error after Stellar success: {e}",
@@ -256,7 +350,7 @@ def refund_payment(
     try:
         resp = server.submit_transaction(tx)
         tx_hash = resp["hash"]
-        return _record_payment(
+        result = _record_payment(
             db,
             booking_id,
             tx_hash,
@@ -265,11 +359,40 @@ def refund_payment(
             ESCROW_PUBLIC,
             client_public,
             memo,
+            event_type=PaymentAuditEventType.PAYMENT_REFUNDED,
+            old_status=PaymentStatus.HELD,
         )
+        return result
     except (BadRequestError, BadResponseError) as e:
         db.rollback()
+        # Log failed refund attempt
+        _create_audit_log(
+            db=db,
+            booking_id=booking_id,
+            event_type=PaymentAuditEventType.PAYMENT_FAILED,
+            old_status=PaymentStatus.HELD,
+            new_status=PaymentStatus.FAILED,
+            amount=amount,
+            from_acc=ESCROW_PUBLIC,
+            to_acc=client_public,
+            memo=memo,
+            description=f"Payment refund failed for booking {booking_id}: {str(e)}",
+        )
         return {"status": "error", "message": str(e)}
     except Exception as e:
+        # Log failed refund attempt
+        _create_audit_log(
+            db=db,
+            booking_id=booking_id,
+            event_type=PaymentAuditEventType.PAYMENT_FAILED,
+            old_status=PaymentStatus.HELD,
+            new_status=PaymentStatus.FAILED,
+            amount=amount,
+            from_acc=ESCROW_PUBLIC,
+            to_acc=client_public,
+            memo=memo,
+            description=f"Payment refund failed for booking {booking_id}: {str(e)}",
+        )
         return {
             "status": "error",
             "message": f"Database error after Stellar success: {e}",
@@ -359,11 +482,47 @@ def submit_signed_payment(db: Session, signed_xdr: str) -> dict[str, Any]:
             tx.transaction.source.account_id,
             ESCROW_PUBLIC,
             memo_text,
+            event_type=PaymentAuditEventType.PAYMENT_SUBMITTED,
+            old_status=PaymentStatus.PENDING,
         )
     except AssertionError:
         return {"status": "error", "message": "Transaction structure invalid"}
     except (BadRequestError, BadResponseError) as e:
         db.rollback()
+        # Log failed submission attempt
+        try:
+            memo_text = tx.transaction.memo.memo_text
+            if isinstance(memo_text, bytes):
+                memo_text = memo_text.decode()
+            booking_token = memo_text.replace("hold-", "")
+        except Exception:
+            booking_token = "unknown"
+        
+        _create_audit_log(
+            db=db,
+            booking_id=booking_token,
+            event_type=PaymentAuditEventType.PAYMENT_FAILED,
+            old_status=PaymentStatus.PENDING,
+            new_status=PaymentStatus.FAILED,
+            description=f"Payment submission failed: {str(e)}",
+        )
         return {"status": "error", "message": str(e)}
     except Exception as e:
+        # Log failed submission attempt
+        try:
+            memo_text = tx.transaction.memo.memo_text
+            if isinstance(memo_text, bytes):
+                memo_text = memo_text.decode()
+            booking_token = memo_text.replace("hold-", "")
+        except Exception:
+            booking_token = "unknown"
+        
+        _create_audit_log(
+            db=db,
+            booking_id=booking_token,
+            event_type=PaymentAuditEventType.PAYMENT_FAILED,
+            old_status=PaymentStatus.PENDING,
+            new_status=PaymentStatus.FAILED,
+            description=f"Payment submission failed: {str(e)}",
+        )
         return {"status": "error", "message": f"Invalid or rejected transaction: {e}"}
