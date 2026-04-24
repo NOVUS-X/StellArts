@@ -32,6 +32,7 @@ class Artisan(Base):
     last_active = Column(DateTime(timezone=True), nullable=True)
     rating = Column(DECIMAL(3, 2), default=0.0)
     total_reviews = Column(Integer, default=0)
+    stellar_address = Column(String(56), nullable=True)  # Stellar public key for on-chain reputation
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
