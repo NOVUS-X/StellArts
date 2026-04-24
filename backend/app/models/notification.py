@@ -1,6 +1,5 @@
 import enum
 import uuid
-from datetime import datetime
 
 from sqlalchemy import (
     Boolean,

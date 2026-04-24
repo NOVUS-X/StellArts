@@ -1,6 +1,5 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -8,22 +7,22 @@ from pydantic import BaseModel
 
 class PaymentAuditBase(BaseModel):
     event_type: str
-    old_status: Optional[str] = None
-    new_status: Optional[str] = None
-    transaction_hash: Optional[str] = None
-    amount: Optional[Decimal] = None
-    from_account: Optional[str] = None
-    to_account: Optional[str] = None
-    memo: Optional[str] = None
-    description: Optional[str] = None
+    old_status: str | None = None
+    new_status: str | None = None
+    transaction_hash: str | None = None
+    amount: Decimal | None = None
+    from_account: str | None = None
+    to_account: str | None = None
+    memo: str | None = None
+    description: str | None = None
 
 
 class PaymentAuditResponse(PaymentAuditBase):
     id: UUID
-    payment_id: Optional[UUID] = None
+    payment_id: UUID | None = None
     booking_id: UUID
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
     created_at: datetime
 
     class Config:

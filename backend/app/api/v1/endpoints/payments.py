@@ -1,7 +1,6 @@
 # app/api/v1/endpoints/payments.py
 import uuid
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -249,8 +248,8 @@ def refund(req: RefundRequest, db: Session = Depends(get_db)):
     response_model=PaymentAuditListResponse,
 )
 def get_payment_audits(
-    booking_id: Optional[str] = Query(None, description="Filter by booking ID"),
-    payment_id: Optional[str] = Query(None, description="Filter by payment ID"),
+    booking_id: str | None = Query(None, description="Filter by booking ID"),
+    payment_id: str | None = Query(None, description="Filter by payment ID"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
@@ -268,14 +267,18 @@ def get_payment_audits(
             booking_uuid = uuid.UUID(booking_id)
             query = query.filter(PaymentAudit.booking_id == booking_uuid)
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid booking ID format")
+            raise HTTPException(
+                status_code=400, detail="Invalid booking ID format"
+            ) from None
 
     if payment_id:
         try:
             payment_uuid = uuid.UUID(payment_id)
             query = query.filter(PaymentAudit.payment_id == payment_uuid)
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid payment ID format")
+            raise HTTPException(
+                status_code=400, detail="Invalid payment ID format"
+            ) from None
 
     # Get total count
     total = query.count()
@@ -306,7 +309,9 @@ def get_booking_payment_audits(
     try:
         booking_uuid = uuid.UUID(booking_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid booking ID format")
+        raise HTTPException(
+            status_code=400, detail="Invalid booking ID format"
+        ) from None
 
     # Verify booking exists
     booking = db.query(Booking).filter(Booking.id == booking_uuid).first()
