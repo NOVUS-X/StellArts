@@ -1,11 +1,12 @@
-'use client';
+"use client";
 
-import { Button } from './button';
-import Link from 'next/link';
-import Image from 'next/image';
-import { useWallet } from '../../context/WalletContext';
-import { useAuth } from '../../context/AuthContext';
-import CurrencySelector from './CurrencySelector';
+import { Button } from "./button";
+import Link from "next/link";
+import Image from "next/image";
+import { useWallet } from "../../context/WalletContext";
+import { useAuth } from "../../context/AuthContext";
+import CurrencySelector from "./CurrencySelector";
+import NotificationBell from "./NotificationBell";
 
 function WalletButton() {
   const { address, isConnected, connect, disconnect } = useWallet();
@@ -48,7 +49,12 @@ export default function Navbar() {
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <div className="w-10 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Image src="/Stellarts.png" alt="Stellarts Logo" width={100} height={100} />
+              <Image
+                src="/Stellarts.png"
+                alt="Stellarts Logo"
+                width={100}
+                height={100}
+              />
             </div>
           </Link>
           <div className="hidden md:flex items-center space-x-8">
@@ -79,6 +85,7 @@ export default function Navbar() {
               </Link>
             )}
             <CurrencySelector />
+            {isAuthenticated && <NotificationBell />}
             <WalletButton />
             {isAuthenticated && (
               <Button

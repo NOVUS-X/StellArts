@@ -115,6 +115,18 @@ export interface BookingResponse {
   updated_at: string | null;
 }
 
+export interface NotificationItem {
+  id: string;
+  user_id: number;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  reference_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface TokenResponse {
   access_token: string;
   refresh_token: string;
@@ -191,6 +203,36 @@ export const api = {
       request<BookingResponse>("/bookings/create", {
         method: "POST",
         body: JSON.stringify(body),
+        token,
+      }),
+  },
+  notifications: {
+    get: (token: string, skip: number = 0, limit: number = 50) =>
+      request<NotificationItem[]>(
+        `/notifications/?skip=${skip}&limit=${limit}`,
+        {
+          method: "GET",
+          token,
+        },
+      ),
+    getUnreadCount: (token: string) =>
+      request<{ unread_count: number }>("/notifications/unread-count", {
+        method: "GET",
+        token,
+      }),
+    markAsRead: (token: string, notificationId: string) =>
+      request<NotificationItem>(`/notifications/${notificationId}/read`, {
+        method: "PUT",
+        token,
+      }),
+    markAllAsRead: (token: string) =>
+      request<{ message: string }>("/notifications/mark-all-read", {
+        method: "PUT",
+        token,
+      }),
+    delete: (token: string, notificationId: string) =>
+      request<{ message: string }>(`/notifications/${notificationId}`, {
+        method: "DELETE",
         token,
       }),
   },
