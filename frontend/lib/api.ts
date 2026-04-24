@@ -10,7 +10,7 @@ const getBaseUrl = (): string =>
 
 async function request<T>(
   path: string,
-  options: RequestInit & { token?: string } = {}
+  options: RequestInit & { token?: string } = {},
 ): Promise<T> {
   const { token, ...init } = options;
   const url = `${getBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
@@ -27,9 +27,13 @@ async function request<T>(
     let message = res.statusText;
     try {
       const json = JSON.parse(text);
-      message = json.detail ?? (typeof json.detail === "string" ? json.detail : message);
+      message =
+        json.detail ??
+        (typeof json.detail === "string" ? json.detail : message);
       if (Array.isArray(json.detail))
-        message = json.detail.map((d: { msg?: string }) => d.msg ?? "").join("; ") || message;
+        message =
+          json.detail.map((d: { msg?: string }) => d.msg ?? "").join("; ") ||
+          message;
     } catch {
       if (text) message = text;
     }
@@ -108,6 +112,7 @@ export interface BookingResponse {
   id: string;
   client_id: number;
   artisan_id: number;
+  artisan_name?: string;
   service: string;
   date: string | null;
   estimated_cost: number | null;
@@ -117,6 +122,18 @@ export interface BookingResponse {
   notes: string | null;
   created_at: string;
   updated_at: string | null;
+}
+
+export interface NotificationItem {
+  id: string;
+  user_id: number;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  reference_id: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface TokenResponse {
@@ -137,7 +154,10 @@ interface PaginatedArtisansResponse {
 export const api = {
   auth: {
     login: (body: { email: string; password: string }) =>
-      request<TokenResponse>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+      request<TokenResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
     register: (body: {
       email: string;
       password: string;
@@ -158,7 +178,13 @@ export const api = {
     nearby: (
       lat: number,
       lon: number,
-      opts: { page?: number; page_size?: number; skill?: string; min_rating?: number; is_available?: boolean } = {}
+      opts: {
+        page?: number;
+        page_size?: number;
+        skill?: string;
+        min_rating?: number;
+        is_available?: boolean;
+      } = {},
     ) => {
       const params = new URLSearchParams({
         lat: String(lat),
@@ -167,8 +193,10 @@ export const api = {
         page_size: String(opts.page_size ?? 10),
       });
       if (opts.skill) params.append("skill", opts.skill);
-      if (opts.min_rating !== undefined && opts.min_rating > 0) params.append("min_rating", String(opts.min_rating));
-      if (opts.is_available !== undefined) params.append("is_available", String(opts.is_available));
+      if (opts.min_rating !== undefined && opts.min_rating > 0)
+        params.append("min_rating", String(opts.min_rating));
+      if (opts.is_available !== undefined)
+        params.append("is_available", String(opts.is_available));
       return request<PaginatedArtisansResponse>(`/artisans/nearby?${params}`);
     },
     getProfile: (artisanId: number) =>
@@ -186,11 +214,44 @@ export const api = {
   },
   bookings: {
     myBookings: (token: string) =>
-      request<BookingResponse[]>("/bookings/my-bookings", { method: "GET", token }),
+      request<BookingResponse[]>("/bookings/my-bookings", {
+        method: "GET",
+        token,
+      }),
     create: (body: BookingCreate, token: string) =>
       request<BookingResponse>("/bookings/create", {
         method: "POST",
         body: JSON.stringify(body),
+        token,
+      }),
+  },
+  notifications: {
+    get: (token: string, skip: number = 0, limit: number = 50) =>
+      request<NotificationItem[]>(
+        `/notifications/?skip=${skip}&limit=${limit}`,
+        {
+          method: "GET",
+          token,
+        },
+      ),
+    getUnreadCount: (token: string) =>
+      request<{ unread_count: number }>("/notifications/unread-count", {
+        method: "GET",
+        token,
+      }),
+    markAsRead: (token: string, notificationId: string) =>
+      request<NotificationItem>(`/notifications/${notificationId}/read`, {
+        method: "PUT",
+        token,
+      }),
+    markAllAsRead: (token: string) =>
+      request<{ message: string }>("/notifications/mark-all-read", {
+        method: "PUT",
+        token,
+      }),
+    delete: (token: string, notificationId: string) =>
+      request<{ message: string }>(`/notifications/${notificationId}`, {
+        method: "DELETE",
         token,
       }),
   },
