@@ -1,11 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from './button';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useWallet } from '../../context/WalletContext';
 import { useAuth } from '../../context/AuthContext';
 import CurrencySelector from './CurrencySelector';
+import { Menu, X } from 'lucide-react';
 
 function WalletButton() {
   const { address, isConnected, connect, disconnect } = useWallet();
@@ -41,16 +43,20 @@ function WalletButton() {
 
 export default function Navbar() {
   const { isAuthenticated, logout } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 w-full">
-      <nav className=" mx-auto max-w-375 px-6 py-4">
+      <nav className=" mx-auto max-w-6xl px-6 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center">
-            <div className="w-10 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Image src="/Stellarts.png" alt="Stellarts Logo" width={100} height={100} />
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center overflow-hidden">
+              <Image src="/Stellarts.png" alt="Stellarts Logo" width={40} height={40} className="object-contain" />
             </div>
+            <span className="ml-2 text-xl font-bold text-gray-900 md:block hidden">Stellarts</span>
           </Link>
+
+          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
             <Link
               href="/#features"
@@ -91,8 +97,72 @@ export default function Navbar() {
               </Button>
             )}
           </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden flex items-center gap-4">
+            <CurrencySelector />
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="p-2 text-gray-600 hover:text-blue-600 transition-colors focus:outline-none"
+              aria-label="Toggle menu"
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Navigation */}
+        {isMenuOpen && (
+          <div className="md:hidden mt-4 pb-4 space-y-4 border-t border-gray-100 pt-4 animate-in slide-in-from-top-2 duration-200">
+            <Link
+              href="/#features"
+              onClick={() => setIsMenuOpen(false)}
+              className="block text-gray-600 hover:text-blue-600 transition-colors py-2"
+            >
+              Features
+            </Link>
+            <Link
+              href="/#use-cases"
+              onClick={() => setIsMenuOpen(false)}
+              className="block text-gray-600 hover:text-blue-600 transition-colors py-2"
+            >
+              Use Cases
+            </Link>
+            <Link
+              href="/#why-stellar"
+              onClick={() => setIsMenuOpen(false)}
+              className="block text-gray-600 hover:text-blue-600 transition-colors py-2"
+            >
+              Why Stellar
+            </Link>
+            {isAuthenticated && (
+              <Link
+                href="/dashboard"
+                onClick={() => setIsMenuOpen(false)}
+                className="block text-gray-600 hover:text-blue-600 transition-colors py-2"
+              >
+                Dashboard
+              </Link>
+            )}
+            <div className="pt-2">
+              <WalletButton />
+            </div>
+            {isAuthenticated && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  logout();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full border-gray-300 text-gray-600 mt-2"
+              >
+                Log out
+              </Button>
+            )}
+          </div>
+        )}
       </nav>
     </header>
   );
-}
+}
