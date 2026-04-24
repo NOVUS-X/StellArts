@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     STATIC_DIR: str = "static"
     AVATARS_DIR: str = "avatars"
+    SUPPORTED_ASSET_CODES: list[str] = ["XLM", "USDC"]
 
     # Security
     SECRET_KEY: str

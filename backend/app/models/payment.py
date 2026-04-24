@@ -27,6 +27,8 @@ class Payment(Base):
     to_account = Column(String(56), nullable=True)
     memo = Column(String, nullable=True)
     transaction_hash = Column(String, unique=True, index=True, nullable=True)
+    asset_code = Column(String(12), default="XLM", nullable=False)
+    asset_issuer = Column(String(56), nullable=True)
 
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
     created_at = Column(
