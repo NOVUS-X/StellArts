@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.api import api_router
 from app.core.cache import cache
 from app.core.config import settings
+from app.core.exceptions import register_exception_handlers
 from app.db.session import get_db
 
 
@@ -26,6 +27,10 @@ app = FastAPI(
     debug=settings.DEBUG,
     lifespan=lifespan,
 )
+
+# Register global exception handlers to ensure every error response follows
+# the standardized { error_code, message, details } schema.
+register_exception_handlers(app)
 
 # Set all CORS enabled origins
 if settings.BACKEND_CORS_ORIGINS:
