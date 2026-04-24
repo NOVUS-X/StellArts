@@ -18,7 +18,12 @@ from stellar_sdk import (
 from stellar_sdk.exceptions import BadRequestError, BadResponseError
 
 from app.models.booking import Booking
-from app.models.payment import Payment, PaymentStatus, PaymentAudit, PaymentAuditEventType
+from app.models.payment import (
+    Payment,
+    PaymentAudit,
+    PaymentAuditEventType,
+    PaymentStatus,
+)
 
 # Stellar config
 HORIZON = os.getenv("STELLAR_HORIZON", "https://horizon-testnet.stellar.org")
@@ -45,12 +50,13 @@ if ESCROW_SECRET:
 DEBUG_MODE = os.getenv("DEBUG", "").lower() == "true"
 
 if not ESCROW_PUBLIC or not StrKey.is_valid_ed25519_public_key(ESCROW_PUBLIC):
-    # Allow local/test environments to boot without strict Stellar configuration.
+    # Allow local/test environments to boot without strict Stellar config.
     import sys
 
     if "pytest" not in sys.modules and not DEBUG_MODE:
         raise RuntimeError(
-            "STELLAR_ESCROW_SECRET or a valid STELLAR_ESCROW_PUBLIC must be configured"
+            "STELLAR_ESCROW_SECRET or a valid STELLAR_ESCROW_PUBLIC "
+            "must be configured"
         )
     else:
         ESCROW_PUBLIC = Keypair.random().public_key
@@ -80,7 +86,7 @@ def _create_audit_log(
     try:
         booking_uuid = uuid.UUID(booking_id)
         payment_uuid = uuid.UUID(payment_id) if payment_id else None
-        
+
         audit = PaymentAudit(
             payment_id=payment_uuid,
             booking_id=booking_uuid,
@@ -99,9 +105,13 @@ def _create_audit_log(
     except Exception as e:
         # Log error but don't fail the payment operation
         import logging
+
         logger = logging.getLogger(__name__)
-        logger.error(f"Failed to create audit log for booking {booking_id}: {e}")
+        logger.error(
+            f"Failed to create audit log for booking {booking_id}: {e}"
+        )
         db.rollback()
+
 
 # ---------------------------
 # Utilities
@@ -139,7 +149,7 @@ def _record_payment(
     db.add(payment)
     db.commit()
     db.refresh(payment)
-    
+
     # Create audit log
     _create_audit_log(
         db=db,
@@ -155,7 +165,7 @@ def _record_payment(
         memo=memo,
         description=f"Payment {status.value} for booking {booking_id}",
     )
-    
+
     return {
         "status": "success",
         "payment_id": str(payment.id),
@@ -172,9 +182,9 @@ def hold_payment(db: Session, *args, **kwargs) -> dict[str, Any]:
     """DEPRECATED / INSECURE
 
     The previous implementation accepted a raw Stellar private key from the
-    client, built a transaction, and signed it server‑side. This pattern has been
-    removed because it violates self‑custody guarantees and exposes client
-    funds to server compromise.
+    client, built a transaction, and signed it server-side. This pattern has
+    been removed because it violates self-custody guarantees and exposes
+    client funds to server compromise.
 
     This stub remains only to avoid runtime errors if a caller accidentally
     invokes it; it no longer performs any cryptographic operations.
@@ -187,7 +197,8 @@ def hold_payment(db: Session, *args, **kwargs) -> dict[str, Any]:
         "status": "error",
         "message": (
             "/payments/hold is deprecated. "
-            "Use /payments/prepare and /payments/submit with client-side signing."
+            "Use /payments/prepare and /payments/submit with "
+            "client-side signing."
         ),
     }
 
@@ -201,19 +212,25 @@ def release_payment(
 
     held = (
         db.query(Payment)
-        .filter(Payment.booking_id == booking_id, Payment.status == PaymentStatus.HELD)
+        .filter(
+            Payment.booking_id == booking_id,
+            Payment.status == PaymentStatus.HELD,
+        )
         .first()
     )
     if not held:
         return {
             "status": "error",
-            "message": "No held payment for booking or already released/refunded",
+            "message": (
+                "No held payment for booking or already released/refunded"
+            ),
         }
 
     already_released = (
         db.query(Payment)
         .filter(
-            Payment.booking_id == booking_id, Payment.status == PaymentStatus.RELEASED
+            Payment.booking_id == booking_id,
+            Payment.status == PaymentStatus.RELEASED,
         )
         .first()
     )
@@ -272,7 +289,10 @@ def release_payment(
             from_acc=ESCROW_PUBLIC,
             to_acc=artisan_public,
             memo=memo,
-            description=f"Payment release failed for booking {booking_id}: {str(e)}",
+            description=(
+                f"Payment release failed for booking {booking_id}: "
+                f"{str(e)}"
+            ),
         )
         return {"status": "error", "message": str(e)}
     except Exception as e:
@@ -287,7 +307,10 @@ def release_payment(
             from_acc=ESCROW_PUBLIC,
             to_acc=artisan_public,
             memo=memo,
-            description=f"Payment release failed for booking {booking_id}: {str(e)}",
+            description=(
+                f"Payment release failed for booking {booking_id}: "
+                f"{str(e)}"
+            ),
         )
         return {
             "status": "error",
@@ -304,19 +327,25 @@ def refund_payment(
 
     held = (
         db.query(Payment)
-        .filter(Payment.booking_id == booking_id, Payment.status == PaymentStatus.HELD)
+        .filter(
+            Payment.booking_id == booking_id,
+            Payment.status == PaymentStatus.HELD,
+        )
         .first()
     )
     if not held:
         return {
             "status": "error",
-            "message": "No held payment for booking or already released/refunded",
+            "message": (
+                "No held payment for booking or already released/refunded"
+            ),
         }
 
     already_refunded = (
         db.query(Payment)
         .filter(
-            Payment.booking_id == booking_id, Payment.status == PaymentStatus.REFUNDED
+            Payment.booking_id == booking_id,
+            Payment.status == PaymentStatus.REFUNDED,
         )
         .first()
     )
@@ -376,7 +405,9 @@ def refund_payment(
             from_acc=ESCROW_PUBLIC,
             to_acc=client_public,
             memo=memo,
-            description=f"Payment refund failed for booking {booking_id}: {str(e)}",
+            description=(
+                f"Payment refund failed for booking {booking_id}: " f"{str(e)}"
+            ),
         )
         return {"status": "error", "message": str(e)}
     except Exception as e:
@@ -391,7 +422,9 @@ def refund_payment(
             from_acc=ESCROW_PUBLIC,
             to_acc=client_public,
             memo=memo,
-            description=f"Payment refund failed for booking {booking_id}: {str(e)}",
+            description=(
+                f"Payment refund failed for booking {booking_id}: " f"{str(e)}"
+            ),
         )
         return {
             "status": "error",
@@ -469,7 +502,9 @@ def submit_signed_payment(db: Session, signed_xdr: str) -> dict[str, Any]:
             if len(candidates) != 1:
                 return {
                     "status": "error",
-                    "message": "Unable to resolve booking from transaction memo",
+                    "message": (
+                        "Unable to resolve booking from transaction memo"
+                    ),
                 }
             booking_id = candidates[0]
 
@@ -497,7 +532,7 @@ def submit_signed_payment(db: Session, signed_xdr: str) -> dict[str, Any]:
             booking_token = memo_text.replace("hold-", "")
         except Exception:
             booking_token = "unknown"
-        
+
         _create_audit_log(
             db=db,
             booking_id=booking_token,
@@ -516,7 +551,7 @@ def submit_signed_payment(db: Session, signed_xdr: str) -> dict[str, Any]:
             booking_token = memo_text.replace("hold-", "")
         except Exception:
             booking_token = "unknown"
-        
+
         _create_audit_log(
             db=db,
             booking_id=booking_token,
@@ -525,4 +560,7 @@ def submit_signed_payment(db: Session, signed_xdr: str) -> dict[str, Any]:
             new_status=PaymentStatus.FAILED,
             description=f"Payment submission failed: {str(e)}",
         )
-        return {"status": "error", "message": f"Invalid or rejected transaction: {e}"}
+        return {
+            "status": "error",
+            "message": f"Invalid or rejected transaction: {e}",
+        }

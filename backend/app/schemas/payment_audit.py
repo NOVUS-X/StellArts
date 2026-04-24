@@ -32,5 +32,6 @@ class PaymentAuditResponse(PaymentAuditBase):
 
 class PaymentAuditListResponse(BaseModel):
     """Response for listing payment audits."""
+
     audits: list[PaymentAuditResponse]
     total: int
