@@ -1,7 +1,9 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -27,9 +29,6 @@ app = FastAPI(
     debug=settings.DEBUG,
     lifespan=lifespan,
 )
-
-from fastapi.staticfiles import StaticFiles
-import os
 
 # Ensure static/avatars directory exists
 static_path = os.path.join(os.getcwd(), settings.STATIC_DIR)

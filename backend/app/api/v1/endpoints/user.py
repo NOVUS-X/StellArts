@@ -1,6 +1,7 @@
 import os
 import shutil
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_active_user, require_admin
@@ -28,7 +29,7 @@ def update_me(
     update_data = user_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(current_user, field, value)
-    
+
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
@@ -47,15 +48,15 @@ async def upload_avatar(
     avatars_path = os.path.join(static_path, settings.AVATARS_DIR)
     if not os.path.exists(avatars_path):
         os.makedirs(avatars_path)
-    
+
     # Save file
     file_extension = file.filename.split(".")[-1]
     file_name = f"user_{current_user.id}.{file_extension}"
     file_path = os.path.join(avatars_path, file_name)
-    
+
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    
+
     # Update user avatar URL
     current_user.avatar = f"/{settings.STATIC_DIR}/{settings.AVATARS_DIR}/{file_name}"
     db.add(current_user)
