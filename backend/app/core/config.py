@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Stellarts"
     DEBUG: bool = False
+    STATIC_DIR: str = "static"
+    AVATARS_DIR: str = "avatars"
 
     # Security
     SECRET_KEY: str

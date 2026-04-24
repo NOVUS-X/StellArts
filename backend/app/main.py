@@ -28,6 +28,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from fastapi.staticfiles import StaticFiles
+import os
+
+# Ensure static/avatars directory exists
+static_path = os.path.join(os.getcwd(), settings.STATIC_DIR)
+avatars_path = os.path.join(static_path, settings.AVATARS_DIR)
+if not os.path.exists(avatars_path):
+    os.makedirs(avatars_path)
+
+app.mount(f"/{settings.STATIC_DIR}", StaticFiles(directory=static_path), name="static")
+
 # Register global exception handlers to ensure every error response follows
 # the standardized { error_code, message, details } schema.
 register_exception_handlers(app)
