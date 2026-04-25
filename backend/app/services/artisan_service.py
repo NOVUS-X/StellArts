@@ -19,6 +19,9 @@ def _build_cache_key(request: NearbyArtisansRequest) -> str:
         "radius": request.radius_km,
         "specialties": sorted(request.specialties or []),  # order-independent
         "min_rating": request.min_rating,
+        "min_experience_years": request.min_experience_years,
+        "min_rate": request.min_rate,
+        "max_rate": request.max_rate,
         "available": request.is_available,
         "limit": request.limit,
     }

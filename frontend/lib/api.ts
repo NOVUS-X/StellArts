@@ -149,7 +149,16 @@ export const api = {
     nearby: (
       lat: number,
       lon: number,
-      opts: { page?: number; page_size?: number; skill?: string; min_rating?: number; is_available?: boolean } = {}
+      opts: { 
+        page?: number; 
+        page_size?: number; 
+        skills?: string[]; 
+        min_rating?: number; 
+        min_experience?: number;
+        min_rate?: number;
+        max_rate?: number;
+        is_available?: boolean;
+      } = {}
     ) => {
       const params = new URLSearchParams({
         lat: String(lat),
@@ -157,9 +166,14 @@ export const api = {
         page: String(opts.page ?? 1),
         page_size: String(opts.page_size ?? 10),
       });
-      if (opts.skill) params.append("skill", opts.skill);
+      if (opts.skills && opts.skills.length > 0) {
+        opts.skills.forEach(skill => params.append("skills", skill));
+      }
       if (opts.min_rating !== undefined && opts.min_rating > 0) params.append("min_rating", String(opts.min_rating));
-      if (opts.is_available !== undefined) params.append("is_available", String(opts.is_available));
+      if (opts.min_experience !== undefined && opts.min_experience > 0) params.append("min_experience", String(opts.min_experience));
+      if (opts.min_rate !== undefined && opts.min_rate > 0) params.append("min_rate", String(opts.min_rate));
+      if (opts.max_rate !== undefined && opts.max_rate > 0) params.append("max_rate", String(opts.max_rate));
+      if (opts.is_available !== undefined) params.append("available", String(opts.is_available));
       return request<PaginatedArtisansResponse>(`/artisans/nearby?${params}`);
     },
     getProfile: (artisanId: number) =>

@@ -166,6 +166,15 @@ class NearbyArtisansRequest(BaseModel):
     min_rating: float | None = Field(
         None, ge=0, le=5, description="Minimum rating filter"
     )
+    min_experience_years: int | None = Field(
+        None, ge=0, description="Minimum experience years"
+    )
+    min_rate: float | None = Field(
+        None, ge=0, description="Minimum hourly rate"
+    )
+    max_rate: float | None = Field(
+        None, ge=0, description="Maximum hourly rate"
+    )
     is_available: bool | None = Field(True, description="Filter by availability")
     limit: int | None = Field(20, ge=1, le=100, description="Maximum number of results")
 
