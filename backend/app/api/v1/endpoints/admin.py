@@ -239,8 +239,16 @@ def resolve_dispute(
     # In a real scenario, we would trigger the Stellar/Soroban transfers here.
     # For now, we update the statuses to reflect resolution.
 
-    payment.status = PaymentStatus.RELEASED if resolution.payout_artisan_ratio > 0 else PaymentStatus.REFUNDED
-    booking.status = BookingStatus.COMPLETED if resolution.payout_artisan_ratio > 0.5 else BookingStatus.CANCELLED
+    payment.status = (
+        PaymentStatus.RELEASED
+        if resolution.payout_artisan_ratio > 0
+        else PaymentStatus.REFUNDED
+    )
+    booking.status = (
+        BookingStatus.COMPLETED
+        if resolution.payout_artisan_ratio > 0.5
+        else BookingStatus.CANCELLED
+    )
 
     db.commit()
     db.refresh(dispute)

@@ -10,9 +10,14 @@ class DisputeResolve(BaseModel):
     """Schema for resolving a dispute"""
 
     payout_artisan_ratio: float = Field(
-        ..., ge=0.0, le=1.0, description="Ratio of funds to release to artisan (0.0 to 1.0)"
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Ratio of funds to release to artisan (0.0 to 1.0)",
     )
-    resolution_memo: str = Field(..., min_length=1, description="Reasoning for the resolution")
+    resolution_memo: str = Field(
+        ..., min_length=1, description="Reasoning for the resolution"
+    )
 
 
 class DisputeResponse(BaseModel):

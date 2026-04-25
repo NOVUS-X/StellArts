@@ -33,7 +33,9 @@ class Dispute(Base):
     status = Column(Enum(DisputeStatus), default=DisputeStatus.OPEN)
 
     # Resolution details
-    payout_artisan_ratio = Column(Numeric(3, 2), nullable=True)  # e.g., 0.70 for 70% to artisan
+    payout_artisan_ratio = Column(
+        Numeric(3, 2), nullable=True
+    )  # e.g., 0.70 for 70% to artisan
     resolution_memo = Column(Text, nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     resolved_by = Column(String, nullable=True)  # Admin username or ID
