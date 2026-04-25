@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import ReviewForm from "@/components/bookings/ReviewForm";
+import ReleaseFundsModal from "@/components/bookings/ReleaseFundsModal";
 
 export type EscrowStatus = "HELD" | "FUNDED" | "RELEASED" | "DISPUTED";
 
@@ -40,6 +41,7 @@ export default function EscrowStepper({
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
 
   const steps = [
     {
@@ -76,10 +78,9 @@ export default function EscrowStepper({
         setStatus("FUNDED");
         toast.success("Payment successful! Funds are now in escrow.");
       } else if (action === "release") {
-        setStatus("RELEASED");
-        toast.success("Funds released to the artisan.");
-        // Show review form after release
-        setShowReviewForm(true);
+        setIsReleaseModalOpen(true);
+        setLoadingAction(null);
+        return;
       } else if (action === "dispute") {
         setStatus("DISPUTED");
         toast.error("Dispute initiated. Our team will review the case.");
@@ -282,7 +283,18 @@ export default function EscrowStepper({
               onSuccess={handleReviewSuccess}
             />
           )}
-      </div>
+
+      <ReleaseFundsModal
+        isOpen={isReleaseModalOpen}
+        onClose={() => setIsReleaseModalOpen(false)}
+        bookingId={bookingId}
+        amount={amount ?? 0}
+        artisanName={artisanName ?? "Artisan"}
+        onSuccess={() => {
+          setStatus("RELEASED");
+          setShowReviewForm(true);
+        }}
+      />
     </div>
   );
 }
