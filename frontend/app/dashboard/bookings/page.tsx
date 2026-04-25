@@ -15,7 +15,9 @@ import { api, type BookingResponse } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
 import { Calendar, ArrowLeft } from "lucide-react";
 import Price from "../../../components/ui/Price";
-import EscrowStepper, { type EscrowStatus } from "../../../components/bookings/EscrowStepper";
+import EscrowStepper, {
+  type EscrowStatus,
+} from "../../../components/bookings/EscrowStepper";
 
 export default function DashboardBookingsPage() {
   const router = useRouter();
@@ -35,7 +37,9 @@ export default function DashboardBookingsPage() {
       .myBookings(token)
       .then(setBookings)
       .catch((err) =>
-        setError(err instanceof Error ? err.message : "Failed to load bookings")
+        setError(
+          err instanceof Error ? err.message : "Failed to load bookings",
+        ),
       )
       .finally(() => setLoading(false));
   }, [token, isAuthenticated, isLoading, router]);
@@ -90,9 +94,11 @@ export default function DashboardBookingsPage() {
                   </p>
                   <p className="text-sm">
                     Cost:{" "}
-                    {b.estimated_cost != null
-                      ? <Price amount={Number(b.estimated_cost)} />
-                      : "—"}
+                    {b.estimated_cost != null ? (
+                      <Price amount={Number(b.estimated_cost)} />
+                    ) : (
+                      "—"
+                    )}
                   </p>
                   <p className="text-sm">
                     Status:{" "}
@@ -108,17 +114,22 @@ export default function DashboardBookingsPage() {
                       {b.status}
                     </span>
                   </p>
-                  
-                  <EscrowStepper 
-                    bookingId={b.id} 
+
+                  <EscrowStepper
+                    bookingId={b.id}
                     initialStatus={
-                      b.status === "completed" ? "RELEASED" : 
-                      (b.status as EscrowStatus) === "FUNDED" ? "FUNDED" : 
-                      (b.status as EscrowStatus) === "DISPUTED" ? "DISPUTED" : 
-                      "HELD"
+                      b.status === "completed"
+                        ? "RELEASED"
+                        : (b.status as EscrowStatus) === "FUNDED"
+                          ? "FUNDED"
+                          : (b.status as EscrowStatus) === "DISPUTED"
+                            ? "DISPUTED"
+                            : "HELD"
                     }
                     serviceName={b.service}
                     amount={b.estimated_cost ?? 0}
+                    artisanId={b.artisan_id}
+                    artisanName={b.artisan_name || "Artisan"}
                   />
 
                   <div className="pt-2">

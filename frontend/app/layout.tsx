@@ -1,36 +1,38 @@
-import * as React from 'react';
+import * as React from "react";
 import "./globals.css";
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import { WalletProvider } from '../context/WalletContext';
-import { AuthProvider } from '../context/AuthContext';
-import { CurrencyProvider } from '../context/CurrencyContext';
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { WalletProvider } from "../context/WalletContext";
+import { AuthProvider } from "../context/AuthContext";
+import { CurrencyProvider } from "../context/CurrencyContext";
+import { NotificationProvider } from "../context/NotificationContext";
+import { ToastProvider } from "../context/ToastContext";
 
-const inter = Inter({ 
-  subsets: ['latin'],
-  display: 'swap',
-  preload: false
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
-  title: 'Stellarts - Uber for Artisans | Built on Stellar Blockchain',
+  title: "Stellarts - Uber for Artisans | Built on Stellar Blockchain",
   icons: {
     icon: "/Stellarts.png",
   },
   description:
-    'Connect with trusted artisans in your area. Stellarts is a decentralized marketplace platform leveraging Stellar blockchain for secure, transparent, and fast transactions.',
+    "Connect with trusted artisans in your area. Stellarts is a decentralized marketplace platform leveraging Stellar blockchain for secure, transparent, and fast transactions.",
   openGraph: {
     images: [
       {
-        url: '',
+        url: "",
       },
     ],
   },
   twitter: {
-    card: 'summary_large_image',
+    card: "summary_large_image",
     images: [
       {
-        url: '',
+        url: "",
       },
     ],
   },
@@ -47,7 +49,9 @@ export default function RootLayout({
         <AuthProvider>
           <WalletProvider>
             <CurrencyProvider>
-              {children}
+              <ToastProvider>
+                <NotificationProvider>{children}</NotificationProvider>
+              </ToastProvider>
             </CurrencyProvider>
           </WalletProvider>
         </AuthProvider>

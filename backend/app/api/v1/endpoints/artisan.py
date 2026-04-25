@@ -133,6 +133,21 @@ async def find_nearby_artisans(
     return result
 
 
+@router.get("/me", response_model=ArtisanOut)
+def get_my_artisan_profile(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_artisan),
+):
+    """Get current artisan profile"""
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
+        )
+    return artisan
+
+
 # Other artisan-related endpoints from main
 @router.post("/profile", response_model=ArtisanOut)
 async def create_artisan_profile(
