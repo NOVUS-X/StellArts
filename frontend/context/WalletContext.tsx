@@ -7,6 +7,7 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
   ReactNode,
 } from "react";
 
@@ -41,7 +42,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
   const [kit, setKit] = useState<WalletKitInstance | null>(null);
 
+  const kitRef = useRef<WalletKitInstance | null>(null);
+
   useEffect(() => {
+    let cancelled = false;
     import("@creit.tech/stellar-wallets-kit").then(
       ({
         StellarWalletsKit: Kit,
@@ -49,15 +53,22 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         allowAllModules,
         FREIGHTER_ID,
       }) => {
-        setKit(
-          new Kit({
-            network: WalletNetwork.TESTNET,
-            selectedWalletId: FREIGHTER_ID,
-            modules: allowAllModules(),
-          })
-        );
+        if (cancelled) return;
+        const instance = new Kit({
+          network: WalletNetwork.TESTNET,
+          selectedWalletId: FREIGHTER_ID,
+          modules: allowAllModules(),
+        });
+        kitRef.current = instance;
+        setKit(instance);
       }
     );
+    return () => {
+      cancelled = true;
+      // Cleanup kit reference to allow GC
+      kitRef.current = null;
+      setKit(null);
+    };
   }, []);
 
   const connect = useCallback(async () => {
@@ -96,12 +107,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     () => ({
       address,
       isConnected: !!address,
-      kit,
+      kit: kitRef.current,
       connect,
       disconnect,
       signTransaction,
     }),
-    [address, kit, connect, disconnect, signTransaction]
+    [address, kitRef.current, connect, disconnect, signTransaction]
   );
 
   return (
