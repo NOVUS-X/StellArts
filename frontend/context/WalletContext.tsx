@@ -7,9 +7,9 @@ import {
   useCallback,
   useMemo,
   useEffect,
-  useRef,
   ReactNode,
-} from "react";
+
+
 
 /** Minimal type for wallet kit — full module loaded only on client via dynamic import */
 interface WalletKitInstance {
@@ -35,38 +35,29 @@ interface WalletContextType {
 
 const WalletContext = createContext<WalletContextType | null>(null);
 
-const TESTNET_PASSPHRASE =
-  "Test SDF Network ; September 2015";
+const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
   const [kit, setKit] = useState<WalletKitInstance | null>(null);
 
-  const kitRef = useRef<WalletKitInstance | null>(null);
-
+  // Initialise the Stellar wallet kit once on mount
   useEffect(() => {
     let cancelled = false;
     import("@creit.tech/stellar-wallets-kit").then(
-      ({
-        StellarWalletsKit: Kit,
-        WalletNetwork,
-        allowAllModules,
-        FREIGHTER_ID,
-      }) => {
+      ({ StellarWalletsKit: Kit, WalletNetwork, allowAllModules, FREIGHTER_ID }) => {
         if (cancelled) return;
         const instance = new Kit({
           network: WalletNetwork.TESTNET,
           selectedWalletId: FREIGHTER_ID,
           modules: allowAllModules(),
         });
-        kitRef.current = instance;
         setKit(instance);
       }
     );
+    // Cleanup on unmount to avoid memory leaks
     return () => {
       cancelled = true;
-      // Cleanup kit reference to allow GC
-      kitRef.current = null;
       setKit(null);
     };
   }, []);
@@ -103,16 +94,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     [kit, address]
   );
 
+  // Memoize context value to prevent unnecessary re-renders
   const value = useMemo(
     () => ({
       address,
       isConnected: !!address,
-      kit: kitRef.current,
+      kit,
       connect,
       disconnect,
       signTransaction,
     }),
-    [address, kitRef.current, connect, disconnect, signTransaction]
+    [address, kit, connect, disconnect, signTransaction]
   );
 
   return (
