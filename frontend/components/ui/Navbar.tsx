@@ -1,13 +1,14 @@
-'use client';
+<<<<<<"use client";
 
-import { useState } from 'react';
-import { Button } from './button';
-import Link from 'next/link';
-import Image from 'next/image';
-import { useWallet } from '../../context/WalletContext';
-import { useAuth } from '../../context/AuthContext';
-import CurrencySelector from './CurrencySelector';
-import { Menu, X } from 'lucide-react';
+import { useState } from "react";
+import { Button } from "./button";
+import Link from "next/link";
+import Image from "next/image";
+import { useWallet } from "../../context/WalletContext";
+import { useAuth } from "../../context/AuthContext";
+import CurrencySelector from "./CurrencySelector";
+import NotificationBell from "./NotificationBell";
+import { Menu, X } from "lucide-react";
 
 function WalletButton() {
   const { address, isConnected, connect, disconnect } = useWallet();
@@ -47,13 +48,21 @@ export default function Navbar() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 w-full">
-      <nav className=" mx-auto max-w-6xl px-6 py-4">
+      <nav className="mx-auto max-w-6xl px-6 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center overflow-hidden">
-              <Image src="/Stellarts.png" alt="Stellarts Logo" width={40} height={40} className="object-contain" />
+              <Image
+                src="/Stellarts.png"
+                alt="Stellarts Logo"
+                width={40}
+                height={40}
+                className="object-contain"
+              />
             </div>
-            <span className="ml-2 text-xl font-bold text-gray-900 md:block hidden">Stellarts</span>
+            <span className="ml-2 text-xl font-bold text-gray-900 md:block hidden">
+              Stellarts
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -76,6 +85,7 @@ export default function Navbar() {
             >
               Why Stellar
             </Link>
+
             {isAuthenticated && (
               <Link
                 href="/dashboard"
@@ -84,8 +94,11 @@ export default function Navbar() {
                 Dashboard
               </Link>
             )}
+
             <CurrencySelector />
+            {isAuthenticated && <NotificationBell />}
             <WalletButton />
+
             {isAuthenticated && (
               <Button
                 variant="outline"
@@ -101,12 +114,18 @@ export default function Navbar() {
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-4">
             <CurrencySelector />
+            {isAuthenticated && <NotificationBell />}
+
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-2 text-gray-600 hover:text-blue-600 transition-colors focus:outline-none"
               aria-label="Toggle menu"
             >
-              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
             </button>
           </div>
         </div>
@@ -135,6 +154,7 @@ export default function Navbar() {
             >
               Why Stellar
             </Link>
+
             {isAuthenticated && (
               <Link
                 href="/dashboard"
@@ -144,9 +164,11 @@ export default function Navbar() {
                 Dashboard
               </Link>
             )}
+
             <div className="pt-2">
               <WalletButton />
             </div>
+
             {isAuthenticated && (
               <Button
                 variant="outline"
@@ -165,4 +187,4 @@ export default function Navbar() {
       </nav>
     </header>
   );
-}
+}
