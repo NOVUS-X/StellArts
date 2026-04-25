@@ -6,7 +6,8 @@ import {
   nativeToScVal, 
   Address,
   Asset,
-  Operation
+  Operation,
+  Transaction
 } from "@stellar/stellar-sdk";
 
 // These would normally be in a .env file
@@ -110,7 +111,7 @@ export async function prepareRelease(
  * @returns The transaction response
  */
 export async function submitTransaction(signedXdr: string): Promise<any> {
-  const tx = TransactionBuilder.fromEnvelope(signedXdr, NETWORK_PASSPHRASE);
+  const tx = new Transaction(signedXdr, NETWORK_PASSPHRASE);
   const sendResp = await rpcServer.sendTransaction(tx);
   
   if (sendResp.status === "ERROR") {
