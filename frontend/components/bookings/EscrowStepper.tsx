@@ -283,6 +283,7 @@ export default function EscrowStepper({
               onSuccess={handleReviewSuccess}
             />
           )}
+      </div>
 
       <ReleaseFundsModal
         isOpen={isReleaseModalOpen}

@@ -187,6 +187,7 @@ export default function ProfileEditPage() {
                   <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                     <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-50 shadow-sm bg-gray-100 flex items-center justify-center">
                       {avatarPreview ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
                         <img src={avatarPreview.startsWith("/") ? `${apiBaseUrl}${avatarPreview}` : avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                       ) : (
                         <div className="text-4xl font-bold text-gray-300">
