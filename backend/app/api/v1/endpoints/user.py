@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+import shutil
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_active_user, require_admin
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import UserOut
+from app.schemas.user import UserOut, UserUpdate
 
 router = APIRouter(prefix="/users")
 
@@ -12,6 +16,52 @@ router = APIRouter(prefix="/users")
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_active_user)):
     """Get current user profile"""
+    return current_user
+
+
+@router.put("/me", response_model=UserOut)
+def update_me(
+    user_in: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Update current user profile"""
+    update_data = user_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
+
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.post("/me/avatar", response_model=UserOut)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Upload user avatar"""
+    # Create directory if it doesn't exist
+    static_path = os.path.join(os.getcwd(), settings.STATIC_DIR)
+    avatars_path = os.path.join(static_path, settings.AVATARS_DIR)
+    if not os.path.exists(avatars_path):
+        os.makedirs(avatars_path)
+
+    # Save file
+    file_extension = file.filename.split(".")[-1]
+    file_name = f"user_{current_user.id}.{file_extension}"
+    file_path = os.path.join(avatars_path, file_name)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # Update user avatar URL
+    current_user.avatar = f"/{settings.STATIC_DIR}/{settings.AVATARS_DIR}/{file_name}"
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 
