@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import require_admin
 from app.db.session import get_db
+from app.models.booking import Booking, BookingStatus
 from app.models.dispute import Dispute, DisputeStatus
 from app.models.payment import Payment, PaymentStatus
-from app.models.booking import Booking, BookingStatus
 from app.models.user import User
 from app.schemas.dispute import DisputeResolve, DisputeResponse
 
