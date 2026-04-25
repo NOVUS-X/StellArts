@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import React from "react";
 import { BookingCard, type BookingProps } from "./BookingCard";
 
 vi.mock("next/link", () => ({
@@ -10,6 +11,18 @@ vi.mock("next/link", () => ({
     children: React.ReactNode;
     href: string;
   }) => <a href={href}>{children}</a>,
+}));
+
+vi.mock("@/context/CurrencyContext", () => ({
+  useCurrency: () => ({
+    currency: "XLM",
+    setCurrency: vi.fn(),
+    rates: { XLM: 1 },
+    loading: false,
+    convert: (amount: number) => amount,
+    format: (amount: number) => `${amount} XLM`,
+  }),
+  CurrencyProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 const defaultDate = new Date("2026-02-15T10:00:00");

@@ -18,6 +18,9 @@ from app.models.booking import Booking
 from app.models.payment import Payment
 from app.models.review import Review
 from app.models.portfolio import PortfolioItem
+from app.models.store import Store
+from app.models.inventory_check_run import InventoryCheckRun
+from app.models.inventory_notification import InventoryNotification
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

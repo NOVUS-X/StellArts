@@ -47,6 +47,15 @@ async function request<T>(
 
 // --- Types (aligned with backend schemas) ---
 
+export interface BOMItem {
+  id: string;
+  part_name: string;
+  part_number: string | null;
+  quantity: number;
+  client_supplied: boolean;
+  client_supplied_at: string | null;
+}
+
 export interface UserOut {
   id: number;
   email: string;
@@ -228,6 +237,16 @@ export const api = {
       request<ArtisanItem>("/artisans/profile", {
         method: "PUT",
         body: JSON.stringify(body),
+        token,
+      }),
+  },
+  inventory: {
+    getBOMItems: (jobId: string, token: string) =>
+      request<BOMItem[]>(`/jobs/${jobId}/bom-items`, { method: "GET", token }),
+    updateSupplyOverride: (jobId: string, itemId: string, clientSupplied: boolean, token: string) =>
+      request<BOMItem>(`/jobs/${jobId}/bom-items/${itemId}/supply-override`, {
+        method: "PATCH",
+        body: JSON.stringify({ client_supplied: clientSupplied }),
         token,
       }),
   },
