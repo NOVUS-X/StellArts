@@ -115,7 +115,7 @@ export async function submitTransaction(signedXdr: string): Promise<any> {
   const sendResp = await rpcServer.sendTransaction(tx);
   
   if (sendResp.status === "ERROR") {
-    throw new Error(`Transaction submission failed: ${JSON.stringify(sendResp.errorResultXdr)}`);
+    throw new Error(`Transaction submission failed: ${JSON.stringify(sendResp.errorResult)}`);
   }
 
   // Poll for status
