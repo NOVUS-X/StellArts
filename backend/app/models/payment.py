@@ -13,6 +13,7 @@ class PaymentStatus(enum.Enum):
     RELEASED = "released"
     FAILED = "failed"
     REFUNDED = "refunded"
+    DISPUTED = "disputed"
 
 
 class Payment(Base):
