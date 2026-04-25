@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import require_admin
 from app.db.session import get_db
-from app.models.booking import Booking, BookingStatus
+from app.models.booking import BookingStatus
 from app.models.dispute import Dispute, DisputeStatus
-from app.models.payment import Payment, PaymentStatus
+from app.models.payment import PaymentStatus
 from app.models.user import User
 from app.schemas.dispute import DisputeResolve, DisputeResponse
 
@@ -209,8 +209,8 @@ def resolve_dispute(
 ):
     """
     Resolve a dispute by setting payout ratio and executing transfers - admin only.
-    
-    The payout_artisan_ratio determines how much of the escrowed funds 
+
+    The payout_artisan_ratio determines how much of the escrowed funds
     go to the artisan. The remainder goes back to the client.
     """
     dispute = db.query(Dispute).filter(Dispute.id == dispute_id).first()
@@ -235,10 +235,9 @@ def resolve_dispute(
     # Update related records
     payment = dispute.payment
     booking = dispute.booking
-    
     # In a real scenario, we would trigger the Stellar/Soroban transfers here.
     # For now, we update the statuses to reflect resolution.
-    
+
     payment.status = PaymentStatus.RELEASED if resolution.payout_artisan_ratio > 0 else PaymentStatus.REFUNDED
     booking.status = BookingStatus.COMPLETED if resolution.payout_artisan_ratio > 0.5 else BookingStatus.CANCELLED
 
