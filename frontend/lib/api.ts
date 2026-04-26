@@ -128,6 +128,49 @@ export interface BookingResponse {
   notes: string | null;
   created_at: string;
   updated_at: string | null;
+  artisan_name?: string;
+  client_name?: string;
+}
+
+export interface PaymentPrepareRequest {
+  booking_id: string;
+  amount: number;
+  client_public: string;
+  asset_code?: string;
+  asset_issuer?: string | null;
+}
+
+export interface PaymentSubmitRequest {
+  signed_xdr: string;
+}
+
+export interface PaymentReleaseRequest {
+  booking_id: string;
+  artisan_public: string;
+  amount: number;
+}
+
+export interface PaymentRefundRequest {
+  booking_id: string;
+  client_public: string;
+  amount: number;
+}
+
+export interface PaymentOut {
+  id: string;
+  booking_id: string;
+  amount: number;
+  transaction_hash: string | null;
+  status: string;
+  created_at: string;
+  service_name?: string;
+}
+
+export interface PaymentResponse {
+  status: string;
+  message: string;
+  transaction_hash?: string;
+  xdr?: string;
 }
 
 export interface NotificationItem {
@@ -241,6 +284,46 @@ export const api = {
       request<BookingResponse>("/bookings/create", {
         method: "POST",
         body: JSON.stringify(body),
+        token,
+      }),
+    updateStatus: (bookingId: string, status: string, token: string) =>
+      request<{ message: string; status: string }>(
+        `/bookings/${bookingId}/status`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ status }),
+          token,
+        },
+      ),
+  },
+  payments: {
+    prepare: (body: PaymentPrepareRequest, token: string) =>
+      request<PaymentResponse>("/payments/prepare", {
+        method: "POST",
+        body: JSON.stringify(body),
+        token,
+      }),
+    submit: (body: PaymentSubmitRequest, token: string) =>
+      request<PaymentResponse>("/payments/submit", {
+        method: "POST",
+        body: JSON.stringify(body),
+        token,
+      }),
+    release: (body: PaymentReleaseRequest, token: string) =>
+      request<PaymentResponse>("/payments/release", {
+        method: "POST",
+        body: JSON.stringify(body),
+        token,
+      }),
+    refund: (body: PaymentRefundRequest, token: string) =>
+      request<PaymentResponse>("/payments/refund", {
+        method: "POST",
+        body: JSON.stringify(body),
+        token,
+      }),
+    myPayments: (token: string) =>
+      request<PaymentOut[]>("/payments/my-payments", {
+        method: "GET",
         token,
       }),
   },
