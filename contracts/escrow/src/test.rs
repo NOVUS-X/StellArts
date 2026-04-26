@@ -81,6 +81,8 @@ mod happy_path_tests {
                 &self.token_address,
                 &amount,
                 &deadline,
+                &soroban_sdk::vec![&self.env],
+                &0u32,
             )
         }
 
@@ -401,6 +403,8 @@ mod happy_path_tests {
             &ctx.token_address,
             &amount,
             &deadline,
+            &soroban_sdk::vec![&ctx.env],
+            &0u32,
         );
 
         // fund and deposit before the deadline
@@ -895,6 +899,8 @@ mod happy_path_tests {
             &ctx.token_address,
             &amount,
             &deadline,
+            &soroban_sdk::vec![&ctx.env],
+            &0u32,
         );
 
         ctx.mint_tokens(&client, amount);
@@ -924,6 +930,8 @@ mod happy_path_tests {
             &ctx.token_address,
             &amount,
             &deadline,
+            &soroban_sdk::vec![&ctx.env],
+            &0u32,
         );
 
         ctx.mint_tokens(&client, amount);
@@ -958,6 +966,8 @@ mod happy_path_tests {
             &ctx.token_address,
             &amount,
             &deadline,
+            &soroban_sdk::vec![&ctx.env],
+            &0u32,
         );
 
         ctx.mint_tokens(&client, amount);
@@ -1014,5 +1024,728 @@ mod happy_path_tests {
             .approve_early_reclaim(&engagement_id, &client);
         ctx.client_contract
             .approve_early_reclaim(&engagement_id, &client);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Issue #217 – TTL snapshot tests using jump_ledgers
+// ─────────────────────────────────────────────────────────────────────────────
+#[cfg(test)]
+mod ttl_snapshot_tests {
+    use crate::{DataKey, EscrowContract, EscrowContractClient, Status};
+    use soroban_sdk::testutils::{Address as AddressTestUtils, Ledger, LedgerInfo};
+    use soroban_sdk::{token, Address, Env};
+
+    const DAY_LEDGERS: u32 = 17_280; // ~1 day at 5 s/ledger
+    #[allow(dead_code)]
+    const LEDGERS_PER_SECOND: u32 = 1; // 1 ledger ≈ 5 s; we use 1 for simplicity
+    #[allow(dead_code)]
+    const ESCROW_TTL: u32 = 1_036_800; // ~60 days
+
+    struct TtlCtx {
+        env: Env,
+        contract_id: Address,
+        token_address: Address,
+        client: EscrowContractClient<'static>,
+        token_client: token::Client<'static>,
+        token_asset_client: token::StellarAssetClient<'static>,
+    }
+
+    impl TtlCtx {
+        fn new() -> Self {
+            let env = Env::default();
+            env.mock_all_auths_allowing_non_root_auth();
+            let contract_id = env.register_contract(None, EscrowContract);
+            let token_admin = Address::generate(&env);
+            let token_contract = env.register_stellar_asset_contract_v2(token_admin);
+            let token_address = token_contract.address();
+            let client = EscrowContractClient::new(&env, &contract_id);
+            let token_client = token::Client::new(&env, &token_address);
+            let token_asset_client = token::StellarAssetClient::new(&env, &token_address);
+            TtlCtx {
+                env,
+                contract_id,
+                token_address,
+                client,
+                token_client,
+                token_asset_client,
+            }
+        }
+
+        /// Advance the ledger by `ledgers` ledgers, updating both sequence and timestamp.
+        /// Extends both contract instance TTLs before the jump so they are not archived.
+        fn jump_ledgers(&self, ledgers: u32) {
+            let ttl = ledgers + 1_036_800;
+            // Extend escrow contract instance TTL before advancing.
+            self.env.as_contract(&self.contract_id, || {
+                self.env.storage().instance().extend_ttl(ttl, ttl);
+            });
+            // Extend token contract instance TTL before advancing.
+            self.env.as_contract(&self.token_address, || {
+                self.env.storage().instance().extend_ttl(ttl, ttl);
+            });
+            let current = self.env.ledger().get();
+            self.env.ledger().set(LedgerInfo {
+                sequence_number: current.sequence_number + ledgers,
+                timestamp: current.timestamp + (ledgers as u64) * 5,
+                ..current
+            });
+        }
+
+        fn initialize_and_fund(&self, amount: i128) -> (u64, Address, Address) {
+            let client_addr = Address::generate(&self.env);
+            let artisan_addr = Address::generate(&self.env);
+            let arbitrator = Address::generate(&self.env);
+            let deadline = self.env.ledger().timestamp() + 86400 * 90; // 90 days
+            let id = self.client.initialize(
+                &client_addr,
+                &artisan_addr,
+                &arbitrator,
+                &self.token_address,
+                &amount,
+                &deadline,
+                &soroban_sdk::vec![&self.env],
+                &0u32,
+            );
+            self.token_asset_client.mint(&client_addr, &amount);
+            self.client.deposit(&id, &self.token_address);
+            (id, client_addr, artisan_addr)
+        }
+    }
+
+    /// TTL-1: Record persists after simulating 30+ days of ledger advancement.
+    #[test]
+    fn test_ttl_record_persists_after_30_days() {
+        let ctx = TtlCtx::new();
+        let (id, _, _) = ctx.initialize_and_fund(1_000);
+
+        // Advance ~30 days (30 * DAY_LEDGERS)
+        ctx.jump_ledgers(30 * DAY_LEDGERS);
+
+        // Escrow record must still be readable
+        let escrow: crate::Escrow = ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .expect("Escrow should still exist after 30 days")
+        });
+        assert_eq!(escrow.status, Status::Funded);
+    }
+
+    /// TTL-2: TTL extends on deposit state transition.
+    #[test]
+    fn test_ttl_extends_on_deposit() {
+        let ctx = TtlCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let deadline = ctx.env.ledger().timestamp() + 86400 * 90;
+        let id = ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &1_000i128,
+            &deadline,
+            &soroban_sdk::vec![&ctx.env],
+            &0u32,
+        );
+
+        // Advance a few days before depositing
+        ctx.jump_ledgers(5 * DAY_LEDGERS);
+
+        ctx.token_asset_client.mint(&client_addr, &1_000i128);
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        // After deposit the TTL should have been refreshed; advance another 30 days
+        ctx.jump_ledgers(30 * DAY_LEDGERS);
+
+        let escrow: crate::Escrow = ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .expect("Escrow should persist after TTL extension on deposit")
+        });
+        assert_eq!(escrow.status, Status::Funded);
+    }
+
+    /// TTL-3: TTL extends on release state transition.
+    #[test]
+    fn test_ttl_extends_on_release() {
+        let ctx = TtlCtx::new();
+        let (id, _, artisan_addr) = ctx.initialize_and_fund(2_000);
+
+        // Advance 10 days, then release
+        ctx.jump_ledgers(10 * DAY_LEDGERS);
+        ctx.client.release(&id, &ctx.token_address);
+
+        // Advance another 30 days – record should still be readable (Released status)
+        ctx.jump_ledgers(30 * DAY_LEDGERS);
+
+        let escrow: crate::Escrow = ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .expect("Released escrow should persist after TTL extension")
+        });
+        assert_eq!(escrow.status, Status::Released);
+        assert_eq!(ctx.token_client.balance(&artisan_addr), 2_000);
+    }
+
+    /// TTL-4: TTL extends on reclaim (Refunded) state transition.
+    #[test]
+    fn test_ttl_extends_on_reclaim() {
+        let ctx = TtlCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let deadline = ctx.env.ledger().timestamp() + 10;
+        let id = ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &500i128,
+            &deadline,
+            &soroban_sdk::vec![&ctx.env],
+            &0u32,
+        );
+        ctx.token_asset_client.mint(&client_addr, &500i128);
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        // Jump past deadline + grace period
+        ctx.jump_ledgers(20 * DAY_LEDGERS);
+        ctx.client.reclaim(&id, &ctx.token_address);
+
+        // Advance another 30 days – record should still be readable
+        ctx.jump_ledgers(30 * DAY_LEDGERS);
+
+        let escrow: crate::Escrow = ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .expect("Refunded escrow should persist after TTL extension")
+        });
+        assert_eq!(escrow.status, Status::Refunded);
+    }
+
+    /// TTL-5: TTL extends on dispute state transition.
+    #[test]
+    fn test_ttl_extends_on_dispute() {
+        let ctx = TtlCtx::new();
+        let (id, client_addr, _) = ctx.initialize_and_fund(3_000);
+
+        ctx.jump_ledgers(5 * DAY_LEDGERS);
+        ctx.client.dispute(&id, &client_addr);
+
+        ctx.jump_ledgers(30 * DAY_LEDGERS);
+
+        let escrow: crate::Escrow = ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .expect("Disputed escrow should persist after TTL extension")
+        });
+        assert_eq!(escrow.status, Status::Disputed);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Issue #211 – Multi-sig support tests
+// ─────────────────────────────────────────────────────────────────────────────
+#[cfg(test)]
+mod multisig_tests {
+    use crate::{DataKey, EscrowContract, EscrowContractClient, Status};
+    use soroban_sdk::testutils::Address as AddressTestUtils;
+    use soroban_sdk::{token, vec, Address, Env};
+
+    struct MsCtx {
+        env: Env,
+        contract_id: Address,
+        token_address: Address,
+        client: EscrowContractClient<'static>,
+        token_client: token::Client<'static>,
+        token_asset_client: token::StellarAssetClient<'static>,
+    }
+
+    impl MsCtx {
+        fn new() -> Self {
+            let env = Env::default();
+            env.mock_all_auths_allowing_non_root_auth();
+            let contract_id = env.register_contract(None, EscrowContract);
+            let token_admin = Address::generate(&env);
+            let tc = env.register_stellar_asset_contract_v2(token_admin);
+            let token_address = tc.address();
+            let client = EscrowContractClient::new(&env, &contract_id);
+            let token_client = token::Client::new(&env, &token_address);
+            let token_asset_client = token::StellarAssetClient::new(&env, &token_address);
+            MsCtx {
+                env,
+                contract_id,
+                token_address,
+                client,
+                token_client,
+                token_asset_client,
+            }
+        }
+    }
+
+    /// MS-1: Single-sig escrow (no multisig) still works as before.
+    #[test]
+    fn test_single_sig_release_unchanged() {
+        let ctx = MsCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let amount = 1_000i128;
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+
+        let id = ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &amount,
+            &deadline,
+            &vec![&ctx.env], // empty → no multisig
+            &0u32,
+        );
+        ctx.token_asset_client.mint(&client_addr, &amount);
+        ctx.client.deposit(&id, &ctx.token_address);
+        ctx.client.release(&id, &ctx.token_address);
+
+        let escrow: crate::Escrow = ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .unwrap()
+        });
+        assert_eq!(escrow.status, Status::Released);
+        assert_eq!(ctx.token_client.balance(&artisan_addr), amount);
+    }
+
+    /// MS-2: Multi-sig release succeeds when threshold is met (2-of-2).
+    #[test]
+    fn test_multisig_release_succeeds_when_threshold_met() {
+        let ctx = MsCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let signer1 = Address::generate(&ctx.env);
+        let signer2 = Address::generate(&ctx.env);
+        let amount = 5_000i128;
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+
+        let signers = vec![&ctx.env, signer1.clone(), signer2.clone()];
+        let id = ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &amount,
+            &deadline,
+            &signers,
+            &2u32, // 2-of-2
+        );
+        ctx.token_asset_client.mint(&client_addr, &amount);
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        // Both signers approve
+        ctx.client.multisig_approve(&id, &signer1);
+        ctx.client.multisig_approve(&id, &signer2);
+
+        // Release should now succeed
+        ctx.client.release(&id, &ctx.token_address);
+
+        let escrow: crate::Escrow = ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .unwrap()
+        });
+        assert_eq!(escrow.status, Status::Released);
+        assert_eq!(ctx.token_client.balance(&artisan_addr), amount);
+    }
+
+    /// MS-3: Release fails when multi-sig threshold is not yet met.
+    #[test]
+    #[should_panic(expected = "Multi-sig threshold not met")]
+    fn test_multisig_release_fails_without_approvals() {
+        let ctx = MsCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let signer1 = Address::generate(&ctx.env);
+        let signer2 = Address::generate(&ctx.env);
+        let amount = 5_000i128;
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+
+        let signers = vec![&ctx.env, signer1.clone(), signer2.clone()];
+        let id = ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &amount,
+            &deadline,
+            &signers,
+            &2u32,
+        );
+        ctx.token_asset_client.mint(&client_addr, &amount);
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        // Only one signer approves – threshold not met
+        ctx.client.multisig_approve(&id, &signer1);
+
+        // Should panic
+        ctx.client.release(&id, &ctx.token_address);
+    }
+
+    /// MS-4: 1-of-2 threshold – release succeeds after only one approval.
+    #[test]
+    fn test_multisig_1_of_2_threshold() {
+        let ctx = MsCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let signer1 = Address::generate(&ctx.env);
+        let signer2 = Address::generate(&ctx.env);
+        let amount = 2_000i128;
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+
+        let signers = vec![&ctx.env, signer1.clone(), signer2.clone()];
+        let id = ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &amount,
+            &deadline,
+            &signers,
+            &1u32, // 1-of-2
+        );
+        ctx.token_asset_client.mint(&client_addr, &amount);
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        // Only signer1 approves
+        ctx.client.multisig_approve(&id, &signer1);
+        ctx.client.release(&id, &ctx.token_address);
+
+        assert_eq!(ctx.token_client.balance(&artisan_addr), amount);
+    }
+
+    /// MS-5: Unauthorized signer cannot approve.
+    #[test]
+    #[should_panic(expected = "Signer is not in the multi-sig required signers list")]
+    fn test_multisig_unauthorized_signer_rejected() {
+        let ctx = MsCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let signer1 = Address::generate(&ctx.env);
+        let unauthorized = Address::generate(&ctx.env);
+        let amount = 1_000i128;
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+
+        let signers = vec![&ctx.env, signer1.clone()];
+        let id = ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &amount,
+            &deadline,
+            &signers,
+            &1u32,
+        );
+        ctx.token_asset_client.mint(&client_addr, &amount);
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        // Unauthorized address tries to approve
+        ctx.client.multisig_approve(&id, &unauthorized);
+    }
+
+    /// MS-6: Same signer cannot approve twice.
+    #[test]
+    #[should_panic(expected = "Signer has already approved this escrow")]
+    fn test_multisig_duplicate_approval_rejected() {
+        let ctx = MsCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let signer1 = Address::generate(&ctx.env);
+        let amount = 1_000i128;
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+
+        let signers = vec![&ctx.env, signer1.clone()];
+        let id = ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &amount,
+            &deadline,
+            &signers,
+            &1u32,
+        );
+        ctx.token_asset_client.mint(&client_addr, &amount);
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        ctx.client.multisig_approve(&id, &signer1);
+        ctx.client.multisig_approve(&id, &signer1); // duplicate – should panic
+    }
+
+    /// MS-7: Invalid threshold (0) is rejected at initialization.
+    #[test]
+    #[should_panic(expected = "multisig_threshold must be between 1 and the number of signers")]
+    fn test_multisig_zero_threshold_rejected() {
+        let ctx = MsCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let signer1 = Address::generate(&ctx.env);
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+
+        let signers = vec![&ctx.env, signer1.clone()];
+        ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &1_000i128,
+            &deadline,
+            &signers,
+            &0u32, // invalid
+        );
+    }
+
+    /// MS-8: Threshold exceeding signer count is rejected.
+    #[test]
+    #[should_panic(expected = "multisig_threshold must be between 1 and the number of signers")]
+    fn test_multisig_threshold_exceeds_signers_rejected() {
+        let ctx = MsCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let signer1 = Address::generate(&ctx.env);
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+
+        let signers = vec![&ctx.env, signer1.clone()]; // 1 signer
+        ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &1_000i128,
+            &deadline,
+            &signers,
+            &3u32, // threshold > signers count
+        );
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Issue #212 – cleanup_expired tests
+// ─────────────────────────────────────────────────────────────────────────────
+#[cfg(test)]
+mod cleanup_tests {
+    use crate::{DataKey, EscrowContract, EscrowContractClient};
+    use soroban_sdk::testutils::{Address as AddressTestUtils, Events, Ledger};
+    use soroban_sdk::{token, vec, Address, Env, Vec};
+
+    struct CleanCtx {
+        env: Env,
+        contract_id: Address,
+        token_address: Address,
+        client: EscrowContractClient<'static>,
+        #[allow(dead_code)]
+        token_client: token::Client<'static>,
+        token_asset_client: token::StellarAssetClient<'static>,
+    }
+
+    impl CleanCtx {
+        fn new() -> Self {
+            let env = Env::default();
+            env.mock_all_auths_allowing_non_root_auth();
+            let contract_id = env.register_contract(None, EscrowContract);
+            let token_admin = Address::generate(&env);
+            let tc = env.register_stellar_asset_contract_v2(token_admin);
+            let token_address = tc.address();
+            let client = EscrowContractClient::new(&env, &contract_id);
+            let token_client = token::Client::new(&env, &token_address);
+            let token_asset_client = token::StellarAssetClient::new(&env, &token_address);
+            CleanCtx {
+                env,
+                contract_id,
+                token_address,
+                client,
+                token_client,
+                token_asset_client,
+            }
+        }
+
+        fn create_released_escrow(&self) -> (u64, Address) {
+            let client_addr = Address::generate(&self.env);
+            let artisan_addr = Address::generate(&self.env);
+            let arbitrator = Address::generate(&self.env);
+            let amount = 1_000i128;
+            let deadline = self.env.ledger().timestamp() + 86400;
+            let id = self.client.initialize(
+                &client_addr,
+                &artisan_addr,
+                &arbitrator,
+                &self.token_address,
+                &amount,
+                &deadline,
+                &vec![&self.env],
+                &0u32,
+            );
+            self.token_asset_client.mint(&client_addr, &amount);
+            self.client.deposit(&id, &self.token_address);
+            self.client.release(&id, &self.token_address);
+            (id, client_addr)
+        }
+
+        fn create_refunded_escrow(&self) -> (u64, Address) {
+            let client_addr = Address::generate(&self.env);
+            let artisan_addr = Address::generate(&self.env);
+            let arbitrator = Address::generate(&self.env);
+            let amount = 500i128;
+            let deadline = self.env.ledger().timestamp() + 10;
+            let id = self.client.initialize(
+                &client_addr,
+                &artisan_addr,
+                &arbitrator,
+                &self.token_address,
+                &amount,
+                &deadline,
+                &vec![&self.env],
+                &0u32,
+            );
+            self.token_asset_client.mint(&client_addr, &amount);
+            self.client.deposit(&id, &self.token_address);
+            // Jump past deadline + grace period
+            let current = self.env.ledger().get();
+            self.env.ledger().set(soroban_sdk::testutils::LedgerInfo {
+                timestamp: deadline + 86400 + 1,
+                ..current
+            });
+            self.client.reclaim(&id, &self.token_address);
+            (id, client_addr)
+        }
+    }
+
+    /// CL-1: cleanup_expired removes a Released escrow from storage.
+    #[test]
+    fn test_cleanup_removes_released_escrow() {
+        let ctx = CleanCtx::new();
+        let (id, _client_addr) = ctx.create_released_escrow();
+
+        // Verify it exists
+        assert!(ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env.storage().persistent().has(&DataKey::Escrow(id))
+        }));
+
+        let ids: Vec<u64> = vec![&ctx.env, id];
+        ctx.client.cleanup_expired(&ids);
+
+        // Verify it was removed
+        assert!(!ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env.storage().persistent().has(&DataKey::Escrow(id))
+        }));
+    }
+
+    /// CL-2: cleanup_expired removes a Refunded escrow from storage.
+    #[test]
+    fn test_cleanup_removes_refunded_escrow() {
+        let ctx = CleanCtx::new();
+        let (id, _) = ctx.create_refunded_escrow();
+
+        assert!(ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env.storage().persistent().has(&DataKey::Escrow(id))
+        }));
+
+        let ids: Vec<u64> = vec![&ctx.env, id];
+        ctx.client.cleanup_expired(&ids);
+
+        assert!(!ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env.storage().persistent().has(&DataKey::Escrow(id))
+        }));
+    }
+
+    /// CL-3: cleanup_expired emits a cleanup event for each removed escrow.
+    #[test]
+    fn test_cleanup_emits_event() {
+        let ctx = CleanCtx::new();
+        let (id, _) = ctx.create_released_escrow();
+
+        let ids: Vec<u64> = vec![&ctx.env, id];
+        ctx.client.cleanup_expired(&ids);
+
+        let raw_events: soroban_sdk::Vec<(
+            Address,
+            soroban_sdk::Vec<soroban_sdk::Val>,
+            soroban_sdk::Val,
+        )> = ctx.env.events().all();
+        let mut found = false;
+        for (addr, _, _) in raw_events.into_iter() {
+            if addr == ctx.contract_id {
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "expected a cleanup event from the escrow contract");
+    }
+
+    /// CL-4: cleanup_expired on a Funded escrow panics.
+    #[test]
+    #[should_panic(expected = "is not in a finalized state")]
+    fn test_cleanup_funded_escrow_panics() {
+        let ctx = CleanCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let amount = 1_000i128;
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+        let id = ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &amount,
+            &deadline,
+            &vec![&ctx.env],
+            &0u32,
+        );
+        ctx.token_asset_client.mint(&client_addr, &amount);
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        let ids: Vec<u64> = vec![&ctx.env, id];
+        ctx.client.cleanup_expired(&ids);
+    }
+
+    /// CL-5: cleanup_expired on multiple finalized escrows in one call.
+    #[test]
+    fn test_cleanup_multiple_escrows() {
+        let ctx = CleanCtx::new();
+        let (id1, _) = ctx.create_released_escrow();
+        let (id2, _) = ctx.create_refunded_escrow();
+
+        let ids: Vec<u64> = vec![&ctx.env, id1, id2];
+        ctx.client.cleanup_expired(&ids);
+
+        assert!(!ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env.storage().persistent().has(&DataKey::Escrow(id1))
+        }));
+        assert!(!ctx.env.as_contract(&ctx.contract_id, || {
+            ctx.env.storage().persistent().has(&DataKey::Escrow(id2))
+        }));
     }
 }

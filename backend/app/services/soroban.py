@@ -2,6 +2,7 @@
 Soroban smart contract integration for StellArts.
 Handles all interactions with Soroban contracts on the Stellar network.
 """
+
 import logging
 import time
 from typing import Any
