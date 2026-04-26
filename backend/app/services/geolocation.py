@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import re
 from decimal import Decimal
 from urllib.parse import quote
 
@@ -21,9 +22,39 @@ class GeolocationService:
         """
         Convert address to coordinates using OpenStreetMap Nominatim API
         (Free alternative to Google Maps API)
+        With sanitization and caching.
         """
+        if not address or not isinstance(address, str):
+            return None
+
+        # 1. Sanitization & Normalization
+        sanitized_address = address.strip()
+        # Remove any suspicious characters but allow common address characters
+        sanitized_address = re.sub(r"[^\w\s,.-]", "", sanitized_address)
+        # Normalize whitespace
+        sanitized_address = re.sub(r"\s+", " ", sanitized_address)
+
+        if len(sanitized_address) < 3 or len(sanitized_address) > 255:
+            return None
+
+        # Check if it's just numbers
+        if sanitized_address.replace(" ", "").replace(",", "").replace(".", "").isdigit():
+            return None
+
+        # 2. Cache Lookup
+        normalized_address = sanitized_address.lower()
+        cache_key = f"geocode:{normalized_address}"
+
         try:
-            encoded_address = quote(address)
+            cached_result = await cache.get(cache_key)
+            if cached_result:
+                return GeolocationResponse(**cached_result)
+        except Exception as e:
+            print(f"Cache lookup error: {e}")
+
+        # 3. External API Call
+        try:
+            encoded_address = quote(sanitized_address)
             url = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded_address}&limit=1"
 
             async with aiohttp.ClientSession() as session:
@@ -35,12 +66,28 @@ class GeolocationService:
                         data = await response.json()
                         if data:
                             result = data[0]
-                            return GeolocationResponse(
+                            geo_response = GeolocationResponse(
                                 latitude=Decimal(str(result["lat"])),
                                 longitude=Decimal(str(result["lon"])),
-                                formatted_address=result.get("display_name", address),
+                                formatted_address=result.get("display_name", sanitized_address),
                                 confidence=float(result.get("importance", 0.5)),
                             )
+
+                            # 4. Store in Cache (24h TTL)
+                            try:
+                                # GeolocationResponse is a Pydantic model, convert to dict for storage
+                                # Note: Decimal needs to be stringified for JSON storage in RedisClient
+                                cache_data = {
+                                    "latitude": str(geo_response.latitude),
+                                    "longitude": str(geo_response.longitude),
+                                    "formatted_address": geo_response.formatted_address,
+                                    "confidence": geo_response.confidence,
+                                }
+                                await cache.set(cache_key, cache_data, expire=86400)
+                            except Exception as e:
+                                print(f"Error caching geocode result: {e}")
+
+                            return geo_response
             return None
         except Exception as e:
             print(f"Geocoding error: {e}")
