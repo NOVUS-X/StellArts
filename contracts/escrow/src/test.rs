@@ -13,6 +13,8 @@ mod happy_path_tests {
         contract_id: Address,
         token_address: Address,
         default_arbitrator: Address,
+        admin: Address,
+        dao: Address,
         client_contract: EscrowContractClient<'static>,
         token_client: token::Client<'static>,
         token_contract_client: token::StellarAssetClient<'static>,
@@ -28,16 +30,22 @@ mod happy_path_tests {
             let token_contract = env.register_stellar_asset_contract_v2(token_admin);
             let token_address = token_contract.address();
             let default_arbitrator = Address::generate(&env);
+            let admin = Address::generate(&env);
+            let dao = Address::generate(&env);
 
             let client_contract = EscrowContractClient::new(&env, &contract_id);
             let token_client = token::Client::new(&env, &token_address);
             let token_contract_client = token::StellarAssetClient::new(&env, &token_address);
+            
+            client_contract.init_contract(&admin, &dao, &0);
 
             TestContext {
                 env,
                 contract_id,
                 token_address,
                 default_arbitrator,
+                admin,
+                dao,
                 client_contract,
                 token_client,
                 token_contract_client,
@@ -1009,10 +1017,105 @@ mod happy_path_tests {
 
         let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
 
-        // Client approves twice
         ctx.client_contract
             .approve_early_reclaim(&engagement_id, &client);
         ctx.client_contract
             .approve_early_reclaim(&engagement_id, &client);
+    }
+
+    /// Test 31: Double initialization fails
+    #[test]
+    #[should_panic(expected = "Contract already initialized")]
+    fn test_init_contract_already_initialized_fails() {
+        let ctx = TestContext::new(); // already initializes
+        let admin = Address::generate(&ctx.env);
+        let dao = Address::generate(&ctx.env);
+        ctx.client_contract.init_contract(&admin, &dao, &100);
+    }
+
+    /// Test 32: Initialization with fee > 10% fails
+    #[test]
+    #[should_panic(expected = "Fee cannot exceed 10% (1000 bps)")]
+    fn test_init_contract_fee_too_high_fails() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, EscrowContract);
+        let client_contract = EscrowContractClient::new(&env, &contract_id);
+        let admin = Address::generate(&env);
+        let dao = Address::generate(&env);
+        client_contract.init_contract(&admin, &dao, &1001);
+    }
+
+    /// Test 33: Set fee with admin
+    #[test]
+    fn test_set_fee_success() {
+        let ctx = TestContext::new();
+        ctx.client_contract.set_fee(&ctx.admin, &500); // 5%
+    }
+
+    /// Test 34: Set fee unauthorized
+    #[test]
+    #[should_panic(expected = "Unauthorized: caller is not admin")]
+    fn test_set_fee_unauthorized_fails() {
+        let ctx = TestContext::new();
+        let fake_admin = Address::generate(&ctx.env);
+        ctx.client_contract.set_fee(&fake_admin, &500);
+    }
+
+    /// Test 35: Set fee too high
+    #[test]
+    #[should_panic(expected = "Fee cannot exceed 10% (1000 bps)")]
+    fn test_set_fee_too_high_fails() {
+        let ctx = TestContext::new();
+        ctx.client_contract.set_fee(&ctx.admin, &1001);
+    }
+
+    /// Test 36: Release with fee deduction
+    #[test]
+    fn test_release_with_fee_deduction() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5000;
+
+        // Set fee to 100 bps (1%)
+        ctx.client_contract.set_fee(&ctx.admin, &100);
+
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        let dao_balance_before = ctx.token_client.balance(&ctx.dao);
+        let artisan_balance_before = ctx.token_client.balance(&artisan);
+
+        ctx.release_funds(engagement_id);
+
+        let expected_fee = 50; // 1% of 5000
+        let expected_artisan_amount = 4950;
+
+        assert_eq!(ctx.token_client.balance(&ctx.dao), dao_balance_before + expected_fee);
+        assert_eq!(ctx.token_client.balance(&artisan), artisan_balance_before + expected_artisan_amount);
+    }
+
+    /// Test 37: Release with fee rounding edge case
+    #[test]
+    fn test_release_with_fee_rounding_edge_case() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let amount: i128 = 5099;
+
+        // Set fee to 100 bps (1%)
+        ctx.client_contract.set_fee(&ctx.admin, &100);
+
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+
+        let dao_balance_before = ctx.token_client.balance(&ctx.dao);
+        let artisan_balance_before = ctx.token_client.balance(&artisan);
+
+        ctx.release_funds(engagement_id);
+
+        // 5099 * 100 = 509900
+        // 509900 / 10000 = 50 (integer division floors it)
+        let expected_fee = 50;
+        let expected_artisan_amount = 5049;
+
+        assert_eq!(ctx.token_client.balance(&ctx.dao), dao_balance_before + expected_fee);
+        assert_eq!(ctx.token_client.balance(&artisan), artisan_balance_before + expected_artisan_amount);
     }
 }
