@@ -81,10 +81,12 @@ async def get_nearby_artisans(
     radius_km: float = Query(
         25.0, ge=0, le=200, description="Search radius in kilometers"
     ),
-    skill: str
-    | None = Query(None, description="Filter by skill keyword (e.g., plumber)"),
-    min_rating: float
-    | None = Query(None, ge=0, le=5, description="Minimum average rating"),
+    skill: str | None = Query(
+        None, description="Filter by skill keyword (e.g., plumber)"
+    ),
+    min_rating: float | None = Query(
+        None, ge=0, le=5, description="Minimum average rating"
+    ),
     available: bool | None = Query(None, description="Filter by current availability"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
@@ -259,7 +261,6 @@ def get_my_portfolio(
     db: Session = Depends(get_db), current_user: User = Depends(require_artisan)
 ):
     """Get current artisan's portfolio items."""
-    from app.schemas.portfolio import PortfolioItemOut
 
     service = ArtisanService(db)
     artisan = service.get_artisan_by_user_id(current_user.id)
@@ -276,7 +277,13 @@ def get_my_portfolio(
         "artisan_id": artisan.id,
         "artisan_name": current_user.full_name,
         "portfolio_items": [
-            {"id": p.id, "artisan_id": p.artisan_id, "title": p.title, "image": p.image, "created_at": p.created_at}
+            {
+                "id": p.id,
+                "artisan_id": p.artisan_id,
+                "title": p.title,
+                "image": p.image,
+                "created_at": p.created_at,
+            }
             for p in items
         ],
     }

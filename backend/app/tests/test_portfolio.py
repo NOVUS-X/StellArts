@@ -12,8 +12,6 @@ Tests cover:
 from __future__ import annotations
 
 import io
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -63,7 +61,9 @@ def _register_and_login(client) -> dict:
     return headers
 
 
-def _add_item(client, headers, title="My Work", image_url="https://example.com/img.jpg"):
+def _add_item(
+    client, headers, title="My Work", image_url="https://example.com/img.jpg"
+):
     """Helper: add a portfolio item and return the response."""
     return client.post(
         "api/v1/artisans/portfolio/add",
@@ -113,7 +113,9 @@ def test_add_portfolio_item(client):
 def test_add_portfolio_item_appears_in_list(client):
     """Added item shows up in GET /my-portfolio."""
     headers = _register_and_login(client)
-    _add_item(client, headers, title="Tile Work", image_url="https://cdn.example.com/tile.jpg")
+    _add_item(
+        client, headers, title="Tile Work", image_url="https://cdn.example.com/tile.jpg"
+    )
 
     resp = client.get("api/v1/artisans/my-portfolio", headers=headers)
     assert resp.status_code == 200
@@ -138,7 +140,9 @@ def test_add_multiple_portfolio_items(client):
     """Multiple items can be added and all appear in the list."""
     headers = _register_and_login(client)
     for i in range(3):
-        _add_item(client, headers, title=f"Item {i}", image_url=f"https://example.com/{i}.jpg")
+        _add_item(
+            client, headers, title=f"Item {i}", image_url=f"https://example.com/{i}.jpg"
+        )
 
     resp = client.get("api/v1/artisans/my-portfolio", headers=headers)
     assert resp.status_code == 200
@@ -243,8 +247,12 @@ def test_delete_portfolio_item_requires_auth(client):
 def test_delete_removes_only_target_item(client):
     """Deleting one item does not affect other items."""
     headers = _register_and_login(client)
-    id1 = _add_item(client, headers, title="Keep", image_url="https://example.com/keep.jpg").json()["id"]
-    id2 = _add_item(client, headers, title="Remove", image_url="https://example.com/remove.jpg").json()["id"]
+    id1 = _add_item(
+        client, headers, title="Keep", image_url="https://example.com/keep.jpg"
+    ).json()["id"]
+    id2 = _add_item(
+        client, headers, title="Remove", image_url="https://example.com/remove.jpg"
+    ).json()["id"]
 
     client.delete(f"api/v1/artisans/portfolio/{id2}", headers=headers)
 
