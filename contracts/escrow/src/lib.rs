@@ -181,10 +181,9 @@ impl EscrowContract {
         // Multi-sig validation
         let multisig: Option<MultiSigConfig> = if multisig_signers.is_empty() {
             None
+        } else if multisig_threshold == 0 || multisig_threshold > multisig_signers.len() as u32 {
+            panic!("multisig_threshold must be between 1 and the number of signers");
         } else {
-            if multisig_threshold == 0 || multisig_threshold > multisig_signers.len() as u32 {
-                panic!("multisig_threshold must be between 1 and the number of signers");
-            }
             Some(MultiSigConfig {
                 required_signers: multisig_signers,
                 threshold: multisig_threshold,
@@ -1028,6 +1027,8 @@ mod test_legacy {
             amount: escrow_amount,
             status: Status::Pending,
             deadline,
+        
+            multisig: None,
         };
 
         // Store the escrow in contract storage
@@ -1097,6 +1098,8 @@ mod test_legacy {
             amount: escrow_amount,
             status: Status::Pending,
             deadline,
+        
+            multisig: None,
         };
 
         env.as_contract(&contract_id, || {
@@ -1149,6 +1152,8 @@ mod test_legacy {
             amount: escrow_amount,
             status: Status::Funded, // Already funded
             deadline,
+        
+            multisig: None,
         };
 
         // Store the escrow
@@ -1205,6 +1210,8 @@ mod test_legacy {
             amount: 500,
             status: Status::Pending,
             deadline: env.ledger().timestamp().saturating_sub(1),
+        
+            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1249,6 +1256,8 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
+        
+            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1287,6 +1296,8 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
+        
+            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1333,6 +1344,8 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
+        
+            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1400,6 +1413,8 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
+        
+            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1452,6 +1467,8 @@ mod test_legacy {
             amount,
             status: Status::Pending,
             deadline,
+        
+            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1494,6 +1511,8 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
+        
+            multisig: None,
         };
 
         env.as_contract(&contract_id, || {
@@ -1545,6 +1564,8 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
+        
+            multisig: None,
         };
 
         // Store the escrow
@@ -1593,6 +1614,8 @@ mod test_legacy {
             amount,
             status: Status::Pending,
             deadline,
+        
+            multisig: None,
         };
 
         env.as_contract(&contract_id, || {
@@ -1635,6 +1658,8 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
+        
+            multisig: None,
         };
 
         env.as_contract(&contract_id, || {
