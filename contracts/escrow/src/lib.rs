@@ -39,8 +39,6 @@ pub struct Escrow {
     pub amount: i128,
     pub status: Status,
     pub deadline: u64,
-    /// Optional multi-sig configuration. `None` means single-sig (default behaviour).
-    pub multisig: Option<MultiSigConfig>,
 }
 
 #[contracttype]
@@ -74,6 +72,7 @@ pub enum DataKey {
     Escrow(u64),
     DeadlineExtension(u64),
     EarlyReclaim(u64),
+    MultiSigConfig(u64),
     MultiSigApprovals(u64),
     NextId,
     Oracle,
@@ -153,6 +152,7 @@ impl EscrowContract {
     /// enable multi-sig release for high-value jobs.  When multi-sig is enabled,
     /// `release` will require that at least `multisig_threshold` of the listed
     /// signers have called `multisig_approve` before funds are transferred.
+    #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         env: Env,
         client: Address,
@@ -181,7 +181,7 @@ impl EscrowContract {
         // Multi-sig validation
         let multisig: Option<MultiSigConfig> = if multisig_signers.is_empty() {
             None
-        } else if multisig_threshold == 0 || multisig_threshold > multisig_signers.len() as u32 {
+        } else if multisig_threshold == 0 || multisig_threshold > multisig_signers.len() {
             panic!("multisig_threshold must be between 1 and the number of signers");
         } else {
             Some(MultiSigConfig {
@@ -197,6 +197,15 @@ impl EscrowContract {
             .persistent()
             .set(&id_key, &(engagement_id + 1));
 
+        // Store multi-sig config separately (Option<contracttype> is not supported by #[contracttype])
+        if let Some(ref cfg) = multisig {
+            let cfg_key = DataKey::MultiSigConfig(engagement_id);
+            env.storage().persistent().set(&cfg_key, cfg);
+            env.storage()
+                .persistent()
+                .extend_ttl(&cfg_key, TTL_THRESHOLD, ESCROW_TTL);
+        }
+
         // Create the escrow record
         let escrow = Escrow {
             client: client.clone(),
@@ -206,7 +215,6 @@ impl EscrowContract {
             amount,
             status: Status::Pending,
             deadline,
-            multisig,
         };
 
         // Store the escrow record
@@ -328,7 +336,12 @@ impl EscrowContract {
         }
 
         // Multi-sig check: if configured, verify threshold is met
-        if let Some(ref cfg) = escrow.multisig {
+        let cfg_key = DataKey::MultiSigConfig(engagement_id);
+        if let Some(cfg) = env
+            .storage()
+            .persistent()
+            .get::<DataKey, MultiSigConfig>(&cfg_key)
+        {
             let approvals_key = DataKey::MultiSigApprovals(engagement_id);
             let approvals: MultiSigApprovals = env
                 .storage()
@@ -337,7 +350,7 @@ impl EscrowContract {
                 .unwrap_or(MultiSigApprovals {
                     approvals: vec![&env],
                 });
-            if (approvals.approvals.len() as u32) < cfg.threshold {
+            if approvals.approvals.len() < cfg.threshold {
                 panic!("Multi-sig threshold not met; more approvals required before release");
             }
             // Clean up approvals storage after successful release
@@ -387,9 +400,10 @@ impl EscrowContract {
 
         signer.require_auth();
 
-        let cfg = escrow
-            .multisig
-            .as_ref()
+        let cfg: MultiSigConfig = env
+            .storage()
+            .persistent()
+            .get(&DataKey::MultiSigConfig(engagement_id))
             .expect("Escrow does not have multi-sig enabled");
 
         // Verify signer is in the required list
@@ -426,9 +440,7 @@ impl EscrowContract {
         }
 
         approvals.approvals.push_back(signer);
-        env.storage()
-            .persistent()
-            .set(&approvals_key, &approvals);
+        env.storage().persistent().set(&approvals_key, &approvals);
         env.storage()
             .persistent()
             .extend_ttl(&approvals_key, TTL_THRESHOLD, ESCROW_TTL);
@@ -824,15 +836,17 @@ impl EscrowContract {
             escrow.client.require_auth();
 
             // Emit event before removal so indexers can archive the record
-            env.events().publish(
-                (Symbol::new(&env, "cleanup"), engagement_id),
-                engagement_id,
-            );
+            env.events()
+                .publish((Symbol::new(&env, "cleanup"), engagement_id), engagement_id);
 
             // Remove primary escrow entry
             env.storage().persistent().remove(&key);
 
             // Remove any leftover auxiliary entries (best-effort)
+            let cfg_key = DataKey::MultiSigConfig(engagement_id);
+            if env.storage().persistent().has(&cfg_key) {
+                env.storage().persistent().remove(&cfg_key);
+            }
             let approvals_key = DataKey::MultiSigApprovals(engagement_id);
             if env.storage().persistent().has(&approvals_key) {
                 env.storage().persistent().remove(&approvals_key);
@@ -1027,8 +1041,6 @@ mod test_legacy {
             amount: escrow_amount,
             status: Status::Pending,
             deadline,
-        
-            multisig: None,
         };
 
         // Store the escrow in contract storage
@@ -1098,8 +1110,6 @@ mod test_legacy {
             amount: escrow_amount,
             status: Status::Pending,
             deadline,
-        
-            multisig: None,
         };
 
         env.as_contract(&contract_id, || {
@@ -1152,8 +1162,6 @@ mod test_legacy {
             amount: escrow_amount,
             status: Status::Funded, // Already funded
             deadline,
-        
-            multisig: None,
         };
 
         // Store the escrow
@@ -1210,8 +1218,6 @@ mod test_legacy {
             amount: 500,
             status: Status::Pending,
             deadline: env.ledger().timestamp().saturating_sub(1),
-        
-            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1256,8 +1262,6 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
-        
-            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1296,8 +1300,6 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
-        
-            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1344,8 +1346,6 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
-        
-            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1413,8 +1413,6 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
-        
-            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1467,8 +1465,6 @@ mod test_legacy {
             amount,
             status: Status::Pending,
             deadline,
-        
-            multisig: None,
         };
         env.as_contract(&contract_id, || {
             env.storage()
@@ -1511,8 +1507,6 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
-        
-            multisig: None,
         };
 
         env.as_contract(&contract_id, || {
@@ -1564,8 +1558,6 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
-        
-            multisig: None,
         };
 
         // Store the escrow
@@ -1614,8 +1606,6 @@ mod test_legacy {
             amount,
             status: Status::Pending,
             deadline,
-        
-            multisig: None,
         };
 
         env.as_contract(&contract_id, || {
@@ -1658,8 +1648,6 @@ mod test_legacy {
             amount,
             status: Status::Funded,
             deadline,
-        
-            multisig: None,
         };
 
         env.as_contract(&contract_id, || {

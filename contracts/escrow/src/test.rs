@@ -1036,8 +1036,10 @@ mod ttl_snapshot_tests {
     use soroban_sdk::testutils::{Address as AddressTestUtils, Ledger, LedgerInfo};
     use soroban_sdk::{token, Address, Env};
 
-    const LEDGERS_PER_SECOND: u32 = 1; // 1 ledger ≈ 5 s; we use 1 for simplicity
     const DAY_LEDGERS: u32 = 17_280; // ~1 day at 5 s/ledger
+    #[allow(dead_code)]
+    const LEDGERS_PER_SECOND: u32 = 1; // 1 ledger ≈ 5 s; we use 1 for simplicity
+    #[allow(dead_code)]
     const ESCROW_TTL: u32 = 1_036_800; // ~60 days
 
     struct TtlCtx {
@@ -1071,7 +1073,17 @@ mod ttl_snapshot_tests {
         }
 
         /// Advance the ledger by `ledgers` ledgers, updating both sequence and timestamp.
+        /// Extends both contract instance TTLs before the jump so they are not archived.
         fn jump_ledgers(&self, ledgers: u32) {
+            let ttl = ledgers + 1_036_800;
+            // Extend escrow contract instance TTL before advancing.
+            self.env.as_contract(&self.contract_id, || {
+                self.env.storage().instance().extend_ttl(ttl, ttl);
+            });
+            // Extend token contract instance TTL before advancing.
+            self.env.as_contract(&self.token_address, || {
+                self.env.storage().instance().extend_ttl(ttl, ttl);
+            });
             let current = self.env.ledger().get();
             self.env.ledger().set(LedgerInfo {
                 sequence_number: current.sequence_number + ledgers,
@@ -1249,7 +1261,7 @@ mod ttl_snapshot_tests {
 #[cfg(test)]
 mod multisig_tests {
     use crate::{DataKey, EscrowContract, EscrowContractClient, Status};
-    use soroban_sdk::testutils::{Address as AddressTestUtils, Ledger};
+    use soroban_sdk::testutils::Address as AddressTestUtils;
     use soroban_sdk::{token, vec, Address, Env};
 
     struct MsCtx {
@@ -1300,7 +1312,7 @@ mod multisig_tests {
             &ctx.token_address,
             &amount,
             &deadline,
-            &vec![&ctx.env],  // empty → no multisig
+            &vec![&ctx.env], // empty → no multisig
             &0u32,
         );
         ctx.token_asset_client.mint(&client_addr, &amount);
@@ -1308,7 +1320,11 @@ mod multisig_tests {
         ctx.client.release(&id, &ctx.token_address);
 
         let escrow: crate::Escrow = ctx.env.as_contract(&ctx.contract_id, || {
-            ctx.env.storage().persistent().get(&DataKey::Escrow(id)).unwrap()
+            ctx.env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .unwrap()
         });
         assert_eq!(escrow.status, Status::Released);
         assert_eq!(ctx.token_client.balance(&artisan_addr), amount);
@@ -1348,7 +1364,11 @@ mod multisig_tests {
         ctx.client.release(&id, &ctx.token_address);
 
         let escrow: crate::Escrow = ctx.env.as_contract(&ctx.contract_id, || {
-            ctx.env.storage().persistent().get(&DataKey::Escrow(id)).unwrap()
+            ctx.env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .unwrap()
         });
         assert_eq!(escrow.status, Status::Released);
         assert_eq!(ctx.token_client.balance(&artisan_addr), amount);
@@ -1536,8 +1556,8 @@ mod multisig_tests {
 // ─────────────────────────────────────────────────────────────────────────────
 #[cfg(test)]
 mod cleanup_tests {
-    use crate::{DataKey, EscrowContract, EscrowContractClient, Status};
-    use soroban_sdk::testutils::{Address as AddressTestUtils, Ledger};
+    use crate::{DataKey, EscrowContract, EscrowContractClient};
+    use soroban_sdk::testutils::{Address as AddressTestUtils, Events, Ledger};
     use soroban_sdk::{token, vec, Address, Env, Vec};
 
     struct CleanCtx {
@@ -1545,6 +1565,7 @@ mod cleanup_tests {
         contract_id: Address,
         token_address: Address,
         client: EscrowContractClient<'static>,
+        #[allow(dead_code)]
         token_client: token::Client<'static>,
         token_asset_client: token::StellarAssetClient<'static>,
     }
@@ -1625,7 +1646,7 @@ mod cleanup_tests {
     #[test]
     fn test_cleanup_removes_released_escrow() {
         let ctx = CleanCtx::new();
-        let (id, client_addr) = ctx.create_released_escrow();
+        let (id, _client_addr) = ctx.create_released_escrow();
 
         // Verify it exists
         assert!(ctx.env.as_contract(&ctx.contract_id, || {
