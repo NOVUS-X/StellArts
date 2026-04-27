@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, Symbol};
+use soroban_sdk::{contract, contractimpl, contracttype, token, vec, Address, Env, Symbol, Vec};
 
 // TTL constants for persistent storage (in ledgers)
 // Note: Each ledger is approximately 5 seconds
@@ -8,6 +8,26 @@ const ESCROW_TTL: u32 = 1_036_800; // ~60 days
 const NEXT_ID_TTL: u32 = 6_220_800; // ~1 year
 const TTL_THRESHOLD: u32 = 17_280; // ~1 day - triggers extension when TTL drops below this
 const GRACE_PERIOD: u64 = 86_400; // 24 hours in seconds - artisan protection window after deadline
+
+/// Multi-sig configuration for large escrow payments.
+/// When `required_signers` is non-empty, `release` requires that at least
+/// `threshold` of those signers have called `multisig_approve` before funds
+/// can be transferred to the artisan.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MultiSigConfig {
+    /// Addresses that are allowed to sign off on the release.
+    pub required_signers: Vec<Address>,
+    /// Number of approvals needed before release is permitted.
+    pub threshold: u32,
+}
+
+/// Tracks which signers have already approved a multi-sig release.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MultiSigApprovals {
+    pub approvals: Vec<Address>,
+}
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -52,6 +72,8 @@ pub enum DataKey {
     Escrow(u64),
     DeadlineExtension(u64),
     EarlyReclaim(u64),
+    MultiSigConfig(u64),
+    MultiSigApprovals(u64),
     NextId,
     Oracle,
 }
@@ -124,7 +146,13 @@ pub struct EscrowContract;
 #[contractimpl]
 impl EscrowContract {
     /// Initialize a new escrow engagement
-    /// Creates a new escrow record with Pending status and a per-escrow arbitrator
+    /// Creates a new escrow record with Pending status and a per-escrow arbitrator.
+    ///
+    /// Pass `multisig_signers` as a non-empty list and `multisig_threshold > 0` to
+    /// enable multi-sig release for high-value jobs.  When multi-sig is enabled,
+    /// `release` will require that at least `multisig_threshold` of the listed
+    /// signers have called `multisig_approve` before funds are transferred.
+    #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         env: Env,
         client: Address,
@@ -133,6 +161,8 @@ impl EscrowContract {
         token: Address,
         amount: i128,
         deadline: u64,
+        multisig_signers: Vec<Address>,
+        multisig_threshold: u32,
     ) -> u64 {
         // Validation: client cannot be the same as artisan
         if client == artisan {
@@ -148,12 +178,33 @@ impl EscrowContract {
             panic!("Amount must be greater than zero");
         }
 
+        // Multi-sig validation
+        let multisig: Option<MultiSigConfig> = if multisig_signers.is_empty() {
+            None
+        } else if multisig_threshold == 0 || multisig_threshold > multisig_signers.len() {
+            panic!("multisig_threshold must be between 1 and the number of signers");
+        } else {
+            Some(MultiSigConfig {
+                required_signers: multisig_signers,
+                threshold: multisig_threshold,
+            })
+        };
+
         // Get and increment the next engagement ID
         let id_key = DataKey::NextId;
         let engagement_id: u64 = env.storage().persistent().get(&id_key).unwrap_or(1);
         env.storage()
             .persistent()
             .set(&id_key, &(engagement_id + 1));
+
+        // Store multi-sig config separately (Option<contracttype> is not supported by #[contracttype])
+        if let Some(ref cfg) = multisig {
+            let cfg_key = DataKey::MultiSigConfig(engagement_id);
+            env.storage().persistent().set(&cfg_key, cfg);
+            env.storage()
+                .persistent()
+                .extend_ttl(&cfg_key, TTL_THRESHOLD, ESCROW_TTL);
+        }
 
         // Create the escrow record
         let escrow = Escrow {
@@ -254,6 +305,9 @@ impl EscrowContract {
     /// Can only be called by the client and only when escrow is funded.
     /// Also verifies that the deadline has not passed; after the deadline the client
     /// must use `reclaim` to retrieve funds instead.
+    ///
+    /// When the escrow was created with multi-sig enabled, the required number of
+    /// signers must have already called `multisig_approve` before this succeeds.
     pub fn release(env: Env, engagement_id: u64, token: Address) {
         let key = DataKey::Escrow(engagement_id);
         let mut escrow: Escrow = env
@@ -279,6 +333,28 @@ impl EscrowContract {
         // Checks: Ensure the escrow status is Funded or InProgress
         if escrow.status != Status::Funded && escrow.status != Status::InProgress {
             panic!("Escrow is not funded or in progress");
+        }
+
+        // Multi-sig check: if configured, verify threshold is met
+        let cfg_key = DataKey::MultiSigConfig(engagement_id);
+        if let Some(cfg) = env
+            .storage()
+            .persistent()
+            .get::<DataKey, MultiSigConfig>(&cfg_key)
+        {
+            let approvals_key = DataKey::MultiSigApprovals(engagement_id);
+            let approvals: MultiSigApprovals = env
+                .storage()
+                .persistent()
+                .get(&approvals_key)
+                .unwrap_or(MultiSigApprovals {
+                    approvals: vec![&env],
+                });
+            if approvals.approvals.len() < cfg.threshold {
+                panic!("Multi-sig threshold not met; more approvals required before release");
+            }
+            // Clean up approvals storage after successful release
+            env.storage().persistent().remove(&approvals_key);
         }
 
         // Logic: Transfer the stored escrow amount from the contract address to the artisan's address
@@ -307,6 +383,67 @@ impl EscrowContract {
                 token: escrow.token,
             },
         );
+    }
+
+    /// Record a signer's approval for a multi-sig escrow release.
+    ///
+    /// Only addresses listed in the escrow's `multisig.required_signers` may call
+    /// this.  Each signer may only approve once.  Once the threshold is reached,
+    /// the client can call `release` to transfer funds.
+    pub fn multisig_approve(env: Env, engagement_id: u64, signer: Address) {
+        let key = DataKey::Escrow(engagement_id);
+        let escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("Escrow not found");
+
+        signer.require_auth();
+
+        let cfg: MultiSigConfig = env
+            .storage()
+            .persistent()
+            .get(&DataKey::MultiSigConfig(engagement_id))
+            .expect("Escrow does not have multi-sig enabled");
+
+        // Verify signer is in the required list
+        let mut is_allowed = false;
+        for s in cfg.required_signers.iter() {
+            if s == signer {
+                is_allowed = true;
+                break;
+            }
+        }
+        if !is_allowed {
+            panic!("Signer is not in the multi-sig required signers list");
+        }
+
+        // Escrow must be Funded or InProgress
+        if escrow.status != Status::Funded && escrow.status != Status::InProgress {
+            panic!("Escrow must be Funded or InProgress to approve");
+        }
+
+        let approvals_key = DataKey::MultiSigApprovals(engagement_id);
+        let mut approvals: MultiSigApprovals = env
+            .storage()
+            .persistent()
+            .get(&approvals_key)
+            .unwrap_or(MultiSigApprovals {
+                approvals: vec![&env],
+            });
+
+        // Prevent duplicate approvals
+        for existing in approvals.approvals.iter() {
+            if existing == signer {
+                panic!("Signer has already approved this escrow");
+            }
+        }
+
+        approvals.approvals.push_back(signer);
+        env.storage().persistent().set(&approvals_key, &approvals);
+        env.storage()
+            .persistent()
+            .extend_ttl(&approvals_key, TTL_THRESHOLD, ESCROW_TTL);
     }
 
     /// Allow the client to reclaim funds after the deadline + grace period has passed,
@@ -672,6 +809,50 @@ impl EscrowContract {
             },
         );
     }
+
+    /// Remove storage entries for a list of finalized escrow IDs.
+    ///
+    /// Only escrows in `Released`, `Refunded`, or `Resolved` status can be
+    /// cleaned up.  The caller must be the client of each escrow (acts as an
+    /// audit gate so only the paying party can trigger cleanup).
+    ///
+    /// Emits a `cleanup` event for each removed escrow so off-chain indexers can
+    /// archive the data before it disappears from on-chain storage.
+    pub fn cleanup_expired(env: Env, engagement_ids: Vec<u64>) {
+        for engagement_id in engagement_ids.iter() {
+            let key = DataKey::Escrow(engagement_id);
+            let escrow: Escrow = match env.storage().persistent().get(&key) {
+                Some(e) => e,
+                None => continue, // already removed – skip silently
+            };
+
+            // Only finalized escrows may be cleaned up
+            match escrow.status {
+                Status::Released | Status::Refunded | Status::Resolved => {}
+                _ => panic!("Escrow {} is not in a finalized state", engagement_id),
+            }
+
+            // Auth: only the client may trigger cleanup
+            escrow.client.require_auth();
+
+            // Emit event before removal so indexers can archive the record
+            env.events()
+                .publish((Symbol::new(&env, "cleanup"), engagement_id), engagement_id);
+
+            // Remove primary escrow entry
+            env.storage().persistent().remove(&key);
+
+            // Remove any leftover auxiliary entries (best-effort)
+            let cfg_key = DataKey::MultiSigConfig(engagement_id);
+            if env.storage().persistent().has(&cfg_key) {
+                env.storage().persistent().remove(&cfg_key);
+            }
+            let approvals_key = DataKey::MultiSigApprovals(engagement_id);
+            if env.storage().persistent().has(&approvals_key) {
+                env.storage().persistent().remove(&approvals_key);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -705,6 +886,8 @@ mod test_legacy {
             &token_address,
             &amount,
             &deadline,
+            &soroban_sdk::vec![&env],
+            &0u32,
         );
 
         // Verify the returned ID is valid (should be 1 for first engagement)
@@ -756,6 +939,8 @@ mod test_legacy {
             &token_address,
             &amount,
             &deadline,
+            &soroban_sdk::vec![&env],
+            &0u32,
         );
     }
 
@@ -781,6 +966,8 @@ mod test_legacy {
             &token_address,
             &zero_amount,
             &deadline,
+            &soroban_sdk::vec![&env],
+            &0u32,
         );
     }
 
@@ -806,6 +993,8 @@ mod test_legacy {
             &token_address,
             &negative_amount,
             &deadline,
+            &soroban_sdk::vec![&env],
+            &0u32,
         );
     }
 

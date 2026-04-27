@@ -15,6 +15,7 @@ function WalletButton() {
 
   if (isConnected && address) {
     const short = `${address.slice(0, 4)}...${address.slice(-4)}`;
+
     return (
       <div className="flex items-center gap-3">
         <span className="text-sm font-mono text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
@@ -50,6 +51,7 @@ export default function Navbar() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 w-full">
       <nav className="mx-auto max-w-6xl px-6 py-4">
         <div className="flex items-center justify-between">
+          {/* Logo */}
           <Link href="/" className="flex items-center">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center overflow-hidden">
               <Image
@@ -65,7 +67,7 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Nav */}
           <div className="hidden md:flex items-center space-x-8">
             <Link href="/#features" className="text-gray-600 hover:text-blue-600">
               Features
@@ -101,12 +103,13 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Controls */}
           <div className="md:hidden flex items-center gap-4">
             <CurrencySelector />
+
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-2 text-gray-600 hover:text-blue-600 transition-colors"
+              className="p-2 text-gray-600 hover:text-blue-600"
               aria-label="Toggle menu"
             >
               {isMenuOpen ? (
@@ -118,42 +121,63 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 space-y-4 border-t border-gray-100 pt-4">
-            <Link href="/#features" onClick={() => setIsMenuOpen(false)}>
+          <div className="md:hidden mt-4 pt-4 pb-4 border-t space-y-4">
+            <Link
+              href="/#features"
+              onClick={() => setIsMenuOpen(false)}
+              className="block"
+            >
               Features
             </Link>
-            <Link href="/#use-cases" onClick={() => setIsMenuOpen(false)}>
+
+            <Link
+              href="/#use-cases"
+              onClick={() => setIsMenuOpen(false)}
+              className="block"
+            >
               Use Cases
             </Link>
-            <Link href="/#why-stellar" onClick={() => setIsMenuOpen(false)}>
+
+            <Link
+              href="/#why-stellar"
+              onClick={() => setIsMenuOpen(false)}
+              className="block"
+            >
               Why Stellar
             </Link>
 
             {isAuthenticated && (
-              <Link href="/dashboard" onClick={() => setIsMenuOpen(false)}>
+              <Link
+                href="/dashboard"
+                onClick={() => setIsMenuOpen(false)}
+                className="block"
+              >
                 Dashboard
               </Link>
+            )}
+
+            {isAuthenticated && (
+              <div className="py-2">
+                <NotificationBell />
+              </div>
             )}
 
             <WalletButton />
 
             {isAuthenticated && (
-              <>
-                <NotificationBell />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    logout();
-                    setIsMenuOpen(false);
-                  }}
-                  className="w-full border-gray-300 text-gray-600"
-                >
-                  Log out
-                </Button>
-              </>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  logout();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full border-gray-300 text-gray-600"
+              >
+                Log out
+              </Button>
             )}
           </div>
         )}
