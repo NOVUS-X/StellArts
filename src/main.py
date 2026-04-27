@@ -1,8 +1,6 @@
 from fastapi import FastAPI
 from src.api.routes import user.py # Import your fixed route file
 
-app.include_router(/api/routes/user.router)
-
 # Metadata for your tags to make the UI look professional
 tags_metadata = [
     {
@@ -21,11 +19,11 @@ app = FastAPI(
     version="1.0.0",
     openapi_tags=tags_metadata,
     
-    # Register the router
-    app.include_router(user.router)
     # Acceptance Criteria: Host at /api/docs
     docs_url="/api/docs", 
     # Optional: You can also move the schema logic to match
     openapi_url="/api/openapi.json",
     redoc_url="/api/redoc"
+    # Include the router so the app knows about the endpoints
+    app.include_router(user.router, prefix="/api/v1")
 )
