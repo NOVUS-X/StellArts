@@ -90,9 +90,15 @@ async def get_nearby_artisans(
     min_experience: int | None = Query(
         None, ge=0, description="Minimum experience years"
     ),
-    min_rate: float | None = Query(None, ge=0, description="Minimum hourly rate"),
-    max_rate: float | None = Query(None, ge=0, description="Maximum hourly rate"),
-    available: bool | None = Query(None, description="Filter by current availability"),
+    min_rate: float | None = Query(
+        None, ge=0, description="Minimum hourly rate"
+    ),
+    max_rate: float | None = Query(
+        None, ge=0, description="Maximum hourly rate"
+    ),
+    available: bool | None = Query(
+        None, description="Filter by current availability"
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
 ):
