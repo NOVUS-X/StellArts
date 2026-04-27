@@ -8,7 +8,7 @@ import {
   useMemo,
   useEffect,
   ReactNode,
-
+} from "react";
 
 
 /** Minimal type for wallet kit — full module loaded only on client via dynamic import */
