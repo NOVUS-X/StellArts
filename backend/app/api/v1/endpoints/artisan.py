@@ -99,8 +99,12 @@ async def get_nearby_artisans(
     available: bool | None = Query(
         None, description="Filter by current availability"
     ),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page: int = Query(
+        1, ge=1
+    ),
+    page_size: int = Query(
+        10, ge=1, le=100
+    ),
 ):
     """
     Discover artisans nearby with optional filters for skill, minimum rating, and availability.

@@ -452,8 +452,6 @@ export default function ArtisansPage() {
 
       <p className="text-sm text-gray-500">{total} results</p>
     </div>
-  </div>
-</div>
         {/* Mobile Filter Drawer */}
         {isFilterDrawerOpen && (
           <div className="fixed inset-0 z-[60] md:hidden">
@@ -592,7 +590,7 @@ export default function ArtisansPage() {
                 </Button>
               </div>
             </div>
-          </div>
+
         )}
 
         {error && (
