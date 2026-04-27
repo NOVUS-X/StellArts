@@ -471,51 +471,26 @@ export default function ArtisansPage() {
                   <X className="w-6 h-6" />
                 </button>
               </div>
-
-nearby: (
-  lat: number,
-  lon: number,
-  opts: {
-    page?: number;
-    page_size?: number;
-    skills?: string[];
-    min_rating?: number;
-    min_experience?: number;
-    min_rate?: number;
-    max_rate?: number;
-    is_available?: boolean;
-  } = {}
-) => {
-  const params = new URLSearchParams({
-    lat: String(lat),
-    lon: String(lon),
-    page: String(opts.page ?? 1),
-    page_size: String(opts.page_size ?? 10),
-  });
-
-  if (opts.skills?.length) {
-    opts.skills.forEach((skill) => params.append("skills", skill));
-  }
-
-  if (opts.min_rating !== undefined)
-    params.append("min_rating", String(opts.min_rating));
-
-  if (opts.min_experience !== undefined)
-    params.append("min_experience", String(opts.min_experience));
-
-  if (opts.min_rate !== undefined)
-    params.append("min_rate", String(opts.min_rate));
-
-  if (opts.max_rate !== undefined)
-    params.append("max_rate", String(opts.max_rate));
-
-  if (opts.is_available !== undefined)
-    params.append("is_available", String(opts.is_available));
-
-  return request<PaginatedArtisansResponse>(
-    `/artisans/nearby?${params}`
-  );
-},
+              <div className="max-h-[70vh] overflow-y-auto pr-2 -mr-2 space-y-8 mb-8">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-4">
+                    Specialties
+                  </label>
+                  <div className="flex flex-wrap gap-3">
+                    {SPECIALTIES.map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => toggleSkill(s)}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                          skills.includes(s)
+                            ? "bg-blue-600 text-white shadow-md shadow-blue-100"
+                            : "bg-gray-50 text-gray-600 border border-gray-100"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
@@ -582,8 +557,7 @@ nearby: (
     />
   </div>
 </div>
-                  </div>
-                </div>
+
 
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                   <label htmlFor="availableNowMobile" className="text-sm font-semibold text-gray-700 select-none cursor-pointer">
