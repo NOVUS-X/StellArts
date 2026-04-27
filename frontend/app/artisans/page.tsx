@@ -10,7 +10,7 @@ import {
   CardContent,
 } from "../../components/ui/card";
 import { api, type ArtisanItem } from "../../lib/api";
-import { Wrench, MapPin, Star, Sparkles } from "lucide-react";
+import { Wrench, MapPin, Star, Sparkles, Filter, X, SlidersHorizontal } from "lucide-react";
 import Price from "../../components/ui/Price";
 
 const DEFAULT_LAT = 51.5074;
@@ -196,6 +196,7 @@ export default function ArtisansPage() {
   const [skill, setSkill] = useState("");
   const [minRating, setMinRating] = useState<number>(0);
   const [isAvailable, setIsAvailable] = useState<boolean>(false);
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
 
   // Debounced filters
   const [debouncedFilters, setDebouncedFilters] = useState({ skill, minRating, isAvailable });
@@ -293,14 +294,14 @@ export default function ArtisansPage() {
            </div>
         )}
 
-        {/* Filter Bar */}
-        <div className="bg-gray-50 p-6 rounded-xl mb-8 flex flex-col md:flex-row gap-6 items-end">
-          <div className="flex-1 w-full min-w-[200px]">
+        {/* Desktop Filter Bar */}
+        <div className="hidden md:flex bg-gray-50 p-6 rounded-xl mb-8 flex-row gap-6 items-end border border-gray-100 shadow-sm">
+          <div className="flex-1 min-w-[200px]">
              <label className="block text-sm font-medium text-gray-700 mb-1">Specialty</label>
              <select 
                value={skill} 
                onChange={(e) => setSkill(e.target.value)}
-               className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-blue-600 focus:outline-none bg-white"
+               className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-gray-900 focus:border-blue-600 focus:outline-none bg-white transition-all hover:border-gray-400"
              >
                <option value="">Any Specialty</option>
                <option value="Plumber">Plumber</option>
@@ -310,8 +311,8 @@ export default function ArtisansPage() {
                <option value="Mechanic">Mechanic</option>
              </select>
           </div>
-          <div className="flex-1 w-full min-w-[200px]">
-             <label className="block text-sm font-medium text-gray-700 mb-3 block">
+          <div className="flex-1 min-w-[200px]">
+             <label className="block text-sm font-medium text-gray-700 mb-3">
                Min Rating ({minRating} Stars)
              </label>
              <input 
@@ -321,22 +322,139 @@ export default function ArtisansPage() {
                step="1"
                value={minRating}
                onChange={(e) => setMinRating(Number(e.target.value))}
-               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
              />
           </div>
-          <div className="flex items-center gap-3 w-full md:w-auto h-10">
+          <div className="flex items-center gap-3 h-10 pb-1">
              <input 
                type="checkbox"
                id="availableNow"
                checked={isAvailable}
                onChange={(e) => setIsAvailable(e.target.checked)}
-               className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+               className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
              />
              <label htmlFor="availableNow" className="text-sm font-medium text-gray-700 select-none cursor-pointer">
                Available Now
              </label>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={clearFilters}
+            className="h-10 text-gray-500 hover:text-red-600"
+          >
+            Reset
+          </Button>
         </div>
+
+        {/* Mobile Filter Button */}
+        <div className="md:hidden flex justify-between items-center mb-6">
+          <Button 
+            onClick={() => setIsFilterDrawerOpen(true)}
+            variant="outline"
+            className="flex items-center gap-2 bg-white border-gray-200 text-gray-700 shadow-sm"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            Filters {(skill || minRating > 0 || isAvailable) && <span className="flex w-2 h-2 rounded-full bg-blue-600"></span>}
+          </Button>
+          <p className="text-sm text-gray-500">
+            {total} results
+          </p>
+        </div>
+
+        {/* Mobile Filter Drawer */}
+        {isFilterDrawerOpen && (
+          <div className="fixed inset-0 z-[60] md:hidden">
+            <div 
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
+              onClick={() => setIsFilterDrawerOpen(false)}
+            />
+            <div className="absolute inset-x-0 bottom-0 bg-white rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-gray-900">Filters</h3>
+                <button 
+                  onClick={() => setIsFilterDrawerOpen(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6 pb-8">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Specialty</label>
+                  <select 
+                    value={skill} 
+                    onChange={(e) => setSkill(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 focus:border-blue-600 focus:outline-none bg-gray-50"
+                  >
+                    <option value="">Any Specialty</option>
+                    <option value="Plumber">Plumber</option>
+                    <option value="Electrician">Electrician</option>
+                    <option value="Carpenter">Carpenter</option>
+                    <option value="Painter">Painter</option>
+                    <option value="Mechanic">Mechanic</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-4">
+                    Min Rating ({minRating} Stars)
+                  </label>
+                  <input 
+                    type="range"
+                    min="0"
+                    max="5"
+                    step="1"
+                    value={minRating}
+                    onChange={(e) => setMinRating(Number(e.target.value))}
+                    className="w-full h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <div className="flex justify-between mt-2 text-xs text-gray-400 font-medium px-1">
+                    <span>0</span>
+                    <span>1</span>
+                    <span>2</span>
+                    <span>3</span>
+                    <span>4</span>
+                    <span>5</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <label htmlFor="availableNowMobile" className="text-sm font-semibold text-gray-700 select-none cursor-pointer">
+                    Available Now
+                  </label>
+                  <input 
+                    type="checkbox"
+                    id="availableNowMobile"
+                    checked={isAvailable}
+                    onChange={(e) => setIsAvailable(e.target.checked)}
+                    className="w-6 h-6 text-blue-600 bg-white border-gray-300 rounded-md focus:ring-blue-500 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 py-6 rounded-xl border-gray-200 text-gray-600"
+                  onClick={() => {
+                    clearFilters();
+                    setIsFilterDrawerOpen(false);
+                  }}
+                >
+                  Reset
+                </Button>
+                <Button 
+                  className="flex-1 py-6 rounded-xl bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
+                  onClick={() => setIsFilterDrawerOpen(false)}
+                >
+                  Apply Filters
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <p className="text-red-600 bg-red-50 p-4 rounded-lg mb-6">{error}</p>

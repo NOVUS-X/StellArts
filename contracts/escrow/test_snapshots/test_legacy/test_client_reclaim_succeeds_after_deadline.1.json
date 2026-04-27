@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 5,
+    "address": 6,
     "nonce": 0
   },
   "auth": [
@@ -106,7 +106,7 @@
   "ledger": {
     "protocol_version": 21,
     "sequence_number": 0,
-    "timestamp": 1,
+    "timestamp": 86501,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -224,6 +224,14 @@
                     },
                     {
                       "key": {
+                        "symbol": "arbitrator"
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                      }
+                    },
+                    {
+                      "key": {
                         "symbol": "artisan"
                       },
                       "val": {
@@ -243,7 +251,7 @@
                         "symbol": "deadline"
                       },
                       "val": {
-                        "u64": 0
+                        "u64": 100
                       }
                     },
                     {
@@ -256,6 +264,14 @@
                             "symbol": "Refunded"
                           }
                         ]
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "token"
+                      },
+                      "val": {
+                        "address": "CDLDVFKHEZ2RVB3NG4UQA4VPD3TSHV6XMHXMHP2BSGCJ2IIWVTOHGDSG"
                       }
                     }
                   ]
@@ -1165,7 +1181,14 @@
         "type_": "contract",
         "body": {
           "v0": {
-            "topics": [],
+            "topics": [
+              {
+                "symbol": "reclaim"
+              },
+              {
+                "u64": 1
+              }
+            ],
             "data": {
               "map": [
                 {
@@ -1177,6 +1200,14 @@
                       "hi": 0,
                       "lo": 500
                     }
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "artisan"
+                  },
+                  "val": {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                   }
                 },
                 {
@@ -1200,7 +1231,15 @@
                     "symbol": "timestamp"
                   },
                   "val": {
-                    "u64": 1
+                    "u64": 86501
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "token"
+                  },
+                  "val": {
+                    "address": "CDLDVFKHEZ2RVB3NG4UQA4VPD3TSHV6XMHXMHP2BSGCJ2IIWVTOHGDSG"
                   }
                 }
               ]

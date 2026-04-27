@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import (
@@ -273,29 +273,168 @@ async def update_availability(
 def get_my_portfolio(
     db: Session = Depends(get_db), current_user: User = Depends(require_artisan)
 ):
-    """Get current artisan's portfolio"""
-    # TODO: Implement Portfolio model and DB table
-    # For now, return empty list as functionality is not yet supported in DB
+    """Get current artisan's portfolio items."""
+
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(status_code=404, detail="Artisan profile not found")
+
+    items = (
+        db.query(Portfolio)
+        .filter(Portfolio.artisan_id == artisan.id)
+        .order_by(Portfolio.created_at.desc())
+        .all()
+    )
     return {
-        "message": f"Portfolio for artisan {current_user.id}",
+        "artisan_id": artisan.id,
         "artisan_name": current_user.full_name,
-        "portfolio_items": [],
+        "portfolio_items": [
+            {
+                "id": p.id,
+                "artisan_id": p.artisan_id,
+                "title": p.title,
+                "image": p.image,
+                "created_at": p.created_at,
+            }
+            for p in items
+        ],
     }
 
 
-@router.post("/portfolio/add")
+@router.post("/portfolio/add", status_code=201)
 def add_portfolio_item(
-    portfolio_item: dict,  # Replace with actual schema
+    title: str = None,
+    image_url: str = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_artisan),
 ):
-    """Add portfolio item - artisan only"""
-    # TODO: Implement Portfolio model and DB table
+    """Add a portfolio item (JSON body with title and image_url)."""
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(status_code=404, detail="Artisan profile not found")
+    if not image_url:
+        raise HTTPException(status_code=422, detail="image_url is required")
+
+    item = Portfolio(artisan_id=artisan.id, title=title, image=image_url)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
     return {
-        "message": "Portfolio item added successfully (simulation)",
-        "artisan_id": current_user.id,
-        "portfolio_item": portfolio_item,
+        "id": item.id,
+        "artisan_id": item.artisan_id,
+        "title": item.title,
+        "image": item.image,
+        "created_at": item.created_at,
     }
+
+
+@router.post("/portfolio/upload", status_code=201)
+def upload_portfolio_image(
+    title: str = None,
+    file: UploadFile = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_artisan),
+):
+    """Upload a portfolio image file and create a portfolio item.
+
+    The file is stored locally under /tmp/stellarts_uploads and the generated
+    URL is returned.  In production this would be replaced by an S3/CDN upload.
+    """
+    import os
+    import uuid
+
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(status_code=404, detail="Artisan profile not found")
+    if file is None:
+        raise HTTPException(status_code=422, detail="file is required")
+
+    ext = os.path.splitext(file.filename or "upload.bin")[1] or ".bin"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    upload_dir = "/tmp/stellarts_uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    dest = os.path.join(upload_dir, filename)
+    with open(dest, "wb") as f:
+        f.write(file.file.read())
+
+    image_url = f"/uploads/{filename}"
+    item = Portfolio(artisan_id=artisan.id, title=title, image=image_url)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return {
+        "id": item.id,
+        "artisan_id": item.artisan_id,
+        "title": item.title,
+        "image": item.image,
+        "image_url": image_url,
+        "created_at": item.created_at,
+    }
+
+
+@router.put("/portfolio/{item_id}")
+def update_portfolio_item(
+    item_id: int,
+    title: str = None,
+    image_url: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_artisan),
+):
+    """Update a portfolio item owned by the current artisan."""
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(status_code=404, detail="Artisan profile not found")
+
+    item = (
+        db.query(Portfolio)
+        .filter(Portfolio.id == item_id, Portfolio.artisan_id == artisan.id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Portfolio item not found")
+
+    if title is not None:
+        item.title = title
+    if image_url is not None:
+        item.image = image_url
+    db.commit()
+    db.refresh(item)
+    return {
+        "id": item.id,
+        "artisan_id": item.artisan_id,
+        "title": item.title,
+        "image": item.image,
+        "created_at": item.created_at,
+    }
+
+
+@router.delete("/portfolio/{item_id}", status_code=204)
+def delete_portfolio_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_artisan),
+):
+    """Delete a portfolio item owned by the current artisan."""
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(status_code=404, detail="Artisan profile not found")
+
+    item = (
+        db.query(Portfolio)
+        .filter(Portfolio.id == item_id, Portfolio.artisan_id == artisan.id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Portfolio item not found")
+
+    db.delete(item)
+    db.commit()
+    return None
 
 
 @router.get("/my-bookings")
