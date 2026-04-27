@@ -309,82 +309,151 @@ export default function ArtisansPage() {
            </div>
         )}
 
-        {/* Main Content Layout */}
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Desktop Filter Sidebar */}
-          <aside className="hidden md:block w-72 shrink-0">
-            <div className="bg-gray-50 p-6 rounded-xl border border-gray-100 shadow-sm sticky top-28">
-              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center justify-between">
-                Filters
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-gray-500 hover:text-red-600 h-auto p-1">Reset</Button>
-              </h3>
-              
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Specialties</label>
-                  <div className="flex flex-wrap gap-2">
-                    {SPECIALTIES.map(s => (
-                      <button 
-                        key={s}
-                        onClick={() => toggleSkill(s)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${skills.includes(s) ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200 hover:border-blue-300'}`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+{/* Main Content Layout */}
+<div className="flex flex-col md:flex-row gap-8">
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Min Rating ({minRating} Stars)
-                  </label>
-                  <input type="range" min="0" max="5" step="1" value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Min Experience ({minExperience} yrs)
-                  </label>
-                  <input type="range" min="0" max="30" step="1" value={minExperience} onChange={(e) => setMinExperience(Number(e.target.value))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
-                </div>
+  {/* Desktop Filter Sidebar */}
+  <aside className="hidden md:block w-72 shrink-0">
+    <div className="bg-gray-50 p-6 rounded-xl border border-gray-100 shadow-sm sticky top-28">
+      <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center justify-between">
+        Filters
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={clearFilters}
+          className="text-xs text-gray-500 hover:text-red-600 h-auto p-1"
+        >
+          Reset
+        </Button>
+      </h3>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Price Range (${minRate} - ${maxRate === 500 ? '500+' : maxRate})
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input type="number" value={minRate} onChange={(e) => setMinRate(Number(e.target.value))} className="w-full px-2 py-1.5 text-sm rounded border border-gray-300" placeholder="Min" min="0" />
-                    <span className="text-gray-500">-</span>
-                    <input type="number" value={maxRate} onChange={(e) => setMaxRate(Number(e.target.value))} className="w-full px-2 py-1.5 text-sm rounded border border-gray-300" placeholder="Max" min="0" />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 pt-2">
-                  <input type="checkbox" id="availableNow" checked={isAvailable} onChange={(e) => setIsAvailable(e.target.checked)} className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 cursor-pointer" />
-                  <label htmlFor="availableNow" className="text-sm font-medium text-gray-700 select-none cursor-pointer">Available Now</label>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          <div className="flex-1 min-w-0">
-
-        {/* Mobile Filter Button */}
-        <div className="md:hidden flex justify-between items-center mb-6">
-          <Button 
-            onClick={() => setIsFilterDrawerOpen(true)}
-            variant="outline"
-            className="flex items-center gap-2 bg-white border-gray-200 text-gray-700 shadow-sm"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            Filters {(skills.length > 0 || minRating > 0 || minExperience > 0 || minRate > 0 || maxRate < 500 || isAvailable) && <span className="flex w-2 h-2 rounded-full bg-blue-600"></span>}
-          </Button>
-          <p className="text-sm text-gray-500">
-            {total} results
-          </p>
+      <div className="space-y-6">
+        {/* Specialties */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-3">
+            Specialties
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {SPECIALTIES.map((s) => (
+              <button
+                key={s}
+                onClick={() => toggleSkill(s)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  skills.includes(s)
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "bg-white text-gray-600 border border-gray-200 hover:border-blue-300"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
 
+        {/* Rating */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-3">
+            Min Rating ({minRating} Stars)
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="5"
+            step="1"
+            value={minRating}
+            onChange={(e) => setMinRating(Number(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+          />
+        </div>
+
+        {/* Experience */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-3">
+            Min Experience ({minExperience} yrs)
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="30"
+            step="1"
+            value={minExperience}
+            onChange={(e) => setMinExperience(Number(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+          />
+        </div>
+
+        {/* Price Range */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-3">
+            Price Range (${minRate} - {maxRate === 500 ? "500+" : maxRate})
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={minRate}
+              onChange={(e) => setMinRate(Number(e.target.value))}
+              className="w-full px-2 py-1.5 text-sm rounded border border-gray-300"
+              placeholder="Min"
+              min="0"
+            />
+            <span className="text-gray-500">-</span>
+            <input
+              type="number"
+              value={maxRate}
+              onChange={(e) => setMaxRate(Number(e.target.value))}
+              className="w-full px-2 py-1.5 text-sm rounded border border-gray-300"
+              placeholder="Max"
+              min="0"
+            />
+          </div>
+        </div>
+
+        {/* Availability */}
+        <div className="flex items-center gap-3 pt-2">
+          <input
+            type="checkbox"
+            id="availableNow"
+            checked={isAvailable}
+            onChange={(e) => setIsAvailable(e.target.checked)}
+            className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+          />
+          <label
+            htmlFor="availableNow"
+            className="text-sm font-medium text-gray-700 select-none cursor-pointer"
+          >
+            Available Now
+          </label>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  {/* Main Content */}
+  <div className="flex-1 min-w-0">
+
+    {/* Mobile Filter Button */}
+    <div className="md:hidden flex justify-between items-center mb-6">
+      <Button
+        onClick={() => setIsFilterDrawerOpen(true)}
+        variant="outline"
+        className="flex items-center gap-2 bg-white border-gray-200 text-gray-700 shadow-sm"
+      >
+        <SlidersHorizontal className="w-4 h-4" />
+        Filters{" "}
+        {(skills.length > 0 ||
+          minRating > 0 ||
+          minExperience > 0 ||
+          minRate > 0 ||
+          maxRate < 500 ||
+          isAvailable) && (
+          <span className="flex w-2 h-2 rounded-full bg-blue-600"></span>
+        )}
+      </Button>
+
+      <p className="text-sm text-gray-500">{total} results</p>
+    </div>
+  </div>
+</div>
         {/* Mobile Filter Drawer */}
         {isFilterDrawerOpen && (
           <div className="fixed inset-0 z-[60] md:hidden">
@@ -403,44 +472,116 @@ export default function ArtisansPage() {
                 </button>
               </div>
 
-              <div className="space-y-6 pb-8 max-h-[60vh] overflow-y-auto px-1">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Specialties</label>
-                  <div className="flex flex-wrap gap-2">
-                    {SPECIALTIES.map(s => (
-                      <button 
-                        key={s}
-                        onClick={() => toggleSkill(s)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${skills.includes(s) ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-blue-300'}`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
+nearby: (
+  lat: number,
+  lon: number,
+  opts: {
+    page?: number;
+    page_size?: number;
+    skills?: string[];
+    min_rating?: number;
+    min_experience?: number;
+    min_rate?: number;
+    max_rate?: number;
+    is_available?: boolean;
+  } = {}
+) => {
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lon: String(lon),
+    page: String(opts.page ?? 1),
+    page_size: String(opts.page_size ?? 10),
+  });
+
+  if (opts.skills?.length) {
+    opts.skills.forEach((skill) => params.append("skills", skill));
+  }
+
+  if (opts.min_rating !== undefined)
+    params.append("min_rating", String(opts.min_rating));
+
+  if (opts.min_experience !== undefined)
+    params.append("min_experience", String(opts.min_experience));
+
+  if (opts.min_rate !== undefined)
+    params.append("min_rate", String(opts.min_rate));
+
+  if (opts.max_rate !== undefined)
+    params.append("max_rate", String(opts.max_rate));
+
+  if (opts.is_available !== undefined)
+    params.append("is_available", String(opts.is_available));
+
+  return request<PaginatedArtisansResponse>(
+    `/artisans/nearby?${params}`
+  );
+},
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-4">
                     Min Rating ({minRating} Stars)
                   </label>
-                  <input type="range" min="0" max="5" step="1" value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} className="w-full h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-blue-600" />
-                </div>
+<input
+  type="range"
+  min="0"
+  max="5"
+  step="1"
+  value={minRating}
+  onChange={(e) => setMinRating(Number(e.target.value))}
+  className="w-full h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+/>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-4">
-                    Min Experience ({minExperience} yrs)
-                  </label>
-                  <input type="range" min="0" max="30" step="1" value={minExperience} onChange={(e) => setMinExperience(Number(e.target.value))} className="w-full h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-blue-600" />
-                </div>
+<div className="flex justify-between mt-2 text-xs text-gray-400 font-medium px-1">
+  <span>0</span>
+  <span>1</span>
+  <span>2</span>
+  <span>3</span>
+  <span>4</span>
+  <span>5</span>
+</div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Price Range (${minRate} - ${maxRate === 500 ? '500+' : maxRate})
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input type="number" value={minRate} onChange={(e) => setMinRate(Number(e.target.value))} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50" placeholder="Min" min="0" />
-                    <span className="text-gray-500">-</span>
-                    <input type="number" value={maxRate} onChange={(e) => setMaxRate(Number(e.target.value))} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50" placeholder="Max" min="0" />
+</div>
+
+<div>
+  <label className="block text-sm font-semibold text-gray-700 mb-4">
+    Min Experience ({minExperience} yrs)
+  </label>
+  <input
+    type="range"
+    min="0"
+    max="30"
+    step="1"
+    value={minExperience}
+    onChange={(e) => setMinExperience(Number(e.target.value))}
+    className="w-full h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+  />
+</div>
+
+<div>
+  <label className="block text-sm font-semibold text-gray-700 mb-3">
+    Price Range (${minRate} - ${maxRate === 500 ? "500+" : maxRate})
+  </label>
+  <div className="flex items-center gap-2">
+    <input
+      type="number"
+      value={minRate}
+      onChange={(e) => setMinRate(Number(e.target.value))}
+      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50"
+      placeholder="Min"
+      min="0"
+    />
+    <span className="text-gray-500">-</span>
+    <input
+      type="number"
+      value={maxRate}
+      onChange={(e) => setMaxRate(Number(e.target.value))}
+      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50"
+      placeholder="Max"
+      min="0"
+    />
+  </div>
+</div>
                   </div>
                 </div>
 

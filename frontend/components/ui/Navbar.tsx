@@ -1,4 +1,4 @@
-<<<<<<"use client";
+"use client";
 
 import { useState } from "react";
 import { Button } from "./button";
@@ -50,6 +50,7 @@ export default function Navbar() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 w-full">
       <nav className="mx-auto max-w-6xl px-6 py-4">
         <div className="flex items-center justify-between">
+          {/* Logo */}
           <Link href="/" className="flex items-center">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center overflow-hidden">
               <Image
@@ -60,7 +61,7 @@ export default function Navbar() {
                 className="object-contain"
               />
             </div>
-            <span className="ml-2 text-xl font-bold text-gray-900 md:block hidden">
+            <span className="ml-2 text-xl font-bold text-gray-900 hidden md:block">
               Stellarts
             </span>
           </Link>
@@ -111,11 +112,10 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Controls */}
           <div className="md:hidden flex items-center gap-4">
             <CurrencySelector />
             {isAuthenticated && <NotificationBell />}
-
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-2 text-gray-600 hover:text-blue-600 transition-colors focus:outline-none"
@@ -136,21 +136,21 @@ export default function Navbar() {
             <Link
               href="/#features"
               onClick={() => setIsMenuOpen(false)}
-              className="block text-gray-600 hover:text-blue-600 transition-colors py-2"
+              className="block text-gray-600 hover:text-blue-600 py-2"
             >
               Features
             </Link>
             <Link
               href="/#use-cases"
               onClick={() => setIsMenuOpen(false)}
-              className="block text-gray-600 hover:text-blue-600 transition-colors py-2"
+              className="block text-gray-600 hover:text-blue-600 py-2"
             >
               Use Cases
             </Link>
             <Link
               href="/#why-stellar"
               onClick={() => setIsMenuOpen(false)}
-              className="block text-gray-600 hover:text-blue-600 transition-colors py-2"
+              className="block text-gray-600 hover:text-blue-600 py-2"
             >
               Why Stellar
             </Link>
@@ -159,7 +159,7 @@ export default function Navbar() {
               <Link
                 href="/dashboard"
                 onClick={() => setIsMenuOpen(false)}
-                className="block text-gray-600 hover:text-blue-600 transition-colors py-2"
+                className="block text-gray-600 hover:text-blue-600 py-2"
               >
                 Dashboard
               </Link>
