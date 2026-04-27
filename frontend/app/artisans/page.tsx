@@ -10,8 +10,9 @@ import {
   CardContent,
 } from "../../components/ui/card";
 import { api, type ArtisanItem } from "../../lib/api";
-import { Wrench, MapPin, Star, Sparkles, Filter, X, SlidersHorizontal } from "lucide-react";
+import { Wrench, MapPin, Star, Sparkles, Filter, X, SlidersHorizontal, Map as MapIcon } from "lucide-react";
 import Price from "../../components/ui/Price";
+import ArtisanMap from "../../components/map";
 
 const DEFAULT_LAT = 51.5074;
 const DEFAULT_LON = -0.1278;
@@ -83,90 +84,40 @@ function ArtisanMapPanel({
   artisans,
   loading,
   hasResults,
+  userLat,
+  userLon,
 }: {
   artisans: ArtisanItem[];
   loading: boolean;
   hasResults: boolean;
+  userLat: number | null;
+  userLon: number | null;
 }) {
   if (loading && !hasResults) {
     return <MapSkeleton />;
   }
 
-  const mappedArtisans = artisans
-    .filter((artisan) => artisan.latitude != null && artisan.longitude != null)
-    .slice(0, 6);
+  const center: [number, number] = userLat && userLon ? [userLat, userLon] : [DEFAULT_LAT, DEFAULT_LON];
 
   return (
-    <Card className="overflow-hidden border-blue-100 bg-white shadow-sm">
-      <CardContent className="p-0">
-        <div className="relative h-[320px] overflow-hidden bg-[linear-gradient(145deg,#eff6ff_0%,#dbeafe_42%,#f8fafc_100%)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.14),transparent_30%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.52)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.52)_1px,transparent_1px)] bg-[size:48px_48px]" />
-          <div className="absolute left-6 top-6 z-10 max-w-[calc(100%-3rem)] rounded-2xl bg-white/88 px-4 py-3 shadow-sm backdrop-blur-sm">
-            <p className="text-sm font-semibold text-gray-900">Nearby map view</p>
-            <p className="mt-1 text-sm text-gray-500">
-              {artisans.length > 0
-                ? `${artisans.length} artisan${artisans.length === 1 ? "" : "s"} in this search`
-                : "No mappable artisans yet"}
-            </p>
-          </div>
-
-          <div className="absolute inset-x-0 bottom-0 top-0">
-            {mappedArtisans.length > 0 ? (
-              mappedArtisans.map((artisan, index) => {
-                const x = 18 + (index % 3) * 24 + (index % 2) * 5;
-                const y = 26 + Math.floor(index / 3) * 28 + (index % 2) * 8;
-                return (
-                  <div
-                    key={artisan.id}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-500"
-                    style={{ left: `${x}%`, top: `${y}%` }}
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full border-4 border-white bg-blue-600 text-white shadow-lg shadow-blue-200/80">
-                      <Wrench className="h-4 w-4" />
-                    </div>
-                    <div className="mt-2 min-w-28 rounded-xl bg-white/90 px-3 py-2 text-xs font-medium text-gray-700 shadow-sm backdrop-blur-sm">
-                      <p className="truncate">{artisan.business_name || "Artisan"}</p>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
-                <div className="rounded-2xl bg-white/88 px-5 py-4 shadow-sm backdrop-blur-sm">
-                  <p className="text-sm font-semibold text-gray-900">Map coordinates unavailable</p>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Results still load below while location details catch up.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="absolute bottom-4 left-4 right-4 z-10">
-            <div className="grid grid-cols-3 gap-3">
-              {artisans.slice(0, 3).map((artisan) => (
-                <div key={artisan.id} className="rounded-xl bg-white/85 px-3 py-2 shadow-sm backdrop-blur-sm">
-                  <p className="truncate text-xs font-semibold text-gray-900">
-                    {artisan.business_name || specialtyLabel(artisan)}
-                  </p>
-                  <p className="mt-1 truncate text-xs text-gray-500">
-                    {artisan.location || "Location pending"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {loading && (
-            <div className="absolute inset-0 z-20 bg-white/45 backdrop-blur-[2px] transition-opacity duration-300">
-              <div className="absolute inset-0 skeleton-wave opacity-70" />
-              <div className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm">
-                Refreshing results...
+    <Card className="overflow-hidden border-blue-100 bg-white shadow-sm flex flex-col">
+      <CardContent className="p-0 flex-1 relative min-h-[320px]">
+        <ArtisanMap 
+          artisans={artisans} 
+          center={center} 
+          zoom={13} 
+        />
+        
+        {loading && (
+          <div className="absolute inset-0 z-20 bg-white/20 backdrop-blur-[1px] pointer-events-none transition-opacity duration-300">
+            <div className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm border border-blue-100">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse" />
+                Updating...
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -483,7 +434,13 @@ export default function ArtisansPage() {
               </div>
             </div>
           </div>
-          <ArtisanMapPanel artisans={artisans} loading={loading} hasResults={hasLoadedResults} />
+          <ArtisanMapPanel 
+            artisans={artisans} 
+            loading={loading} 
+            hasResults={hasLoadedResults} 
+            userLat={lat}
+            userLon={lon}
+          />
         </section>
 
         {showInitialSkeleton ? (
