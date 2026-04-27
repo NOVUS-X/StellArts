@@ -21,9 +21,7 @@ class ArtisanItem(BaseModel):
     is_available: bool = False
     rating: float | None = None
     total_reviews: int = 0
-    distance_km: float | None = Field(
-        None, description="Great-circle distance in kilometers"
-    )
+    distance_km: float | None = Field(None, description="Great-circle distance in kilometers")
 
 
 class PaginatedArtisans(BaseModel):
@@ -35,15 +33,9 @@ class PaginatedArtisans(BaseModel):
 
 # Creation/Update/Input Schemas
 class ArtisanLocationUpdate(BaseModel):
-    location: str | None = Field(
-        None, max_length=200, description="Human-readable address"
-    )
-    latitude: Decimal | None = Field(
-        None, ge=-90, le=90, description="Latitude coordinate"
-    )
-    longitude: Decimal | None = Field(
-        None, ge=-180, le=180, description="Longitude coordinate"
-    )
+    location: str | None = Field(None, max_length=200, description="Human-readable address")
+    latitude: Decimal | None = Field(None, ge=-90, le=90, description="Latitude coordinate")
+    longitude: Decimal | None = Field(None, ge=-180, le=180, description="Longitude coordinate")
 
     @field_validator("latitude")
     @classmethod
@@ -67,18 +59,10 @@ class ArtisanProfileCreate(BaseModel):
         default_factory=list, description="List of specialties"
     )
     experience_years: int | None = Field(None, ge=0, le=50)
-    hourly_rate: Decimal | None = Field(
-        None, ge=0, description="Hourly rate in currency"
-    )
-    location: str | None = Field(
-        None, max_length=200, description="Human-readable address"
-    )
-    latitude: Decimal | None = Field(
-        None, ge=-90, le=90, description="Latitude coordinate"
-    )
-    longitude: Decimal | None = Field(
-        None, ge=-180, le=180, description="Longitude coordinate"
-    )
+    hourly_rate: Decimal | None = Field(None, ge=0, description="Hourly rate in currency")
+    location: str | None = Field(None, max_length=200, description="Human-readable address")
+    latitude: Decimal | None = Field(None, ge=-90, le=90, description="Latitude coordinate")
+    longitude: Decimal | None = Field(None, ge=-180, le=180, description="Longitude coordinate")
 
     @field_validator("specialties")
     @classmethod
@@ -93,18 +77,10 @@ class ArtisanProfileUpdate(BaseModel):
     description: str | None = None
     specialties: list[str] | None = Field(None, description="List of specialties")
     experience_years: int | None = Field(None, ge=0, le=50)
-    hourly_rate: Decimal | None = Field(
-        None, ge=0, description="Hourly rate in currency"
-    )
-    location: str | None = Field(
-        None, max_length=200, description="Human-readable address"
-    )
-    latitude: Decimal | None = Field(
-        None, ge=-90, le=90, description="Latitude coordinate"
-    )
-    longitude: Decimal | None = Field(
-        None, ge=-180, le=180, description="Longitude coordinate"
-    )
+    hourly_rate: Decimal | None = Field(None, ge=0, description="Hourly rate in currency")
+    location: str | None = Field(None, max_length=200, description="Human-readable address")
+    latitude: Decimal | None = Field(None, ge=-90, le=90, description="Latitude coordinate")
+    longitude: Decimal | None = Field(None, ge=-180, le=180, description="Longitude coordinate")
     is_available: bool | None = None
 
 
@@ -148,9 +124,7 @@ class ArtisanOut(BaseModel):
 
 
 class ArtisanWithDistance(ArtisanOut):
-    distance_km: float | None = Field(
-        None, description="Distance in kilometers from search point"
-    )
+    distance_km: float | None = Field(None, description="Distance in kilometers from search point")
 
 
 # Search & Filtering
@@ -159,9 +133,7 @@ class NearbyArtisansRequest(BaseModel):
     longitude: Decimal = Field(
         ..., ge=-180, le=180, description="Search center longitude"
     )
-    radius_km: float | None = Field(
-        10.0, ge=0.1, le=100, description="Search radius in kilometers"
-    )
+    radius_km: float | None = Field(10.0, ge=0.1, le=100, description="Search radius in kilometers")
     specialties: list[str] | None = Field(None, description="Filter by specialties")
     min_rating: float | None = Field(
         None, ge=0, le=5, description="Minimum rating filter"
@@ -169,12 +141,8 @@ class NearbyArtisansRequest(BaseModel):
     min_experience_years: int | None = Field(
         None, ge=0, description="Minimum experience years"
     )
-    min_rate: float | None = Field(
-        None, ge=0, description="Minimum hourly rate"
-    )
-    max_rate: float | None = Field(
-        None, ge=0, description="Maximum hourly rate"
-    )
+    min_rate: float | None = Field(None, ge=0, description="Minimum hourly rate")
+    max_rate: float | None = Field(None, ge=0, description="Maximum hourly rate")
     is_available: bool | None = Field(True, description="Filter by availability")
     limit: int | None = Field(20, ge=1, le=100, description="Maximum number of results")
 
