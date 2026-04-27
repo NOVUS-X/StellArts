@@ -1,16 +1,20 @@
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+# 1. Define the router instead of trying to use 'app'
 router = APIRouter()
 
-class Item(BaseModel):
-    name: str = Field(examples=["Fubotoy"])
-    price: float = Field(description="The price must be greater than zero", examples=[19.99])
+# 2. Define a schema for documentation (Solves "document all endpoints")
+class MintRequest(BaseModel):
+    name: str = Field(..., examples=["StellArt #001"])
+    description: str = Field(..., examples=["A unique digital collectible"])
 
-@router.post("/items/", tags=["items"], summary="Create a new item")
-async def create_item(item: Item):
-    return {"message": "Item Created"}
+# 3. Use @router instead of @app
+@router.post("/mint", tags=["nfts"], summary="Mint a new NFT")
+async def mint_nft(request: MintRequest):
     """
-    Create an item with all the information:
-    - **name**: each item must have a name
-    - **price**: must be a float
+    Detailed documentation for the Swagger UI:
+    - **name**: The name of the NFT to be created.
+    - **description**: A short bio for the asset.
     """
-    return item
+    return {"status": "success", "asset": request.name}
