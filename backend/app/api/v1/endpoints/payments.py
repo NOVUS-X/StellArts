@@ -1,13 +1,14 @@
 # app/api/v1/endpoints/payments.py
 import uuid
 from decimal import Decimal
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from stellar_sdk import TransactionEnvelope
 
-from app.core.auth import require_client
+from app.core.auth import require_client, get_current_active_user
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.booking import Booking
@@ -47,6 +48,19 @@ class RefundRequest(BaseModel):
     booking_id: str
     client_public: str
     amount: Decimal = Field(..., gt=0)
+
+
+class PaymentOut(BaseModel):
+    id: uuid.UUID
+    booking_id: uuid.UUID
+    amount: Decimal
+    transaction_hash: str | None
+    status: str
+    created_at: Any
+    service_name: str | None = None
+
+    class Config:
+        from_attributes = True
 
 
 # The old /hold endpoint has been removed due to security concerns. Clients
@@ -185,3 +199,39 @@ def refund(req: RefundRequest, db: Session = Depends(get_db)):
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message"))
     return res
+
+
+@router.get("/my-payments", response_model=list[PaymentOut])
+def get_my_payments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get payment history for the current user (either as client or artisan)"""
+    from app.models.artisan import Artisan
+    from app.models.client import Client
+
+    query = db.query(Payment).join(Booking)
+
+    if current_user.role == "client":
+        client = db.query(Client).filter(Client.user_id == current_user.id).first()
+        if not client:
+            return []
+        query = query.filter(Booking.client_id == client.id)
+    elif current_user.role == "artisan":
+        artisan = db.query(Artisan).filter(Artisan.user_id == current_user.id).first()
+        if not artisan:
+            return []
+        query = query.filter(Booking.artisan_id == artisan.id)
+    else:
+        return []
+
+    payments = query.order_by(Payment.created_at.desc()).all()
+
+    # Map to include service name
+    results = []
+    for p in payments:
+        p_out = PaymentOut.from_orm(p)
+        p_out.service_name = p.booking.service
+        results.append(p_out)
+
+    return results
