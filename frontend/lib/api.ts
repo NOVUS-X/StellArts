@@ -13,39 +13,52 @@ async function request<T>(
   options: RequestInit & { token?: string } = {},
 ): Promise<T> {
   const { token, ...init } = options;
+
   const url = `${getBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+
   const headers: HeadersInit = {
     ...(init.headers as Record<string, string>),
   };
+
   if (!(init.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
+
   if (token) {
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
+
   const res = await fetch(url, { ...init, headers });
   const text = await res.text();
+
   if (!res.ok) {
     let message = res.statusText;
+
     try {
       const json = JSON.parse(text);
-      message =
-        json.detail ??
-        (typeof json.detail === "string" ? json.detail : message);
-      if (Array.isArray(json.detail))
+
+      if (typeof json.detail === "string") {
+        message = json.detail;
+      } else if (Array.isArray(json.detail)) {
         message =
           json.detail.map((d: { msg?: string }) => d.msg ?? "").join("; ") ||
           message;
+      }
     } catch {
       if (text) message = text;
     }
+
     throw new Error(message);
   }
+
   if (!text) return undefined as T;
+
   return JSON.parse(text) as T;
 }
 
-// --- Types (aligned with backend schemas) ---
+/* =========================
+   TYPES
+========================= */
 
 export interface UserOut {
   id: number;
@@ -155,7 +168,9 @@ interface PaginatedArtisansResponse {
   page_size: number;
 }
 
-// --- API object ---
+/* =========================
+   API
+========================= */
 
 export const api = {
   auth: {
@@ -164,6 +179,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+
     register: (body: {
       email: string;
       password: string;
@@ -176,18 +192,22 @@ export const api = {
         body: JSON.stringify(body),
       }),
   },
+
   users: {
     me: (token: string) =>
       request<UserOut>("/users/me", { method: "GET", token }),
+
     updateMe: (body: Partial<UserOut>, token: string) =>
       request<UserOut>("/users/me", {
         method: "PUT",
         body: JSON.stringify(body),
         token,
       }),
+
     uploadAvatar: (file: File, token: string) => {
       const formData = new FormData();
       formData.append("file", file);
+
       return request<UserOut>("/users/me/avatar", {
         method: "POST",
         body: formData,
@@ -195,17 +215,21 @@ export const api = {
       });
     },
   },
+
   artisans: {
     me: (token: string) =>
       request<ArtisanItem>("/artisans/me", { method: "GET", token }),
+
     nearby: (
       lat: number,
       lon: number,
       opts: {
         page?: number;
         page_size?: number;
-        skill?: string;
+        specialties?: string[];
         min_rating?: number;
+        max_price?: number;
+        min_experience?: number;
         is_available?: boolean;
       } = {},
     ) => {
@@ -215,15 +239,35 @@ export const api = {
         page: String(opts.page ?? 1),
         page_size: String(opts.page_size ?? 10),
       });
-      if (opts.skill) params.append("skill", opts.skill);
-      if (opts.min_rating !== undefined && opts.min_rating > 0)
+
+      if (opts.specialties && opts.specialties.length > 0) {
+        opts.specialties.forEach((s) => params.append("specialties", s));
+      }
+
+      if (opts.min_rating && opts.min_rating > 0) {
         params.append("min_rating", String(opts.min_rating));
-      if (opts.is_available !== undefined)
+      }
+
+      if (opts.max_price && opts.max_price > 0) {
+        params.append("max_price", String(opts.max_price));
+      }
+
+      if (opts.min_experience && opts.min_experience > 0) {
+        params.append("min_experience", String(opts.min_experience));
+      }
+
+      if (opts.is_available !== undefined) {
         params.append("is_available", String(opts.is_available));
-      return request<PaginatedArtisansResponse>(`/artisans/nearby?${params}`);
+      }
+
+      return request<PaginatedArtisansResponse>(
+        `/artisans/nearby?${params.toString()}`,
+      );
     },
+
     getProfile: (artisanId: number) =>
       request<ArtisanProfileResponse>(`/artisans/${artisanId}/profile`),
+
     updateProfile: (body: ArtisanProfileUpdate, token: string) =>
       request<ArtisanItem>("/artisans/profile", {
         method: "PUT",
@@ -231,12 +275,14 @@ export const api = {
         token,
       }),
   },
+
   bookings: {
     myBookings: (token: string) =>
       request<BookingResponse[]>("/bookings/my-bookings", {
         method: "GET",
         token,
       }),
+
     create: (body: BookingCreate, token: string) =>
       request<BookingResponse>("/bookings/create", {
         method: "POST",
@@ -244,8 +290,9 @@ export const api = {
         token,
       }),
   },
+
   notifications: {
-    get: (token: string, skip: number = 0, limit: number = 50) =>
+    get: (token: string, skip = 0, limit = 50) =>
       request<NotificationItem[]>(
         `/notifications/?skip=${skip}&limit=${limit}`,
         {
@@ -253,25 +300,35 @@ export const api = {
           token,
         },
       ),
+
     getUnreadCount: (token: string) =>
       request<{ unread_count: number }>("/notifications/unread-count", {
         method: "GET",
         token,
       }),
+
     markAsRead: (token: string, notificationId: string) =>
-      request<NotificationItem>(`/notifications/${notificationId}/read`, {
-        method: "PUT",
-        token,
-      }),
+      request<NotificationItem>(
+        `/notifications/${notificationId}/read`,
+        {
+          method: "PUT",
+          token,
+        },
+      ),
+
     markAllAsRead: (token: string) =>
       request<{ message: string }>("/notifications/mark-all-read", {
         method: "PUT",
         token,
       }),
+
     delete: (token: string, notificationId: string) =>
-      request<{ message: string }>(`/notifications/${notificationId}`, {
-        method: "DELETE",
-        token,
-      }),
+      request<{ message: string }>(
+        `/notifications/${notificationId}`,
+        {
+          method: "DELETE",
+          token,
+        },
+      ),
   },
 };

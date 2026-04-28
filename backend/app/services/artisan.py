@@ -162,6 +162,8 @@ class ArtisanService:
         limit: int = 100,
         specialties: list[str] | None = None,
         min_rating: float | None = None,
+        max_price: float | None = None,
+        min_experience: int | None = None,
         is_available: bool | None = None,
         has_location: bool | None = None,
     ) -> list[Artisan]:
@@ -178,6 +180,12 @@ class ArtisanService:
 
         if min_rating is not None:
             query = query.filter(Artisan.rating >= min_rating)
+
+        if max_price is not None:
+            query = query.filter(Artisan.hourly_rate <= max_price)
+
+        if min_experience is not None:
+            query = query.filter(Artisan.experience_years >= min_experience)
 
         if is_available is not None:
             query = query.filter(Artisan.is_available == is_available)
@@ -230,6 +238,12 @@ class ArtisanService:
 
             if request.min_rating is not None:
                 query = query.filter(Artisan.rating >= request.min_rating)
+
+            if request.max_price is not None:
+                query = query.filter(Artisan.hourly_rate <= request.max_price)
+
+            if request.min_experience is not None:
+                query = query.filter(Artisan.experience_years >= request.min_experience)
 
             if request.is_available is not None:
                 query = query.filter(Artisan.is_available == request.is_available)
