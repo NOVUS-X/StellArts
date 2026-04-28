@@ -42,7 +42,7 @@ router = APIRouter(prefix="/bookings")
 @router.post(
     "/create", response_model=BookingResponse, status_code=status.HTTP_201_CREATED
 )
-def create_booking(
+async def create_booking(
     booking_data: BookingCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_client),
@@ -132,15 +132,11 @@ def create_booking(
     db.commit()
     db.refresh(new_booking)
 
-    # Dispatch smart pitches to matched artisans (async operation)
+    # Dispatch smart pitches to matched artisans (fire-and-forget background task)
     try:
-        # Run async dispatch in background (fire and forget)
-        asyncio.create_task(
+        asyncio.ensure_future(
             notification_service.dispatch_to_matched_artisans(db, new_booking)
         )
-    except ImportError:
-        # Notification service not available, continue without dispatch
-        pass
     except Exception as e:
         # Log error but don't fail booking creation
         print(f"Failed to dispatch notifications: {e}")
