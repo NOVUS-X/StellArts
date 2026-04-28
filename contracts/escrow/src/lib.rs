@@ -37,6 +37,9 @@ pub struct Escrow {
     pub arbitrator: Address,
     pub token: Address,
     pub amount: i128,
+    pub material_amount: i128,
+    pub labor_amount: i128,
+    pub materials_released: bool,
     pub status: Status,
     pub deadline: u64,
 }
@@ -140,6 +143,15 @@ pub struct DisputeResolvedEvent {
     pub timestamp: u64,
 }
 
+// Event emitted when the material tranche is released to the artisan
+#[contracttype]
+pub struct MaterialsReleasedEvent {
+    pub id: u64,
+    pub artisan: Address,
+    pub amount: i128,
+    pub timestamp: u64,
+}
+
 #[contract]
 pub struct EscrowContract;
 
@@ -157,6 +169,8 @@ impl EscrowContract {
         env: Env,
         client: Address,
         artisan: Address,
+        material_amount: i128,
+        labor_amount: i128,
         arbitrator: Address,
         token: Address,
         amount: i128,
@@ -169,6 +183,24 @@ impl EscrowContract {
             panic!("Client and artisan cannot be the same address");
         }
 
+        // Validation: both amounts must be positive
+        if material_amount <= 0 {
+            panic!("Amount must be greater than zero");
+        }
+        if labor_amount <= 0 {
+            panic!("Amount must be greater than zero");
+        }
+
+        let amount = material_amount + labor_amount;
+
+        // Generate unique engagement ID
+        let next_id = env
+            .storage()
+            .persistent()
+            .get(&DataKey::NextId)
+            .unwrap_or(1u64);
+
+        let engagement_id = next_id;
         // Validation: arbitrator cannot be client or artisan
         if arbitrator == client || arbitrator == artisan {
             panic!("Arbitrator must be a third party");
@@ -213,6 +245,9 @@ impl EscrowContract {
             arbitrator: arbitrator.clone(),
             token: token.clone(),
             amount,
+            material_amount,
+            labor_amount,
+            materials_released: false,
             status: Status::Pending,
             deadline,
         };
@@ -301,6 +336,62 @@ impl EscrowContract {
         );
     }
 
+    /// Release the material tranche to the artisan immediately upon job acceptance.
+    /// Can only be called by the client when the escrow is Funded.
+    /// The labor tranche remains locked in Funded state until the job is complete.
+    pub fn release_materials(env: Env, engagement_id: u64, token: Address) {
+        let key = DataKey::Escrow(engagement_id);
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("Escrow not found");
+
+        // Auth: Require the client's signature
+        escrow.client.require_auth();
+
+        // State check: must be Funded
+        if escrow.status != Status::Funded {
+            panic!("Escrow is not funded");
+        }
+
+        // Guard against double release of materials
+        if escrow.materials_released {
+            panic!("Materials have already been released");
+        }
+
+        // Deadline check
+        let current_time = env.ledger().timestamp();
+        if current_time > escrow.deadline {
+            panic!("Deadline has passed; cannot release materials");
+        }
+
+        // Transfer material amount to artisan
+        let token_client = token::Client::new(&env, &token);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &escrow.artisan,
+            &escrow.material_amount,
+        );
+
+        // Mark materials as released; labor remains locked (status stays Funded)
+        escrow.materials_released = true;
+        env.storage().persistent().set(&key, &escrow);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
+
+        env.events().publish(
+            (),
+            MaterialsReleasedEvent {
+                id: engagement_id,
+                artisan: escrow.artisan,
+                amount: escrow.material_amount,
+                timestamp: current_time,
+            },
+        );
+    }
+
     /// Release funds from escrow to the artisan
     /// Can only be called by the client and only when escrow is funded.
     /// Also verifies that the deadline has not passed; after the deadline the client
@@ -357,12 +448,17 @@ impl EscrowContract {
             env.storage().persistent().remove(&approvals_key);
         }
 
-        // Logic: Transfer the stored escrow amount from the contract address to the artisan's address
+        // Logic: Transfer remaining labor amount (or full amount if materials were not pre-released)
+        let release_amount = if escrow.materials_released {
+            escrow.labor_amount
+        } else {
+            escrow.amount
+        };
         let token_client = token::Client::new(&env, &token);
         token_client.transfer(
             &env.current_contract_address(),
             &escrow.artisan,
-            &escrow.amount,
+            &release_amount,
         );
 
         // State: Update the escrow status to Released
@@ -476,6 +572,12 @@ impl EscrowContract {
             panic!("Deadline has not passed; cannot reclaim yet");
         }
 
+        // Transfer only the locked portion back to client (labor if materials were pre-released)
+        let reclaim_amount = if escrow.materials_released {
+            escrow.labor_amount
+        } else {
+            escrow.amount
+        };
         // Check if we're still within the grace period
         let grace_deadline = escrow.deadline + GRACE_PERIOD;
         if current_time <= grace_deadline {
@@ -505,7 +607,7 @@ impl EscrowContract {
         token_client.transfer(
             &env.current_contract_address(),
             &escrow.client,
-            &escrow.amount,
+            &reclaim_amount,
         );
 
         // Update state to Refunded
@@ -521,6 +623,7 @@ impl EscrowContract {
             ReclaimedEvent {
                 id: engagement_id,
                 client: escrow.client.clone(),
+                amount: reclaim_amount,
                 artisan: escrow.artisan.clone(),
                 amount: escrow.amount,
                 token: escrow.token.clone(),
@@ -754,6 +857,18 @@ impl EscrowContract {
             panic!("Distribution amounts must equal the escrowed amount");
         }
 
+        // Transfer only the locked portion to winner (labor if materials were pre-released)
+        let arbitrate_amount = if escrow.materials_released {
+            escrow.labor_amount
+        } else {
+            escrow.amount
+        };
+        let token_client = token::Client::new(&env, &token);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &winner,
+            &arbitrate_amount,
+        );
         // Verify token matches initialized token
         if token != escrow.token {
             panic!("Token does not match the initialized token for this engagement");
@@ -800,6 +915,8 @@ impl EscrowContract {
             (Symbol::new(&env, "dispute_resolved"), engagement_id),
             DisputeResolvedEvent {
                 id: engagement_id,
+                winner,
+                amount: arbitrate_amount,
                 client: escrow.client.clone(),
                 artisan: escrow.artisan.clone(),
                 token: escrow.token.clone(),
@@ -873,6 +990,8 @@ mod test_legacy {
         // Create test addresses
         let client_address = Address::generate(&env);
         let artisan_address = Address::generate(&env);
+        let material_amount: i128 = 600;
+        let labor_amount: i128 = 400;
         let arbitrator_address = Address::generate(&env);
         let token_address = Address::generate(&env);
         let amount: i128 = 1000;
@@ -882,6 +1001,9 @@ mod test_legacy {
         let engagement_id = client.initialize(
             &client_address,
             &artisan_address,
+            &material_amount,
+            &labor_amount,
+            &deadline,
             &arbitrator_address,
             &token_address,
             &amount,
@@ -903,6 +1025,10 @@ mod test_legacy {
 
         assert_eq!(stored_escrow.client, client_address);
         assert_eq!(stored_escrow.artisan, artisan_address);
+        assert_eq!(stored_escrow.amount, material_amount + labor_amount);
+        assert_eq!(stored_escrow.material_amount, material_amount);
+        assert_eq!(stored_escrow.labor_amount, labor_amount);
+        assert_eq!(stored_escrow.materials_released, false);
         assert_eq!(stored_escrow.token, token_address);
         assert_eq!(stored_escrow.amount, amount);
         assert_eq!(stored_escrow.status, Status::Pending);
@@ -926,6 +1052,10 @@ mod test_legacy {
         let client = EscrowContractClient::new(&env, &contract_id);
 
         let same_address = Address::generate(&env);
+        let deadline = env.ledger().timestamp() + 86400;
+
+        // This should panic because client == artisan
+        client.initialize(&same_address, &same_address, &500i128, &500i128, &deadline);
         let arbitrator_address = Address::generate(&env);
         let token_address = Address::generate(&env);
         let amount: i128 = 1000;
@@ -958,6 +1088,8 @@ mod test_legacy {
         let zero_amount: i128 = 0;
         let deadline = env.ledger().timestamp() + 86400;
 
+        // This should panic because material_amount is zero
+        client.initialize(&client_address, &artisan_address, &zero_amount, &500i128, &deadline);
         // This should panic because amount is zero
         client.initialize(
             &client_address,
@@ -985,13 +1117,14 @@ mod test_legacy {
         let negative_amount: i128 = -100;
         let deadline = env.ledger().timestamp() + 86400;
 
-        // This should panic because amount is negative
+        // This should panic because material_amount is negative
         client.initialize(
             &client_address,
             &artisan_address,
             &arbitrator_address,
             &token_address,
             &negative_amount,
+            &500i128,
             &deadline,
             &soroban_sdk::vec![&env],
             &0u32,
@@ -1039,6 +1172,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount: escrow_amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Pending,
             deadline,
         };
@@ -1108,6 +1244,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount: escrow_amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Pending,
             deadline,
         };
@@ -1160,6 +1299,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount: escrow_amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Funded, // Already funded
             deadline,
         };
@@ -1216,6 +1358,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount: 500,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Pending,
             deadline: env.ledger().timestamp().saturating_sub(1),
         };
@@ -1260,6 +1405,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -1298,6 +1446,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -1344,6 +1495,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -1411,6 +1565,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -1463,6 +1620,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Pending,
             deadline,
         };
@@ -1505,6 +1665,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -1556,6 +1719,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
@@ -1604,6 +1770,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Pending,
             deadline,
         };
@@ -1646,6 +1815,9 @@ mod test_legacy {
             arbitrator: Address::generate(&env),
             token: token_address.clone(),
             amount,
+            material_amount: 0,
+            labor_amount: 0,
+            materials_released: false,
             status: Status::Funded,
             deadline,
         };
