@@ -81,10 +81,14 @@ async def get_nearby_artisans(
     radius_km: float = Query(
         25.0, ge=0, le=200, description="Search radius in kilometers"
     ),
-    skill: str
-    | None = Query(None, description="Filter by skill keyword (e.g., plumber)"),
+    specialties: list[str]
+    | None = Query(None, description="Filter by multiple skill keywords"),
     min_rating: float
     | None = Query(None, ge=0, le=5, description="Minimum average rating"),
+    max_price: float
+    | None = Query(None, ge=0, description="Maximum hourly rate"),
+    min_experience: int
+    | None = Query(None, ge=0, description="Minimum years of experience"),
     available: bool | None = Query(None, description="Filter by current availability"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
@@ -97,8 +101,10 @@ async def get_nearby_artisans(
         latitude=lat,
         longitude=lon,
         radius_km=radius_km,
-        specialties=[skill] if skill else None,
+        specialties=specialties,
         min_rating=min_rating,
+        max_price=max_price,
+        min_experience=min_experience,
         is_available=available if available is not None else True,
         limit=page_size * page,  # Fetch enough for pagination
     )

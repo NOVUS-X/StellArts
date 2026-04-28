@@ -231,6 +231,12 @@ class ArtisanService:
             if request.min_rating is not None:
                 query = query.filter(Artisan.rating >= request.min_rating)
 
+            if request.max_price is not None:
+                query = query.filter(Artisan.hourly_rate <= request.max_price)
+
+            if request.min_experience is not None:
+                query = query.filter(Artisan.experience_years >= request.min_experience)
+
             if request.is_available is not None:
                 query = query.filter(Artisan.is_available == request.is_available)
 

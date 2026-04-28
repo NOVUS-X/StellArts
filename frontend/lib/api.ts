@@ -149,7 +149,7 @@ export const api = {
     nearby: (
       lat: number,
       lon: number,
-      opts: { page?: number; page_size?: number; skill?: string; min_rating?: number; is_available?: boolean } = {}
+      opts: { page?: number; page_size?: number; specialties?: string[]; min_rating?: number; max_price?: number; min_experience?: number; is_available?: boolean } = {}
     ) => {
       const params = new URLSearchParams({
         lat: String(lat),
@@ -157,8 +157,12 @@ export const api = {
         page: String(opts.page ?? 1),
         page_size: String(opts.page_size ?? 10),
       });
-      if (opts.skill) params.append("skill", opts.skill);
+      if (opts.specialties && opts.specialties.length > 0) {
+        opts.specialties.forEach(spec => params.append("specialties", spec));
+      }
       if (opts.min_rating !== undefined && opts.min_rating > 0) params.append("min_rating", String(opts.min_rating));
+      if (opts.max_price !== undefined && opts.max_price > 0) params.append("max_price", String(opts.max_price));
+      if (opts.min_experience !== undefined && opts.min_experience > 0) params.append("min_experience", String(opts.min_experience));
       if (opts.is_available !== undefined) params.append("is_available", String(opts.is_available));
       return request<PaginatedArtisansResponse>(`/artisans/nearby?${params}`);
     },
