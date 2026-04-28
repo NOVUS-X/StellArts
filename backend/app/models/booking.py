@@ -24,6 +24,7 @@ class BookingStatus(enum.Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+    DISPUTED = "disputed"
 
 
 class Booking(Base):
