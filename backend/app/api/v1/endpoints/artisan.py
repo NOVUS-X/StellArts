@@ -81,17 +81,11 @@ async def get_nearby_artisans(
     radius_km: float = Query(
         25.0, ge=0, le=200, description="Search radius in kilometers"
     ),
-    specialties: list[str] | None = Query(
-        None, description="Filter by multiple skill keywords"
-    ),
-    min_rating: float | None = Query(
-        None, ge=0, le=5, description="Minimum average rating"
-    ),
-    max_price: float | None = Query(None, ge=0, description="Maximum hourly rate"),
-    min_experience: int | None = Query(
-        None, ge=0, description="Minimum years of experience"
-    ),
-    available: bool | None = Query(None, description="Filter by current availability"),
+    specialties: list[str] | None = Query(None, description="Filter by skills"),
+    min_rating: float | None = Query(None, ge=0, le=5, description="Min rating"),
+    max_price: float | None = Query(None, ge=0, description="Max hourly rate"),
+    min_experience: int | None = Query(None, ge=0, description="Min experience"),
+    available: bool | None = Query(None, description="Filter by availability"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
 ):
@@ -473,6 +467,8 @@ def list_artisans(
     limit: int = Query(20, ge=1, le=100),
     specialties: list[str] | None = Query(None),
     min_rating: float | None = Query(None, ge=0, le=5),
+    max_price: float | None = Query(None, ge=0),
+    min_experience: int | None = Query(None, ge=0),
     is_available: bool | None = Query(None),
     has_location: bool | None = Query(None),
 ):
@@ -483,6 +479,8 @@ def list_artisans(
         limit=limit,
         specialties=specialties,
         min_rating=min_rating,
+        max_price=max_price,
+        min_experience=min_experience,
         is_available=is_available,
         has_location=has_location,
     )
