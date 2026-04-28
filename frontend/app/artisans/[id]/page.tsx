@@ -13,6 +13,7 @@ import {
 import { api, type ArtisanProfileResponse } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
 import { ArrowLeft, MapPin, Star, Wrench } from "lucide-react";
+import Price from "../../../components/ui/Price";
 
 export default function ArtisanProfilePage() {
   const params = useParams();
@@ -86,35 +87,41 @@ export default function ArtisanProfilePage() {
         </Link>
 
         <Card>
-          <CardContent className="p-8">
-            <div className="flex items-start gap-6">
-              <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                <Wrench className="w-10 h-10 text-blue-600" />
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-6">
+              <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center shrink-0 border-4 border-blue-50 shadow-sm">
+                <Wrench className="w-12 h-12 text-blue-600" />
               </div>
               <div className="min-w-0 flex-1">
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
                   {profile.name || "Artisan"}
                 </h1>
                 {profile.specialty && (
-                  <p className="text-gray-600 mt-1">{profile.specialty}</p>
+                  <p className="text-blue-600 font-medium mt-1">{profile.specialty}</p>
                 )}
                 {profile.location && (
-                  <p className="text-sm text-gray-500 flex items-center gap-1 mt-2">
+                  <p className="text-sm text-gray-500 flex items-center justify-center sm:justify-start gap-1 mt-2">
                     <MapPin className="w-4 h-4" />
                     {profile.location}
                   </p>
                 )}
-                <div className="flex items-center gap-4 mt-3">
+                <div className="flex items-center justify-center sm:justify-start gap-6 mt-4">
                   {profile.average_rating != null && (
-                    <span className="flex items-center gap-1 text-amber-600">
-                      <Star className="w-4 h-4 fill-current" />
-                      {Number(profile.average_rating).toFixed(1)}
-                    </span>
+                    <div className="flex flex-col items-center sm:items-start">
+                      <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Rating</span>
+                      <span className="flex items-center gap-1 text-amber-600 font-bold text-lg">
+                        <Star className="w-5 h-5 fill-current" />
+                        {Number(profile.average_rating).toFixed(1)}
+                      </span>
+                    </div>
                   )}
                   {profile.rate != null && (
-                    <span className="font-semibold text-gray-900">
-                      ${Number(profile.rate).toFixed(0)}/hr
-                    </span>
+                    <div className="flex flex-col items-center sm:items-start">
+                      <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Rate</span>
+                      <span className="font-bold text-gray-900 text-lg">
+                        <Price amount={Number(profile.rate)} />/hr
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>

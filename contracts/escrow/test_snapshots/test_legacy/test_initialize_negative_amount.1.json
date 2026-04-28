@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 3,
+    "address": 5,
     "nonce": 0
   },
   "auth": [
@@ -99,6 +99,12 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                },
+                {
                   "i128": {
                     "hi": -1,
                     "lo": 18446744073709551516
@@ -106,6 +112,12 @@
                 },
                 {
                   "u64": 86400
+                },
+                {
+                  "vec": []
+                },
+                {
+                  "u32": 0
                 }
               ]
             }
@@ -129,13 +141,19 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Amount must be greater than zero' from contract function 'Symbol(obj#9)'"
+                  "string": "caught panic 'Amount must be greater than zero' from contract function 'Symbol(obj#15)'"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                 },
                 {
                   "i128": {
@@ -145,6 +163,12 @@
                 },
                 {
                   "u64": 86400
+                },
+                {
+                  "vec": []
+                },
+                {
+                  "u32": 0
                 }
               ]
             }
@@ -212,6 +236,12 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                     },
                     {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                    },
+                    {
                       "i128": {
                         "hi": -1,
                         "lo": 18446744073709551516
@@ -219,6 +249,12 @@
                     },
                     {
                       "u64": 86400
+                    },
+                    {
+                      "vec": []
+                    },
+                    {
+                      "u32": 0
                     }
                   ]
                 }

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
+from app.core.cache import cache
 from app.models.artisan import Artisan
 from app.schemas.artisan import (
     ArtisanProfileCreate,
@@ -83,7 +85,7 @@ class ArtisanService:
             self.db.refresh(artisan)
 
             # Update Redis geospatial index if coordinates changed
-            if artisan.latitude and artisan.longitude:
+            if artisan.is_available and artisan.latitude and artisan.longitude:
                 await geolocation_service.add_artisan_location(
                     artisan.id, artisan.latitude, artisan.longitude
                 )
@@ -96,6 +98,55 @@ class ArtisanService:
             self.db.rollback()
             print(f"Error updating artisan profile: {e}")
             return None
+
+    async def update_artisan_availability(
+        self, artisan_id: int, is_available: bool
+    ) -> Artisan | None:
+        """Update availability and keep search indexes/cache in sync."""
+        try:
+            artisan = self.db.query(Artisan).filter(Artisan.id == artisan_id).first()
+            if not artisan:
+                return None
+
+            artisan.is_available = is_available
+            artisan.last_active = datetime.now(UTC)
+
+            self.db.commit()
+            self.db.refresh(artisan)
+
+            if artisan.is_available and artisan.latitude and artisan.longitude:
+                await geolocation_service.add_artisan_location(
+                    artisan.id, artisan.latitude, artisan.longitude
+                )
+            else:
+                await geolocation_service.remove_artisan_location(artisan.id)
+
+            await self._invalidate_nearby_cache()
+            return artisan
+        except Exception as e:
+            self.db.rollback()
+            print(f"Error updating artisan availability: {e}")
+            return None
+
+    async def _invalidate_nearby_cache(self) -> None:
+        if not cache.redis:
+            return
+
+        try:
+            keys = []
+            scan_iter = cache.redis.scan_iter(match="nearby:*")
+            if hasattr(scan_iter, "__await__"):
+                scan_iter = await scan_iter
+            if not hasattr(scan_iter, "__aiter__"):
+                return
+
+            async for key in scan_iter:
+                keys.append(key)
+
+            if keys:
+                await cache.redis.delete(*keys)
+        except Exception as e:
+            print(f"Error invalidating nearby artisan cache: {e}")
 
     def get_artisan_by_id(self, artisan_id: int) -> Artisan | None:
         """Get artisan by ID"""
@@ -111,6 +162,8 @@ class ArtisanService:
         limit: int = 100,
         specialties: list[str] | None = None,
         min_rating: float | None = None,
+        max_price: float | None = None,
+        min_experience: int | None = None,
         is_available: bool | None = None,
         has_location: bool | None = None,
     ) -> list[Artisan]:
@@ -127,6 +180,12 @@ class ArtisanService:
 
         if min_rating is not None:
             query = query.filter(Artisan.rating >= min_rating)
+
+        if max_price is not None:
+            query = query.filter(Artisan.hourly_rate <= max_price)
+
+        if min_experience is not None:
+            query = query.filter(Artisan.experience_years >= min_experience)
 
         if is_available is not None:
             query = query.filter(Artisan.is_available == is_available)
@@ -180,6 +239,12 @@ class ArtisanService:
             if request.min_rating is not None:
                 query = query.filter(Artisan.rating >= request.min_rating)
 
+            if request.max_price is not None:
+                query = query.filter(Artisan.hourly_rate <= request.max_price)
+
+            if request.min_experience is not None:
+                query = query.filter(Artisan.experience_years >= request.min_experience)
+
             if request.is_available is not None:
                 query = query.filter(Artisan.is_available == request.is_available)
 
@@ -197,8 +262,14 @@ class ArtisanService:
                 artisan_dict["distance_km"] = distance_map.get(artisan.id, 0.0)
                 artisan_results.append(artisan_dict)
 
-            # Sort by distance
-            artisan_results.sort(key=lambda x: x["distance_km"])
+            # Sort by distance, then rating and recent activity.
+            artisan_results.sort(
+                key=lambda x: (
+                    x["distance_km"],
+                    -(x["rating"] or 0),
+                    -(x["last_active"].timestamp() if x["last_active"] else 0),
+                )
+            )
 
             return {
                 "artisans": artisan_results,
@@ -262,7 +333,11 @@ class ArtisanService:
             artisans = (
                 self.db.query(Artisan)
                 .filter(
-                    and_(Artisan.latitude.isnot(None), Artisan.longitude.isnot(None))
+                    and_(
+                        Artisan.latitude.isnot(None),
+                        Artisan.longitude.isnot(None),
+                        Artisan.is_available == True,  # noqa: E712
+                    )
                 )
                 .all()
             )
@@ -307,6 +382,7 @@ class ArtisanService:
             "longitude": float(artisan.longitude) if artisan.longitude else None,
             "is_verified": artisan.is_verified,
             "is_available": artisan.is_available,
+            "last_active": artisan.last_active,
             "rating": float(artisan.rating) if artisan.rating else None,
             "total_reviews": artisan.total_reviews,
             "created_at": artisan.created_at,

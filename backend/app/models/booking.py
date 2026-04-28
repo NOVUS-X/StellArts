@@ -24,6 +24,7 @@ class BookingStatus(enum.Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+    DISPUTED = "disputed"
 
 
 class Booking(Base):
@@ -35,6 +36,11 @@ class Booking(Base):
     service = Column(Text, nullable=False)
     estimated_hours = Column(DECIMAL(5, 2))
     estimated_cost = Column(DECIMAL(10, 2))
+    labor_cost = Column(DECIMAL(10, 2))
+    material_cost = Column(DECIMAL(10, 2))
+    range_min = Column(DECIMAL(10, 2))
+    range_max = Column(DECIMAL(10, 2))
+    artisan_pitch = Column(Text)
     status = Column(Enum(BookingStatus), default=BookingStatus.PENDING)
     date = Column(DateTime(timezone=True))
     location = Column(String(500))

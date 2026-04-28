@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Stellarts"
     DEBUG: bool = False
+    STATIC_DIR: str = "static"
+    AVATARS_DIR: str = "avatars"
+    SUPPORTED_ASSET_CODES: list[str] = ["XLM", "USDC"]
 
     # Security
     SECRET_KEY: str
@@ -55,8 +58,16 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_PUBLISHABLE_KEY: str | None = None
 
-        # Soroban Configuration
+    # Soroban Configuration
+    # Optional vision model configuration for completion verification
+    VISION_API_URL: str | None = None
+    VISION_API_KEY: str | None = None
+    VISION_MODEL: str = "gpt-4o-mini"
+    JOB_COMPLETION_ACCEPTANCE_THRESHOLD: float = 0.75
+
+    # Soroban Configuration
     SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
+    SOROBAN_NETWORK_PASSPHRASE: str = "Test SDF Network ; September 2015"
     ESCROW_CONTRACT_ID: str | None = None
     REPUTATION_CONTRACT_ID: str | None = None
 

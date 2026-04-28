@@ -29,6 +29,7 @@ class Artisan(Base):
     longitude = Column(DECIMAL(11, 8))
     is_verified = Column(Boolean, default=False)
     is_available = Column(Boolean, default=True)
+    last_active = Column(DateTime(timezone=True), nullable=True)
     rating = Column(DECIMAL(3, 2), default=0.0)
     total_reviews = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

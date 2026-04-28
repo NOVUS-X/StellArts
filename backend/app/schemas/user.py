@@ -12,7 +12,7 @@ class RoleEnum(StrEnum):
     admin = "admin"
 
 
-class PublicRoleEnum(str, Enum):
+class PublicRoleEnum(StrEnum):
     client = "client"
     artisan = "artisan"
 
@@ -68,6 +68,13 @@ class LogoutRequest(BaseModel):
     refresh_token: str
 
 
+class UserUpdate(BaseModel):
+    full_name: str | None = Field(None, max_length=200)
+    phone: str | None = Field(None, max_length=20)
+    username: str | None = Field(None, max_length=100)
+    avatar: str | None = Field(None, max_length=500)
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -77,6 +84,7 @@ class UserOut(BaseModel):
     full_name: str | None = None
     phone: str | None = None
     username: str | None = None
+    avatar: str | None = None
 
 
 class TokenResponse(BaseModel):

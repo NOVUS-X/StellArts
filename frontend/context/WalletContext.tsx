@@ -7,6 +7,7 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
   ReactNode,
 } from "react";
 
@@ -41,23 +42,43 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
   const [kit, setKit] = useState<WalletKitInstance | null>(null);
 
+  const kitRef = useRef<WalletKitInstance | null>(null);
+
   useEffect(() => {
-    import("@creit.tech/stellar-wallets-kit").then(
-      ({
-        StellarWalletsKit: Kit,
-        WalletNetwork,
-        allowAllModules,
-        FREIGHTER_ID,
-      }) => {
-        setKit(
-          new Kit({
+    let isMounted = true;
+
+    if (!kitRef.current) {
+      import("@creit.tech/stellar-wallets-kit").then(
+        ({
+          StellarWalletsKit: Kit,
+          WalletNetwork,
+          allowAllModules,
+          FREIGHTER_ID,
+        }) => {
+          if (!isMounted) return;
+          const newKit = new Kit({
             network: WalletNetwork.TESTNET,
             selectedWalletId: FREIGHTER_ID,
             modules: allowAllModules(),
-          })
-        );
+          });
+          kitRef.current = newKit as WalletKitInstance;
+          setKit(kitRef.current);
+        }
+      );
+    }
+
+    return () => {
+      isMounted = false;
+      // Ensure event listeners for the wallet kit are properly cleaned up on unmount
+      if (kitRef.current) {
+        const currentKit = kitRef.current as any;
+        if (typeof currentKit.removeEventListeners === "function") {
+          currentKit.removeEventListeners();
+        } else if (typeof currentKit.disconnect === "function") {
+          currentKit.disconnect();
+        }
       }
-    );
+    };
   }, []);
 
   const connect = useCallback(async () => {

@@ -108,6 +108,10 @@ class ArtisanProfileUpdate(BaseModel):
     is_available: bool | None = None
 
 
+class ArtisanAvailabilityUpdate(BaseModel):
+    is_available: bool
+
+
 # Output Schema
 class ArtisanOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -124,6 +128,7 @@ class ArtisanOut(BaseModel):
     longitude: Decimal | None = None
     is_verified: bool = False
     is_available: bool = True
+    last_active: datetime | None = None
     rating: Decimal | None = None
     total_reviews: int = 0
     created_at: datetime
@@ -160,6 +165,12 @@ class NearbyArtisansRequest(BaseModel):
     specialties: list[str] | None = Field(None, description="Filter by specialties")
     min_rating: float | None = Field(
         None, ge=0, le=5, description="Minimum rating filter"
+    )
+    max_price: float | None = Field(
+        None, ge=0, description="Maximum hourly rate filter"
+    )
+    min_experience: int | None = Field(
+        None, ge=0, description="Minimum experience years filter"
     )
     is_available: bool | None = Field(True, description="Filter by availability")
     limit: int | None = Field(20, ge=1, le=100, description="Maximum number of results")

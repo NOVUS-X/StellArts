@@ -7,6 +7,7 @@ import {
   CardDescription,
 } from "../ui/card";
 import { cn } from "../../lib/utils";
+import Price from "../ui/Price";
 
 export interface BookingProps {
   id: string;
@@ -34,7 +35,6 @@ export function BookingCard({
   service,
   date,
   price,
-  currency = "XLM",
   status,
 }: BookingProps) {
   const formattedDate = new Intl.DateTimeFormat("en-US", {
@@ -44,13 +44,7 @@ export function BookingCard({
     minute: "2-digit",
   }).format(date);
 
-  const formattedPrice =
-    currency === "USD"
-      ? new Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: "USD",
-        }).format(price)
-      : `${price.toLocaleString(undefined, { maximumFractionDigits: 7 })} ${currency}`;
+  const formattedPrice = <Price amount={price} />;
 
   return (
     <Card className="group w-full max-w-md cursor-pointer border border-gray-100 shadow-sm transition-all duration-300 hover:shadow-lg hover:border-blue-200 hover:-translate-y-1 bg-white relative overflow-hidden">
