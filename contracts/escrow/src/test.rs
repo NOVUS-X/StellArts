@@ -53,11 +53,14 @@ mod happy_path_tests {
             })
         }
 
-        /// Initialize an engagement
+        /// Initialize an engagement with a material/labor split
         fn initialize_engagement(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
+            let half = amount / 2;
+            let material_amount = half;
+            let labor_amount = amount - half;
             let deadline = self.env.ledger().timestamp() + 86400;
             self.client_contract
-                .initialize(client, artisan, &amount, &deadline)
+                .initialize(client, artisan, &material_amount, &labor_amount, &deadline)
         }
 
         /// Mint tokens to an address
@@ -370,9 +373,10 @@ mod happy_path_tests {
         // set a short deadline a few seconds in the future
         let now = ctx.env.ledger().timestamp();
         let deadline = now + 10;
+        let half = amount / 2;
         let engagement_id = ctx
             .client_contract
-            .initialize(&client, &artisan, &amount, &deadline);
+            .initialize(&client, &artisan, &half, &(amount - half), &deadline);
 
         // fund and deposit before the deadline
         ctx.mint_tokens(&client, amount);
@@ -660,4 +664,183 @@ mod happy_path_tests {
         // Try to arbitrate without arbitrator set
         ctx.client_contract
             .arbitrate(&engagement_id, &client, &ctx.token_address);
-    }}
+    }
+
+    // ─── Tranche tests (ISSUE-22) ───────────────────────────────────────────
+
+    /// Test 23: Client deposits combined sum with a single signature (material + labor)
+    #[test]
+    fn test_split_deposit_single_sign() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let material: i128 = 3000;
+        let labor: i128 = 7000;
+        let total = material + labor;
+
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+        let engagement_id = ctx
+            .client_contract
+            .initialize(&client, &artisan, &material, &labor, &deadline);
+
+        // Client signs once to deposit the combined sum
+        ctx.mint_tokens(&client, total);
+        ctx.client_contract
+            .deposit(&engagement_id, &ctx.token_address);
+
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), total);
+        assert_eq!(ctx.get_escrow(engagement_id).status, Status::Funded);
+    }
+
+    /// Test 24: release_materials sends material_amount to artisan; labor stays locked
+    #[test]
+    fn test_release_materials_basic() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let material: i128 = 3000;
+        let labor: i128 = 7000;
+        let total = material + labor;
+
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+        let engagement_id = ctx
+            .client_contract
+            .initialize(&client, &artisan, &material, &labor, &deadline);
+
+        ctx.mint_tokens(&client, total);
+        ctx.client_contract
+            .deposit(&engagement_id, &ctx.token_address);
+
+        let artisan_before = ctx.token_client.balance(&artisan);
+        ctx.client_contract
+            .release_materials(&engagement_id, &ctx.token_address);
+        let artisan_after = ctx.token_client.balance(&artisan);
+
+        // Artisan received exactly the material amount
+        assert_eq!(artisan_after - artisan_before, material);
+        // Contract still holds the labor amount
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), labor);
+
+        let escrow = ctx.get_escrow(engagement_id);
+        assert!(escrow.materials_released);
+        // Status stays Funded (labor still locked)
+        assert_eq!(escrow.status, Status::Funded);
+    }
+
+    /// Test 25: Full tranche workflow — release_materials then release (labor)
+    #[test]
+    fn test_release_materials_then_labor() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let material: i128 = 3000;
+        let labor: i128 = 7000;
+        let total = material + labor;
+
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+        let engagement_id = ctx
+            .client_contract
+            .initialize(&client, &artisan, &material, &labor, &deadline);
+
+        ctx.mint_tokens(&client, total);
+        ctx.client_contract
+            .deposit(&engagement_id, &ctx.token_address);
+
+        // Release materials first
+        ctx.client_contract
+            .release_materials(&engagement_id, &ctx.token_address);
+        assert_eq!(ctx.token_client.balance(&artisan), material);
+
+        // Release labor (only labor_amount should transfer)
+        ctx.client_contract
+            .release(&engagement_id, &ctx.token_address);
+        assert_eq!(ctx.token_client.balance(&artisan), total);
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
+
+        assert_eq!(ctx.get_escrow(engagement_id).status, Status::Released);
+    }
+
+    /// Test 26: release_materials fails if escrow is not Funded
+    #[test]
+    #[should_panic(expected = "Escrow is not funded")]
+    fn test_release_materials_wrong_state() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let material: i128 = 3000;
+        let labor: i128 = 7000;
+
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+        let engagement_id = ctx
+            .client_contract
+            .initialize(&client, &artisan, &material, &labor, &deadline);
+
+        // Do NOT deposit — escrow stays Pending
+        ctx.client_contract
+            .release_materials(&engagement_id, &ctx.token_address);
+    }
+
+    /// Test 27: release_materials fails on a second call (double release guard)
+    #[test]
+    #[should_panic(expected = "Materials have already been released")]
+    fn test_release_materials_twice() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let material: i128 = 3000;
+        let labor: i128 = 7000;
+        let total = material + labor;
+
+        let deadline = ctx.env.ledger().timestamp() + 86400;
+        let engagement_id = ctx
+            .client_contract
+            .initialize(&client, &artisan, &material, &labor, &deadline);
+
+        ctx.mint_tokens(&client, total);
+        ctx.client_contract
+            .deposit(&engagement_id, &ctx.token_address);
+
+        ctx.client_contract
+            .release_materials(&engagement_id, &ctx.token_address);
+        // Second call must panic
+        ctx.client_contract
+            .release_materials(&engagement_id, &ctx.token_address);
+    }
+
+    /// Test 28: reclaim after materials released returns only labor_amount
+    #[test]
+    fn test_reclaim_after_materials_released() {
+        let ctx = TestContext::new();
+        let (client, artisan) = create_addresses(&ctx.env);
+        let material: i128 = 3000;
+        let labor: i128 = 7000;
+        let total = material + labor;
+
+        let now = ctx.env.ledger().timestamp();
+        let deadline = now + 10;
+        let engagement_id = ctx
+            .client_contract
+            .initialize(&client, &artisan, &material, &labor, &deadline);
+
+        ctx.mint_tokens(&client, total);
+        ctx.client_contract
+            .deposit(&engagement_id, &ctx.token_address);
+
+        // Release materials before deadline
+        ctx.client_contract
+            .release_materials(&engagement_id, &ctx.token_address);
+
+        // Fast-forward past deadline
+        ctx.env.ledger().set_timestamp(deadline + 1);
+
+        let client_before = ctx.token_client.balance(&client);
+        ctx.client_contract
+            .reclaim(&engagement_id, &ctx.token_address);
+        let client_after = ctx.token_client.balance(&client);
+
+        // Only labor portion is returned; materials already went to artisan
+        assert_eq!(client_after - client_before, labor);
+        assert_eq!(ctx.token_client.balance(&artisan), material);
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
+
+        assert_eq!(
+            ctx.get_escrow(engagement_id).status,
+            Status::Refunded
+        );
+    }
+}
