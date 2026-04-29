@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
 from app.api.v1.api import api_router
 from app.core.cache import cache
 from app.core.config import settings
