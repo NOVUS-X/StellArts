@@ -65,9 +65,11 @@ class Settings(BaseSettings):
     VISION_MODEL: str = "gpt-4o-mini"
     JOB_COMPLETION_ACCEPTANCE_THRESHOLD: float = 0.75
 
-    # Soroban Configuration
-    SOROBAN_RPC_URL: str = "https://soroban-testnet.stellar.org"
-    SOROBAN_NETWORK_PASSPHRASE: str = "Test SDF Network ; September 2015"
+    # Stellar/Soroban Configuration
+    STELLAR_NETWORK: str = "standalone"  # standalone, testnet, or mainnet
+    STELLAR_RPC_URL: str = "http://localhost:8002/soroban/rpc"
+    STELLAR_NETWORK_PASSPHRASE: str = "Standalone Network ; September 2022"
+    STELLAR_ESCROW_PUBLIC: str | None = None
     ESCROW_CONTRACT_ID: str | None = None
     REPUTATION_CONTRACT_ID: str | None = None
 
