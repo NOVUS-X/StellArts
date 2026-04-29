@@ -39,6 +39,8 @@ class PrepareRequest(BaseModel):
     booking_id: str
     amount: Decimal = Field(..., gt=0)
     client_public: str
+    asset_code: str = "XLM"
+    asset_issuer: str | None = None
 
 
 class SubmitRequest(BaseModel):
@@ -113,6 +115,13 @@ def prepare(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_client),
 ):
+    # Reject unsupported assets
+    if req.asset_code.upper() not in settings.SUPPORTED_ASSET_CODES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Asset code '{req.asset_code}' is not supported. Allowed: {', '.join(settings.SUPPORTED_ASSET_CODES)}",
+        )
+
     # Require verified email before preparing payments (configurable)
     if settings.REQUIRE_EMAIL_VERIFICATION and not current_user.is_verified:
         raise HTTPException(
@@ -139,7 +148,13 @@ def prepare(
             detail="You are not authorized to prepare payment for this booking",
         )
 
-    return prepare_payment(req.booking_id, req.amount, req.client_public)
+    return prepare_payment(
+        req.booking_id,
+        req.amount,
+        req.client_public,
+        req.asset_code,
+        req.asset_issuer,
+    )
 
 
 @router.post("/submit", summary="Submit signed payment XDR from wallet")

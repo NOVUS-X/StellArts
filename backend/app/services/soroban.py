@@ -2,6 +2,7 @@
 Soroban smart contract integration for StellArts.
 Handles all interactions with Soroban contracts on the Stellar network.
 """
+
 import logging
 import time
 from typing import Any
@@ -23,8 +24,8 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # Soroban configuration
-SOROBAN_RPC_URL = settings.SOROBAN_RPC_URL
-SOROBAN_NETWORK_PASSPHRASE = settings.SOROBAN_NETWORK_PASSPHRASE
+SOROBAN_RPC_URL = settings.STELLAR_RPC_URL
+SOROBAN_NETWORK_PASSPHRASE = settings.STELLAR_NETWORK_PASSPHRASE
 soroban_server = SorobanServer(SOROBAN_RPC_URL)
 
 
