@@ -4,6 +4,9 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -11,17 +14,14 @@ from app.api.v1.api import api_router
 from app.core.cache import cache
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
+from app.core.rate_limit import limiter
 from app.db.session import get_db
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    await cache.initialize()  # Cambio: connect() -> initialize()
+    await cache.initialize()
     yield
-    # Shutdown
-    await cache.close()  # Cambio: disconnect() -> close()
-
+    await cache.close()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -30,19 +30,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Ensure static/avatars directory exists
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# Static files
 static_path = os.path.join(os.getcwd(), settings.STATIC_DIR)
 avatars_path = os.path.join(static_path, settings.AVATARS_DIR)
 if not os.path.exists(avatars_path):
     os.makedirs(avatars_path)
-
 app.mount(f"/{settings.STATIC_DIR}", StaticFiles(directory=static_path), name="static")
 
-# Register global exception handlers to ensure every error response follows
-# the standardized { error_code, message, details } schema.
+# Global exception handlers
 register_exception_handlers(app)
 
-# Set all CORS enabled origins
+# CORS
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
@@ -52,7 +55,6 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-# Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 

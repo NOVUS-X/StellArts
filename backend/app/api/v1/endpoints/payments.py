@@ -2,13 +2,22 @@
 import uuid
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from limits import parse as parse_limit
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from stellar_sdk import TransactionEnvelope
 
 from app.core.auth import require_client
 from app.core.config import settings
+from app.core.rate_limit import (
+    PAYMENT_PREPARE_LIMIT,
+    PAYMENT_REFUND_LIMIT,
+    PAYMENT_RELEASE_LIMIT,
+    PAYMENT_SUBMIT_FAILED_LIMIT,
+    PAYMENT_SUBMIT_LIMIT,
+    limiter,
+)
 from app.db.session import get_db
 from app.models.booking import Booking
 from app.models.user import User
@@ -22,7 +31,8 @@ from app.services.payments import (
 
 router = APIRouter()
 
-# deprecated: used by the insecure /hold endpoint which has been removed
+# Bucket name used for the stricter failed-submit rate limit.
+_FAILED_SUBMIT_BUCKET = "payments:submit:failed"
 
 
 class PrepareRequest(BaseModel):
@@ -49,13 +59,58 @@ class RefundRequest(BaseModel):
     amount: Decimal = Field(..., gt=0)
 
 
+def _failed_submit_item():
+    return parse_limit(PAYMENT_SUBMIT_FAILED_LIMIT)
+
+
+def _record_failed_submit(request: Request) -> None:
+    """Record a failed submission against the stricter failed-submit bucket.
+
+    Applies a tighter limit on erroring submissions (e.g. invalid XDR, unknown
+    booking) to blunt brute-force attempts without punishing legitimate users
+    who occasionally fail.
+    """
+    lim = getattr(request.app.state, "limiter", None)
+    if lim is None:
+        return
+    try:
+        key = lim._key_func(request)
+        lim._limiter.hit(_failed_submit_item(), _FAILED_SUBMIT_BUCKET, key)
+    except Exception:
+        # Never let rate-limit bookkeeping break the request flow.
+        pass
+
+
+def _check_failed_submit_quota(request: Request) -> None:
+    """Reject further calls when the failed-submit bucket is exhausted."""
+    lim = getattr(request.app.state, "limiter", None)
+    if lim is None:
+        return
+    try:
+        key = lim._key_func(request)
+        allowed = lim._limiter.test(_failed_submit_item(), _FAILED_SUBMIT_BUCKET, key)
+    except Exception:
+        # If the backend is unavailable, fail open rather than block users.
+        return
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Too many failed payment submissions. Please wait "
+                "before trying again."
+            ),
+        )
+
+
 # The old /hold endpoint has been removed due to security concerns. Clients
 # should use the two-step prepare/submit flow instead.  A request to this path
 # will now return 404 (FastAPI simply won't register it).
 
 
 @router.post("/prepare", summary="Prepare unsigned payment XDR for client signing")
+@limiter.limit(PAYMENT_PREPARE_LIMIT)
 def prepare(
+    request: Request,
     req: PrepareRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_client),
@@ -103,11 +158,16 @@ def prepare(
 
 
 @router.post("/submit", summary="Submit signed payment XDR from wallet")
+@limiter.limit(PAYMENT_SUBMIT_LIMIT)
 def submit(
+    request: Request,
     req: SubmitRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_client),
 ):
+    # Stricter limit for repeatedly-failing submissions.
+    _check_failed_submit_quota(request)
+
     # Require verified email before submitting payments (configurable)
     if settings.REQUIRE_EMAIL_VERIFICATION and not current_user.is_verified:
         raise HTTPException(
@@ -128,6 +188,7 @@ def submit(
             memo_text = memo_text.decode()
         booking_token = memo_text.replace("hold-", "")
     except Exception:
+        _record_failed_submit(request)
         raise HTTPException(
             status_code=400, detail="Invalid signed transaction XDR"
         ) from None
@@ -143,6 +204,7 @@ def submit(
             if str(row[0]).startswith(booking_token)
         ]
         if len(candidates) != 1:
+            _record_failed_submit(request)
             raise HTTPException(
                 status_code=400,
                 detail="Unable to resolve booking from transaction memo",
@@ -153,13 +215,16 @@ def submit(
     try:
         booking_uuid = uuid.UUID(str(booking_id))
     except ValueError:
+        _record_failed_submit(request)
         raise HTTPException(status_code=404, detail="Booking not found") from None
 
     booking = db.query(Booking).filter(Booking.id == booking_uuid).first()
     if not booking:
+        _record_failed_submit(request)
         raise HTTPException(status_code=404, detail="Booking not found")
 
     if booking.client.user_id != current_user.id:
+        _record_failed_submit(request)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not authorized to submit payment for this booking",
@@ -167,12 +232,14 @@ def submit(
 
     res = submit_signed_payment(db, req.signed_xdr)
     if res.get("status") == "error":
+        _record_failed_submit(request)
         raise HTTPException(status_code=400, detail=res.get("message"))
     return res
 
 
 @router.post("/release", summary="Release escrow to artisan")
-def release(req: ReleaseRequest, db: Session = Depends(get_db)):
+@limiter.limit(PAYMENT_RELEASE_LIMIT)
+def release(request: Request, req: ReleaseRequest, db: Session = Depends(get_db)):
     res = release_payment(db, req.booking_id, req.artisan_public, req.amount)
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message"))
@@ -180,7 +247,8 @@ def release(req: ReleaseRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/refund", summary="Refund escrow to client")
-def refund(req: RefundRequest, db: Session = Depends(get_db)):
+@limiter.limit(PAYMENT_REFUND_LIMIT)
+def refund(request: Request, req: RefundRequest, db: Session = Depends(get_db)):
     res = refund_payment(db, req.booking_id, req.client_public, req.amount)
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message"))
