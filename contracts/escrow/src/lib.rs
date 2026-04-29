@@ -76,6 +76,9 @@ pub enum DataKey {
     MultiSigApprovals(u64),
     NextId,
     Oracle,
+    Admin,
+    DaoAddress,
+    FeeBps,
 }
 
 #[contracttype]
@@ -102,6 +105,7 @@ pub struct FundsReleasedEvent {
     pub client: Address,
     pub artisan: Address,
     pub amount: i128,
+    pub fee_amount: i128,
     pub token: Address,
 }
 
@@ -145,6 +149,48 @@ pub struct EscrowContract;
 
 #[contractimpl]
 impl EscrowContract {
+    /// Initialize contract with global parameters
+    pub fn init_contract(env: Env, admin: Address, dao_address: Address, fee_bps: u32) {
+        if env.storage().persistent().has(&DataKey::Admin) {
+            panic!("Contract already initialized");
+        }
+        if fee_bps > 1000 {
+            panic!("Fee cannot exceed 10% (1000 bps)");
+        }
+        env.storage().persistent().set(&DataKey::Admin, &admin);
+        env.storage().persistent().set(&DataKey::DaoAddress, &dao_address);
+        env.storage().persistent().set(&DataKey::FeeBps, &fee_bps);
+        
+        env.storage().persistent().extend_ttl(&DataKey::Admin, TTL_THRESHOLD, NEXT_ID_TTL);
+        env.storage().persistent().extend_ttl(&DataKey::DaoAddress, TTL_THRESHOLD, NEXT_ID_TTL);
+        env.storage().persistent().extend_ttl(&DataKey::FeeBps, TTL_THRESHOLD, NEXT_ID_TTL);
+    }
+
+    /// Update the protocol fee
+    pub fn set_fee(env: Env, admin: Address, fee_bps: u32) {
+        admin.require_auth();
+        let stored_admin: Address = env.storage().persistent().get(&DataKey::Admin).expect("Contract not initialized");
+        if admin != stored_admin {
+            panic!("Unauthorized: caller is not admin");
+        }
+        if fee_bps > 1000 {
+            panic!("Fee cannot exceed 10% (1000 bps)");
+        }
+        env.storage().persistent().set(&DataKey::FeeBps, &fee_bps);
+        env.storage().persistent().extend_ttl(&DataKey::FeeBps, TTL_THRESHOLD, NEXT_ID_TTL);
+    }
+
+    /// Update the DAO address
+    pub fn set_dao(env: Env, admin: Address, dao_address: Address) {
+        admin.require_auth();
+        let stored_admin: Address = env.storage().persistent().get(&DataKey::Admin).expect("Contract not initialized");
+        if admin != stored_admin {
+            panic!("Unauthorized: caller is not admin");
+        }
+        env.storage().persistent().set(&DataKey::DaoAddress, &dao_address);
+        env.storage().persistent().extend_ttl(&DataKey::DaoAddress, TTL_THRESHOLD, NEXT_ID_TTL);
+    }
+
     /// Initialize a new escrow engagement
     /// Creates a new escrow record with Pending status and a per-escrow arbitrator.
     ///
@@ -359,11 +405,35 @@ impl EscrowContract {
 
         // Logic: Transfer the stored escrow amount from the contract address to the artisan's address
         let token_client = token::Client::new(&env, &token);
-        token_client.transfer(
-            &env.current_contract_address(),
-            &escrow.artisan,
-            &escrow.amount,
-        );
+        
+        // Calculate fee
+        let fee_bps: u32 = env.storage().persistent().get(&DataKey::FeeBps).unwrap_or(0);
+        
+        let fee_amount = if fee_bps > 0 {
+            let fee_num = (escrow.amount as i128).checked_mul(fee_bps as i128).expect("Arithmetic overflow");
+            fee_num.checked_div(10000).expect("Arithmetic error")
+        } else {
+            0
+        };
+        
+        let artisan_amount = escrow.amount.checked_sub(fee_amount).expect("Arithmetic underflow");
+
+        if fee_amount > 0 {
+            let dao_address: Address = env.storage().persistent().get(&DataKey::DaoAddress).expect("DAO address not set");
+            token_client.transfer(
+                &env.current_contract_address(),
+                &dao_address,
+                &fee_amount,
+            );
+        }
+
+        if artisan_amount > 0 {
+            token_client.transfer(
+                &env.current_contract_address(),
+                &escrow.artisan,
+                &artisan_amount,
+            );
+        }
 
         // State: Update the escrow status to Released
         escrow.status = Status::Released;
@@ -380,6 +450,7 @@ impl EscrowContract {
                 client: escrow.client,
                 artisan: escrow.artisan,
                 amount: escrow.amount,
+                fee_amount,
                 token: escrow.token,
             },
         );
@@ -637,6 +708,10 @@ impl EscrowContract {
     /// Set the oracle address for verifying physical arrival
     pub fn set_oracle(env: Env, admin: Address, oracle: Address) {
         admin.require_auth();
+        let stored_admin: Address = env.storage().persistent().get(&DataKey::Admin).expect("Contract not initialized");
+        if admin != stored_admin {
+            panic!("Unauthorized: caller is not admin");
+        }
         env.storage().persistent().set(&DataKey::Oracle, &oracle);
         env.storage()
             .persistent()
