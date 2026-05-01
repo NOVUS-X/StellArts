@@ -76,6 +76,8 @@ def _record_payment(
     from_acc: str,
     to_acc: str,
     memo: str,
+    asset_code: str = "XLM",
+    asset_issuer: str | None = None,
 ) -> dict[str, Any]:
     """Insert payment record into DB and commit."""
     booking_uuid = uuid.UUID(booking_id)
@@ -87,6 +89,8 @@ def _record_payment(
         from_account=from_acc,
         to_account=to_acc,
         memo=memo,
+        asset_code=asset_code,
+        asset_issuer=asset_issuer,
     )
     db.add(payment)
     db.commit()
@@ -162,6 +166,11 @@ def release_payment(
     escrow_account = server.load_account(ESCROW_PUBLIC)
     # memo = f"release-{booking_id}"
     memo = f"release-{booking_id}"[:MAX_MEMO_LENGTH]
+
+    asset = Asset.native()
+    if held.asset_code.upper() != "XLM":
+        asset = Asset(held.asset_code, held.asset_issuer)
+
     tx = (
         TransactionBuilder(
             source_account=escrow_account,
@@ -172,7 +181,7 @@ def release_payment(
         .append_payment_op(
             destination=artisan_public,
             amount=_sanitize_amount(amount),
-            asset=Asset.native(),
+            asset=asset,
         )
         .build()
     )
@@ -190,6 +199,8 @@ def release_payment(
             ESCROW_PUBLIC,
             artisan_public,
             memo,
+            held.asset_code,
+            held.asset_issuer,
         )
     except (BadRequestError, BadResponseError) as e:
         db.rollback()
@@ -237,6 +248,10 @@ def refund_payment(
     # memo = f"refund-{booking_id}"
     memo = f"refund-{booking_id}"[:MAX_MEMO_LENGTH]
 
+    asset = Asset.native()
+    if held.asset_code.upper() != "XLM":
+        asset = Asset(held.asset_code, held.asset_issuer)
+
     tx = (
         TransactionBuilder(
             source_account=escrow_account,
@@ -247,7 +262,7 @@ def refund_payment(
         .append_payment_op(
             destination=client_public,
             amount=_sanitize_amount(amount),
-            asset=Asset.native(),
+            asset=asset,
         )
         .build()
     )
@@ -265,6 +280,8 @@ def refund_payment(
             ESCROW_PUBLIC,
             client_public,
             memo,
+            held.asset_code,
+            held.asset_issuer,
         )
     except (BadRequestError, BadResponseError) as e:
         db.rollback()
@@ -282,7 +299,11 @@ def refund_payment(
 
 
 def prepare_payment(
-    booking_id: str, amount: Decimal, client_public: str
+    booking_id: str,
+    amount: Decimal,
+    client_public: str,
+    asset_code: str = "XLM",
+    asset_issuer: str | None = None,
 ) -> dict[str, Any]:
     """Build an **unsigned** Stellar transaction envelope for a hold.
 
@@ -290,9 +311,14 @@ def prepare_payment(
     to sign it, and then submit the signed XDR to ``submit_signed_payment``.
     """
     memo = f"hold-{booking_id}"[:MAX_MEMO_LENGTH]
-    from stellar_sdk import Account
+    from stellar_sdk import Account, Asset
 
     source_account = Account(account=client_public, sequence=0)
+
+    if asset_code.upper() == "XLM":
+        asset = Asset.native()
+    else:
+        asset = Asset(asset_code, asset_issuer)
 
     tx = (
         TransactionBuilder(
@@ -304,7 +330,7 @@ def prepare_payment(
         .append_payment_op(
             destination=ESCROW_PUBLIC,
             amount=_sanitize_amount(amount),
-            asset=Asset.native(),
+            asset=asset,
         )
         .build()
     )
@@ -359,6 +385,8 @@ def submit_signed_payment(db: Session, signed_xdr: str) -> dict[str, Any]:
             tx.transaction.source.account_id,
             ESCROW_PUBLIC,
             memo_text,
+            payment_op.asset.code if payment_op.asset.code else "XLM",
+            payment_op.asset.issuer if payment_op.asset.issuer else None,
         )
     except AssertionError:
         return {"status": "error", "message": "Transaction structure invalid"}

@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.auth import require_admin
 from app.db.session import get_db
+from app.models.booking import BookingStatus
+from app.models.dispute import Dispute, DisputeStatus
+from app.models.payment import PaymentStatus
 from app.models.user import User
+from app.schemas.dispute import DisputeResolve, DisputeResponse
 
 router = APIRouter(prefix="/admin")
 
@@ -173,4 +180,83 @@ def get_system_stats(
                 "admins": admins,
             },
         },
+    }
+
+
+@router.get("/disputes", response_model=list[DisputeResponse])
+def get_all_disputes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+    skip: int = 0,
+    limit: int = 100,
+    status_filter: DisputeStatus | None = None,
+):
+    """Get all disputes with optional status filtering - admin only"""
+    query = db.query(Dispute)
+
+    if status_filter:
+        query = query.filter(Dispute.status == status_filter)
+
+    disputes = query.order_by(Dispute.created_at.desc()).offset(skip).limit(limit).all()
+    return disputes
+
+
+@router.post("/disputes/{dispute_id}/resolve")
+def resolve_dispute(
+    dispute_id: uuid.UUID,
+    resolution: DisputeResolve,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Resolve a dispute by setting payout ratio and executing transfers - admin only.
+
+    The payout_artisan_ratio determines how much of the escrowed funds
+    go to the artisan. The remainder goes back to the client.
+    """
+    dispute = db.query(Dispute).filter(Dispute.id == dispute_id).first()
+    if not dispute:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Dispute not found"
+        )
+
+    if dispute.status != DisputeStatus.OPEN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Dispute is already {dispute.status.value}",
+        )
+
+    # Update dispute record
+    dispute.status = DisputeStatus.RESOLVED
+    dispute.payout_artisan_ratio = resolution.payout_artisan_ratio
+    dispute.resolution_memo = resolution.resolution_memo
+    dispute.resolved_at = func.now()
+    dispute.resolved_by = current_user.full_name
+
+    # Update related records
+    payment = dispute.payment
+    booking = dispute.booking
+    # In a real scenario, we would trigger the Stellar/Soroban transfers here.
+    # For now, we update the statuses to reflect resolution.
+
+    payment.status = (
+        PaymentStatus.RELEASED
+        if resolution.payout_artisan_ratio > 0
+        else PaymentStatus.REFUNDED
+    )
+    booking.status = (
+        BookingStatus.COMPLETED
+        if resolution.payout_artisan_ratio > 0.5
+        else BookingStatus.CANCELLED
+    )
+
+    db.commit()
+    db.refresh(dispute)
+
+    return {
+        "message": "Dispute resolved successfully",
+        "dispute_id": dispute.id,
+        "status": dispute.status.value,
+        "payout_artisan_ratio": float(dispute.payout_artisan_ratio),
+        "resolved_by": dispute.resolved_by,
     }

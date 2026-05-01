@@ -1,19 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  CheckCircle2, 
-  Circle, 
-  CreditCard, 
-  Lock, 
-  PackageCheck, 
-  ShieldAlert, 
+import {
+  CheckCircle2,
+  Circle,
+  CreditCard,
+  Lock,
+  PackageCheck,
+  ShieldAlert,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import ReviewForm from "@/components/bookings/ReviewForm";
+import ReleaseFundsModal from "@/components/bookings/ReleaseFundsModal";
 
 export type EscrowStatus = "HELD" | "FUNDED" | "RELEASED" | "DISPUTED";
 
@@ -22,54 +25,62 @@ interface EscrowStepperProps {
   initialStatus: EscrowStatus;
   serviceName: string;
   amount?: number;
+  artisanId?: number;
+  artisanName?: string;
 }
 
-export default function EscrowStepper({ 
-  bookingId, 
-  initialStatus, 
+export default function EscrowStepper({
+  bookingId,
+  initialStatus,
   serviceName,
-  amount 
+  amount,
+  artisanId,
+  artisanName,
 }: EscrowStepperProps) {
   const [status, setStatus] = useState<EscrowStatus>(initialStatus);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
 
   const steps = [
-    { 
-      id: "HELD", 
-      label: "Pending Payment", 
+    {
+      id: "HELD",
+      label: "Pending Payment",
       icon: CreditCard,
-      description: "Payment requested by artisan" 
+      description: "Payment requested by artisan",
     },
-    { 
-      id: "FUNDED", 
-      label: "Funds in Escrow", 
+    {
+      id: "FUNDED",
+      label: "Funds in Escrow",
       icon: Lock,
-      description: "Funds securely held in contract" 
+      description: "Funds securely held in contract",
     },
-    { 
-      id: "RELEASED", 
-      label: "Payment Released", 
+    {
+      id: "RELEASED",
+      label: "Payment Released",
       icon: PackageCheck,
-      description: "Artisan has been paid" 
-    }
+      description: "Artisan has been paid",
+    },
   ];
 
-  const currentStepIndex = steps.findIndex(s => s.id === status);
+  const currentStepIndex = steps.findIndex((s) => s.id === status);
   const isDisputed = status === "DISPUTED";
 
   const handleAction = async (action: "pay" | "release" | "dispute") => {
     setLoadingAction(action);
-    
+
     // Simulate blockchain delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     try {
       if (action === "pay") {
         setStatus("FUNDED");
         toast.success("Payment successful! Funds are now in escrow.");
       } else if (action === "release") {
-        setStatus("RELEASED");
-        toast.success("Funds released to the artisan.");
+        setIsReleaseModalOpen(true);
+        setLoadingAction(null);
+        return;
       } else if (action === "dispute") {
         setStatus("DISPUTED");
         toast.error("Dispute initiated. Our team will review the case.");
@@ -81,6 +92,12 @@ export default function EscrowStepper({
     }
   };
 
+  const handleReviewSuccess = () => {
+    setReviewSubmitted(true);
+    setShowReviewForm(false);
+    toast.success("Thank you for your review!");
+  };
+
   return (
     <div className="mt-6 border rounded-xl overflow-hidden bg-white shadow-sm border-gray-100">
       <div className="bg-gray-50/50 px-4 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -88,13 +105,15 @@ export default function EscrowStepper({
           <ShieldAlert className="w-4 h-4 text-blue-600" />
           Escrow Security: {serviceName}
         </h4>
-        <span className={cn(
-          "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider",
-          status === "HELD" && "bg-amber-100 text-amber-700",
-          status === "FUNDED" && "bg-blue-100 text-blue-700",
-          status === "RELEASED" && "bg-green-100 text-green-700",
-          status === "DISPUTED" && "bg-red-100 text-red-700"
-        )}>
+        <span
+          className={cn(
+            "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider",
+            status === "HELD" && "bg-amber-100 text-amber-700",
+            status === "FUNDED" && "bg-blue-100 text-blue-700",
+            status === "RELEASED" && "bg-green-100 text-green-700",
+            status === "DISPUTED" && "bg-red-100 text-red-700",
+          )}
+        >
           {status}
         </span>
       </div>
@@ -104,32 +123,52 @@ export default function EscrowStepper({
         <div className="relative flex justify-between items-start mb-8">
           {/* Connector Line */}
           <div className="absolute top-5 left-0 w-full h-0.5 bg-gray-100 -z-0">
-            <div 
-              className="h-full bg-blue-600 transition-all duration-500 ease-in-out" 
-              style={{ width: `${(Math.max(0, currentStepIndex) / (steps.length - 1)) * 100}%` }}
+            <div
+              className="h-full bg-blue-600 transition-all duration-500 ease-in-out"
+              style={{
+                width: `${(Math.max(0, currentStepIndex) / (steps.length - 1)) * 100}%`,
+              }}
             />
           </div>
 
           {steps.map((step, index) => {
             const Icon = step.icon;
-            const isCompleted = index < currentStepIndex || status === "RELEASED";
+            const isCompleted =
+              index < currentStepIndex || status === "RELEASED";
             const isActive = index === currentStepIndex && !isDisputed;
-            
+
             return (
-              <div key={step.id} className="relative z-10 flex flex-col items-center w-1/3">
-                <div className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300",
-                  isCompleted ? "bg-blue-600 text-white shadow-blue-200 shadow-lg" : 
-                  isActive ? "bg-white border-2 border-blue-600 text-blue-600 shadow-md scale-110" : 
-                  "bg-white border-2 border-gray-200 text-gray-400"
-                )}>
-                  {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+              <div
+                key={step.id}
+                className="relative z-10 flex flex-col items-center w-1/3"
+              >
+                <div
+                  className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300",
+                    isCompleted
+                      ? "bg-blue-600 text-white shadow-blue-200 shadow-lg"
+                      : isActive
+                        ? "bg-white border-2 border-blue-600 text-blue-600 shadow-md scale-110"
+                        : "bg-white border-2 border-gray-200 text-gray-400",
+                  )}
+                >
+                  {isCompleted ? (
+                    <CheckCircle2 className="w-5 h-5" />
+                  ) : (
+                    <Icon className="w-5 h-5" />
+                  )}
                 </div>
                 <div className="mt-3 text-center">
-                  <p className={cn(
-                    "text-xs font-bold",
-                    isActive ? "text-blue-700" : isCompleted ? "text-gray-900" : "text-gray-400"
-                  )}>
+                  <p
+                    className={cn(
+                      "text-xs font-bold",
+                      isActive
+                        ? "text-blue-700"
+                        : isCompleted
+                          ? "text-gray-900"
+                          : "text-gray-400",
+                    )}
+                  >
                     {step.label}
                   </p>
                   <p className="text-[10px] text-gray-400 mt-1 hidden sm:block">
@@ -147,7 +186,9 @@ export default function EscrowStepper({
             <AlertCircle className="w-5 h-5 shrink-0" />
             <div>
               <p className="text-sm font-bold">Booking Disputed</p>
-              <p className="text-xs mt-1">Funds are locked until a resolution is reached.</p>
+              <p className="text-xs mt-1">
+                Funds are locked until a resolution is reached.
+              </p>
             </div>
           </div>
         )}
@@ -155,7 +196,7 @@ export default function EscrowStepper({
         {/* Actions Section */}
         <div className="flex flex-wrap gap-3 justify-end items-center">
           {status === "HELD" && (
-            <Button 
+            <Button
               size="sm"
               onClick={() => handleAction("pay")}
               disabled={!!loadingAction}
@@ -174,7 +215,7 @@ export default function EscrowStepper({
 
           {status === "FUNDED" && (
             <>
-              <Button 
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handleAction("dispute")}
@@ -187,7 +228,7 @@ export default function EscrowStepper({
                   "Initiate Dispute"
                 )}
               </Button>
-              <Button 
+              <Button
                 size="sm"
                 onClick={() => handleAction("release")}
                 disabled={!!loadingAction}
@@ -205,15 +246,22 @@ export default function EscrowStepper({
             </>
           )}
 
-          {status === "RELEASED" && (
+          {status === "RELEASED" && !reviewSubmitted && (
             <p className="text-sm text-green-600 font-medium flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
-              Transaction Complete
+              Transaction Complete - Please rate your experience
+            </p>
+          )}
+
+          {status === "RELEASED" && reviewSubmitted && (
+            <p className="text-sm text-green-600 font-medium flex items-center gap-2">
+              <Star className="w-4 h-4 fill-current" />
+              Thank you for your review!
             </p>
           )}
 
           {status === "DISPUTED" && (
-            <Button 
+            <Button
               variant="link"
               size="sm"
               className="text-blue-600 p-0 h-auto font-bold"
@@ -222,7 +270,32 @@ export default function EscrowStepper({
             </Button>
           )}
         </div>
+
+        {/* Review Form - Shown after funds are released */}
+        {status === "RELEASED" &&
+          showReviewForm &&
+          artisanId &&
+          artisanName && (
+            <ReviewForm
+              bookingId={bookingId}
+              artisanId={artisanId}
+              artisanName={artisanName}
+              onSuccess={handleReviewSuccess}
+            />
+          )}
       </div>
+
+      <ReleaseFundsModal
+        isOpen={isReleaseModalOpen}
+        onClose={() => setIsReleaseModalOpen(false)}
+        bookingId={bookingId}
+        amount={amount ?? 0}
+        artisanName={artisanName ?? "Artisan"}
+        onSuccess={() => {
+          setStatus("RELEASED");
+          setShowReviewForm(true);
+        }}
+      />
     </div>
   );
 }

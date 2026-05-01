@@ -14,6 +14,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
   redis:
     image: redis:7-alpine
     ports:
@@ -27,6 +28,55 @@ services:
       timeout: 10s
       retries: 3
 
+  # Soroban standalone network for local contract development
+  stellar-core:
+    image: stellar/quickstart:latest
+    container_name: stellar-core
+    environment:
+      - NETWORK=standalone
+      - ENABLE_SOROBAN_RPC=true
+      - ENABLE_SOROBAN_DIAGNOSTIC_EVENTS=true
+    ports:
+      - "8003:8003"  # Stellar Core HTTP
+      - "6783:6783"  # Stellar Core peer port
+    volumes:
+      - stellar_core_data:/var/lib/stellar
+    command: >
+      /bin/sh -c "
+      /start --standalone --enable-soroban-rpc
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  soroban-rpc:
+    image: stellar/quickstart:latest
+    container_name: soroban-rpc
+    environment:
+      - NETWORK=standalone
+      - ENABLE_SOROBAN_RPC=true
+      - SOROBAN_RPC_HOST=0.0.0.0
+      - SOROBAN_RPC_PORT=8000
+    ports:
+      - "8002:8000"  # Soroban RPC
+    depends_on:
+      stellar-core:
+        condition: service_healthy
+    volumes:
+      - soroban_rpc_data:/var/lib/stellar
+    command: >
+      /bin/sh -c "
+      sleep 10 &&
+      /start --standalone --enable-soroban-rpc --enable-soroban-diagnostic-events
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/soroban/rpc"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   api:
     build: .
     environment:
@@ -36,14 +86,18 @@ services:
       DEBUG: "True"
       API_V1_STR: /api/v1
       PROJECT_NAME: Stellarts
-      STELLAR_NETWORK: testnet
-      STELLAR_ESCROW_PUBLIC: GDUMMY000000000000000000000000000000000000000000000000
+      STELLAR_NETWORK: ${STELLAR_NETWORK:-standalone}
+      STELLAR_RPC_URL: ${STELLAR_RPC_URL:-http://soroban-rpc:8002/soroban/rpc}
+      STELLAR_ESCROW_PUBLIC: ${STELLAR_ESCROW_PUBLIC:-}
+      STELLAR_NETWORK_PASSPHRASE: ${STELLAR_NETWORK_PASSPHRASE:-Standalone Network ; September 2022}
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      soroban-rpc:
         condition: service_healthy
     volumes:
       - .:/app
@@ -58,8 +112,10 @@ services:
       DEBUG: "False"
       API_V1_STR: /api/v1
       PROJECT_NAME: Stellarts
-      STELLAR_NETWORK: testnet
-      STELLAR_ESCROW_PUBLIC: GDUMMY000000000000000000000000000000000000000000000000
+      STELLAR_NETWORK: ${STELLAR_NETWORK:-standalone}
+      STELLAR_RPC_URL: ${STELLAR_RPC_URL:-http://soroban-rpc:8002/soroban/rpc}
+      STELLAR_ESCROW_PUBLIC: ${STELLAR_ESCROW_PUBLIC:-}
+      STELLAR_NETWORK_PASSPHRASE: ${STELLAR_NETWORK_PASSPHRASE:-Standalone Network ; September 2022}
     ports:
       - "8001:8000"
     depends_on:
@@ -67,8 +123,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      soroban-rpc:
+        condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4
 
 volumes:
   postgres_data:
   redis_data:
+  stellar_core_data:
+  soroban_rpc_data:
