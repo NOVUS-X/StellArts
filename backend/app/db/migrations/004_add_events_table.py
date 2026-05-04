@@ -5,6 +5,7 @@ This table stores Soroban events with their processing status
 and cursor information for idempotent event handling.
 """
 
+import logging
 from sqlalchemy import (
     Column,
     String,
@@ -12,9 +13,14 @@ from sqlalchemy import (
     Text,
     Boolean,
     Index,
+    Integer,
+    Table,
     func,
 )
 from app.db.base import Base
+
+logger = logging.getLogger(__name__)
+
 def upgrade():
     """Create events table."""
     events_table = Table(
@@ -50,6 +56,7 @@ def upgrade():
 
     events_table.create(checkfirst=True)
     logger.info("Events table created successfully")
+
 def downgrade():
     """Drop events table."""
     events_table = Table(
@@ -58,8 +65,3 @@ def downgrade():
     )
     events_table.drop(checkfirst=True)
     logger.info("Events table dropped successfully")
-from sqlalchemy import Table, Column, String, DateTime, Text, Boolean, Index, func
-from app.db.base import Base
-import logging
-
-logger = logging.getLogger(__name__)
