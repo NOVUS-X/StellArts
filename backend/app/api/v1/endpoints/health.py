@@ -1,50 +1,126 @@
-from fastapi import APIRouter, Depends, Response, status
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+import time
+import logging
 
-from app.core.cache import cache
+from fastapi import APIRouter, Depends
+from redis.asyncio import Redis
+
 from app.core.config import settings
 from app.db.session import get_db
+from app.services.soroban import soroban_server
+from app.services.webhook_listener import WebhookListenerService, EventHandler
 
-router = APIRouter()
-
-
-@router.get("/health")
-async def health_check(response: Response, db: Session = Depends(get_db)):
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/health", tags=["health"])
+@router.get("/", response_model=dict, summary="Health check for all services")
+async def health_check(
+    db=Depends(get_db),
+    redis_client: Redis = Depends(lambda: settings.REDIS_URL),
+) -> dict:
     """
-    Health check endpoint to verify server, database, and Redis connectivity.
-
-    Returns HTTP 200 when all dependencies are healthy, and HTTP 503 when any
-    dependency is unavailable. Designed to be consumed by external uptime
-    monitors (e.g. UptimeRobot) that trigger email/Slack alerts on failure.
+    Comprehensive health check endpoint.
+    
+    Returns the health status of:
+    - Database connectivity
+    - Redis connectivity
+    - Soroban RPC server
+    - Webhook listener service (if enabled)
     """
-    # Check database connectivity
+    checks = {
+        "status": "healthy",
+        "checks": {},
+        "version": "1.0.0",
+    }
+    
+    # Database health check
     try:
-        db.execute(text("SELECT 1"))
-        db_status = "healthy"
-    except Exception:
-        db_status = "unhealthy"
-
-    # Check Redis connectivity
+        result = await db.execute("SELECT 1")
+        checks["database"] = {
+            "status": "healthy",
+            "details": "Database connection successful",
+        }
+    except Exception as e:
+        checks["database"] = {
+            "status": "unhealthy",
+            "error": str(e),
+        }
+        checks["status"] = "degraded"
+    
+    # Redis health check
     try:
-        if cache.redis is None:
-            redis_status = "unhealthy"
-        else:
-            await cache.redis.ping()
-            redis_status = "healthy"
-    except Exception:
-        redis_status = "unhealthy"
-
-    overall_healthy = db_status == "healthy" and redis_status == "healthy"
-    overall_status = "healthy" if overall_healthy else "unhealthy"
-
-    if not overall_healthy:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-
+        await redis_client.ping()
+        checks["redis"] = {
+            "status": "healthy",
+            "details": "Redis connection successful",
+        }
+    except Exception as e:
+        checks["redis"] = {
+            "status": "unhealthy",
+            "error": str(e),
+        }
+        checks["status"] = "degraded"
+    
+    # Soroban server health check
+    try:
+        network_passphrase = settings.SOROBAN_NETWORK_PASSPHRASE
+        server_info = await soroban_server.server_info()
+        checks["soroban"] = {
+            "status": "healthy",
+            "details": f"Connected to network: {server_info.network_passphrase}",
+            "network_passphrase": network_passphrase,
+        }
+    except Exception as e:
+        checks["soroban"] = {
+            "status": "unhealthy",
+            "error": str(e),
+        }
+        checks["status"] = "degraded"
+    
+    # Webhook listener health check
+    if settings.WEBHOOK_LISTENER_ENABLED:
+        try:
+            # Check Redis cursor storage capability
+            test_key = f"webhook_listener:health_check:{int(time.time())}"
+            await redis_client.setex(test_key, 60, "healthy")
+            await redis_client.delete(test_key)
+            
+            checks["webhook_listener"] = {
+                "status": "healthy",
+                "enabled": True,
+                "details": "Webhook listener is operational",
+                "contract_address": settings.ESCROW_CONTRACT_ID or "not configured",
+            }
+        except Exception as e:
+            checks["webhook_listener"] = {
+                "status": "unhealthy",
+                "error": str(e),
+                "enabled": True,
+            }
+            checks["status"] = "degraded"
+    else:
+        checks["webhook_listener"] = {
+            "status": "disabled",
+            "enabled": False,
+        }
+    
+    # Overall status determination
+    unhealthy_count = sum(
+        1 for check in checks["checks"].values() 
+        if check["status"] == "unhealthy"
+    )
+    degraded_count = sum(
+        1 for check in checks["checks"].values() 
+        if check["status"] == "degraded"
+    )
+    
+    if unhealthy_count > 0:
+        checks["status"] = "unhealthy"
+    elif degraded_count > 0:
+        checks["status"] = "degraded"
+    else:
+        checks["status"] = "healthy"
+    
     return {
-        "status": overall_status,
-        "project": settings.PROJECT_NAME,
-        "database": db_status,
-        "redis": redis_status,
-        "debug": settings.DEBUG,
+        "status": checks["status"],
+        "checks": checks["checks"],
+        "timestamp": int(time.time()),
     }

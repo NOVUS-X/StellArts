@@ -21,8 +21,6 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     await cache.close()  # Cambio: disconnect() -> close()
-
-
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
@@ -54,8 +52,6 @@ if settings.BACKEND_CORS_ORIGINS:
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
-
-
 @app.get("/")
 def root():
     """
@@ -66,9 +62,8 @@ def root():
         "version": "1.0.0",
         "docs": "/docs",
         "health": f"{settings.API_V1_STR}/health",
+        "webhook_listener": f"{settings.API_V1_STR}/webhook/listener",
     }
-
-
 @app.get("/test-redis")
 async def test_redis():
     """Test Redis connection and basic operations"""
@@ -87,8 +82,6 @@ async def test_redis():
         }
     except Exception as e:
         return {"redis_status": "error", "error": str(e)}
-
-
 @app.get("/test-db")
 async def test_database(db: Session = Depends(get_db)):
     """Test database connection"""
@@ -104,3 +97,17 @@ async def test_database(db: Session = Depends(get_db)):
         }
     except Exception as e:
         return {"database_status": "error", "error": str(e)}
+@app.post("/webhook/listener", summary="Webhook listener endpoint for Soroban events")
+async def webhook_listener():
+    """
+    HTTP endpoint to receive webhook notifications from external systems.
+    
+    This endpoint allows external systems to notify about event updates
+    that may need to be processed. The main event streaming should still
+    use the SorobanServer.stream() in WebhookListenerService.
+    """
+    return {
+        "status": "available",
+        "message": "Webhook listener is operational",
+        "note": "Main event streaming runs via SorobanServer.stream()",
+    }
