@@ -60,6 +60,18 @@ class ArtisanLocationUpdate(BaseModel):
         return v
 
 
+class ArtisanLocationRealtimeUpdate(BaseModel):
+    """Minimal schema for real-time, Redis-only artisan location updates.
+
+    Unlike ArtisanLocationUpdate, both coordinates are *required* and no
+    PostgreSQL write is performed — data is stored only in the Redis geo
+    index with a 15-minute TTL.
+    """
+
+    latitude: float = Field(..., ge=-90, le=90, description="Latitude coordinate")
+    longitude: float = Field(..., ge=-180, le=180, description="Longitude coordinate")
+
+
 class ArtisanProfileCreate(BaseModel):
     business_name: str | None = Field(None, max_length=200)
     description: str | None = None
