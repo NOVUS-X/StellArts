@@ -7,19 +7,29 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+import asyncio
+
 from app.api.v1.api import api_router
 from app.core.cache import cache
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.db.session import get_db
+from app.services.soroban_worker import worker
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     await cache.initialize()  # Cambio: connect() -> initialize()
+    # Start the Soroban background worker
+    worker_task = asyncio.create_task(worker.start())
     yield
     # Shutdown
+    await worker.stop()
+    try:
+        await asyncio.wait_for(worker_task, timeout=5.0)
+    except asyncio.TimeoutError:
+        pass
     await cache.close()  # Cambio: disconnect() -> close()
 
 
