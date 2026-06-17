@@ -68,6 +68,13 @@ pub struct EarlyReclaimApproval {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TreasuryConfig {
+    pub treasury_address: Address,
+    pub fee_basis_points: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Escrow(u64),
     DeadlineExtension(u64),
@@ -76,6 +83,8 @@ pub enum DataKey {
     MultiSigApprovals(u64),
     NextId,
     Oracle,
+    TreasuryAdmin,
+    Treasury,
 }
 
 #[contracttype]
@@ -365,13 +374,36 @@ impl EscrowContract {
             env.storage().persistent().remove(&approvals_key);
         }
 
-        // Logic: Transfer the stored escrow amount from the contract address to the artisan's address
+        // Logic: Transfer funds, deducting protocol fee if treasury is configured.
         let token_client = token::Client::new(&env, &token);
-        token_client.transfer(
-            &env.current_contract_address(),
-            &escrow.artisan,
-            &escrow.amount,
-        );
+        if let Some(treasury) = env
+            .storage()
+            .persistent()
+            .get::<DataKey, TreasuryConfig>(&DataKey::Treasury)
+        {
+            let fee = escrow.amount * (treasury.fee_basis_points as i128) / 10_000;
+            let artisan_net = escrow.amount - fee;
+            if fee > 0 {
+                token_client.transfer(
+                    &env.current_contract_address(),
+                    &treasury.treasury_address,
+                    &fee,
+                );
+            }
+            if artisan_net > 0 {
+                token_client.transfer(
+                    &env.current_contract_address(),
+                    &escrow.artisan,
+                    &artisan_net,
+                );
+            }
+        } else {
+            token_client.transfer(
+                &env.current_contract_address(),
+                &escrow.artisan,
+                &escrow.amount,
+            );
+        }
 
         // State: Update the escrow status to Released
         escrow.status = Status::Released;
@@ -642,6 +674,52 @@ impl EscrowContract {
         }
     }
 
+    /// Configure the protocol treasury address and fee in basis points (1 bps = 0.01%).
+    /// The first call sets the admin; subsequent calls require the existing admin's authorization.
+    /// Fee is deducted from the artisan's payout on release and dispute resolution.
+    pub fn init_treasury(
+        env: Env,
+        admin: Address,
+        treasury_address: Address,
+        fee_basis_points: u32,
+    ) {
+        if fee_basis_points > 10_000 {
+            panic!("fee_basis_points cannot exceed 10000");
+        }
+
+        let admin_key = DataKey::TreasuryAdmin;
+        if let Some(existing_admin) = env
+            .storage()
+            .persistent()
+            .get::<DataKey, Address>(&admin_key)
+        {
+            existing_admin.require_auth();
+        } else {
+            admin.require_auth();
+            env.storage().persistent().set(&admin_key, &admin);
+            env.storage()
+                .persistent()
+                .extend_ttl(&admin_key, TTL_THRESHOLD, NEXT_ID_TTL);
+        }
+
+        let treasury_key = DataKey::Treasury;
+        env.storage().persistent().set(
+            &treasury_key,
+            &TreasuryConfig {
+                treasury_address,
+                fee_basis_points,
+            },
+        );
+        env.storage()
+            .persistent()
+            .extend_ttl(&treasury_key, TTL_THRESHOLD, NEXT_ID_TTL);
+    }
+
+    /// Read the current treasury configuration (returns None if not yet set).
+    pub fn get_treasury(env: Env) -> Option<TreasuryConfig> {
+        env.storage().persistent().get(&DataKey::Treasury)
+    }
+
     /// Set the oracle address for verifying physical arrival
     pub fn set_oracle(env: Env, admin: Address, oracle: Address) {
         admin.require_auth();
@@ -767,7 +845,9 @@ impl EscrowContract {
             panic!("Token does not match the initialized token for this engagement");
         }
 
-        // Logic: Transfer funds based on distribution
+        // Logic: Transfer funds based on distribution.
+        // Protocol fee applies proportionately to the artisan's share only.
+        // If artisan_amount == 0 (full refund to client) the fee is waived.
         let token_client = token::Client::new(&env, &token);
         if client_amount > 0 {
             token_client.transfer(
@@ -777,11 +857,34 @@ impl EscrowContract {
             );
         }
         if artisan_amount > 0 {
-            token_client.transfer(
-                &env.current_contract_address(),
-                &escrow.artisan,
-                &artisan_amount,
-            );
+            if let Some(treasury) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, TreasuryConfig>(&DataKey::Treasury)
+            {
+                let fee = artisan_amount * (treasury.fee_basis_points as i128) / 10_000;
+                let artisan_net = artisan_amount - fee;
+                if fee > 0 {
+                    token_client.transfer(
+                        &env.current_contract_address(),
+                        &treasury.treasury_address,
+                        &fee,
+                    );
+                }
+                if artisan_net > 0 {
+                    token_client.transfer(
+                        &env.current_contract_address(),
+                        &escrow.artisan,
+                        &artisan_net,
+                    );
+                }
+            } else {
+                token_client.transfer(
+                    &env.current_contract_address(),
+                    &escrow.artisan,
+                    &artisan_amount,
+                );
+            }
         }
 
         // Status update based on distribution
