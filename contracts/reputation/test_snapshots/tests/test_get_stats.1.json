@@ -56,18 +56,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "average_scaled"
                       },
                       "val": {
-                        "u64": 2
+                        "u64": 46000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 9
+                        "u64": 2
                       }
                     }
                   ]
@@ -194,18 +194,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "average_scaled"
                       },
                       "val": {
-                        "u64": 2
+                        "u64": 46000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 9
+                        "u64": 2
                       }
                     }
                   ]
@@ -282,7 +282,7 @@
             "data": {
               "vec": [
                 {
-                  "u64": 450
+                  "u64": 46000
                 },
                 {
                   "u64": 2

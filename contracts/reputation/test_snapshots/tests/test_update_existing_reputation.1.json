@@ -57,18 +57,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "average_scaled"
                       },
                       "val": {
-                        "u64": 12
+                        "u64": 42000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 80
+                        "u64": 12
                       }
                     }
                   ]
@@ -195,18 +195,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "average_scaled"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 48000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 30
+                        "u64": 5
                       }
                     }
                   ]
@@ -266,18 +266,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "average_scaled"
                       },
                       "val": {
-                        "u64": 12
+                        "u64": 42000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 80
+                        "u64": 12
                       }
                     }
                   ]
@@ -355,18 +355,18 @@
               "map": [
                 {
                   "key": {
-                    "symbol": "review_count"
+                    "symbol": "average_scaled"
                   },
                   "val": {
-                    "u64": 12
+                    "u64": 42000
                   }
                 },
                 {
                   "key": {
-                    "symbol": "total_stars"
+                    "symbol": "review_count"
                   },
                   "val": {
-                    "u64": 80
+                    "u64": 12
                   }
                 }
               ]
