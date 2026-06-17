@@ -17,11 +17,20 @@ pub struct RateArtisanEvent {
     pub timestamp: u64,
 }
 
+/// Scale factor for fixed-point EMA arithmetic.
+pub const RATING_SCALE: u64 = 10000;
+/// Weight applied to the new rating (20%).
+pub const NEW_WEIGHT: u64 = 2000;
+/// Weight applied to the existing average (80%).
+pub const OLD_WEIGHT: u64 = 8000;
+
 /// Public struct containing aggregated review data for a user.
+/// Uses an Exponential Moving Average (EMA) stored as a scaled integer
+/// to heavily weight recent reviews without storing individual ratings.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct ReputationData {
-    pub total_stars: u64,
+    pub average_scaled: u64,
     pub review_count: u64,
 }
 
@@ -138,7 +147,15 @@ impl ReputationContract {
         }
 
         let mut artisan_data = Self::get_reputation(env.clone(), artisan.clone());
-        artisan_data.total_stars += stars;
+
+        if artisan_data.review_count == 0 {
+            artisan_data.average_scaled = stars * RATING_SCALE;
+        } else {
+            let new_rating_scaled = stars * RATING_SCALE;
+            artisan_data.average_scaled = (artisan_data.average_scaled * OLD_WEIGHT
+                + new_rating_scaled * NEW_WEIGHT)
+                / RATING_SCALE;
+        }
         artisan_data.review_count += 1;
 
         Self::set_reputation(env.clone(), artisan.clone(), artisan_data);
@@ -155,14 +172,10 @@ impl ReputationContract {
     }
 
     /// Get reputation statistics for a user.
-    /// Returns (average_scaled_by_100, count).
+    /// Returns (average_scaled_by_10000, count) using the EMA-based score.
     pub fn get_stats(env: Env, user: Address) -> (u64, u64) {
         let data = read_reputation(&env, &user);
-        if data.review_count == 0 {
-            return (0, 0);
-        }
-        let average_scaled = (data.total_stars * 100) / data.review_count;
-        (average_scaled, data.review_count)
+        (data.average_scaled, data.review_count)
     }
 }
 
@@ -214,7 +227,7 @@ mod tests {
     #[test]
     fn test_default_reputation_data() {
         let default = ReputationData::default();
-        assert_eq!(default.total_stars, 0);
+        assert_eq!(default.average_scaled, 0);
         assert_eq!(default.review_count, 0);
     }
 
@@ -226,7 +239,7 @@ mod tests {
         let user = Address::generate(&env);
         let reputation = client.get_reputation(&user);
 
-        assert_eq!(reputation.total_stars, 0);
+        assert_eq!(reputation.average_scaled, 0);
         assert_eq!(reputation.review_count, 0);
     }
 
@@ -237,14 +250,14 @@ mod tests {
 
         let user = Address::generate(&env);
         let data = ReputationData {
-            total_stars: 100,
+            average_scaled: 48000,
             review_count: 20,
         };
 
         client.set_reputation(&user, &data);
         let retrieved = client.get_reputation(&user);
 
-        assert_eq!(retrieved.total_stars, 100);
+        assert_eq!(retrieved.average_scaled, 48000);
         assert_eq!(retrieved.review_count, 20);
     }
 
@@ -259,14 +272,14 @@ mod tests {
         client.set_reputation(
             &user1,
             &ReputationData {
-                total_stars: 50,
+                average_scaled: 48000,
                 review_count: 10,
             },
         );
         client.set_reputation(
             &user2,
             &ReputationData {
-                total_stars: 75,
+                average_scaled: 42000,
                 review_count: 15,
             },
         );
@@ -274,9 +287,9 @@ mod tests {
         let retrieved1 = client.get_reputation(&user1);
         let retrieved2 = client.get_reputation(&user2);
 
-        assert_eq!(retrieved1.total_stars, 50);
+        assert_eq!(retrieved1.average_scaled, 48000);
         assert_eq!(retrieved1.review_count, 10);
-        assert_eq!(retrieved2.total_stars, 75);
+        assert_eq!(retrieved2.average_scaled, 42000);
         assert_eq!(retrieved2.review_count, 15);
     }
 
@@ -289,7 +302,7 @@ mod tests {
         client.set_reputation(
             &user,
             &ReputationData {
-                total_stars: 30,
+                average_scaled: 48000,
                 review_count: 5,
             },
         );
@@ -297,13 +310,13 @@ mod tests {
         client.set_reputation(
             &user,
             &ReputationData {
-                total_stars: 80,
+                average_scaled: 42000,
                 review_count: 12,
             },
         );
 
         let retrieved = client.get_reputation(&user);
-        assert_eq!(retrieved.total_stars, 80);
+        assert_eq!(retrieved.average_scaled, 42000);
         assert_eq!(retrieved.review_count, 12);
     }
 
@@ -334,7 +347,7 @@ mod tests {
         );
 
         let reputation = client.get_reputation(&artisan);
-        assert_eq!(reputation.total_stars, 5);
+        assert_eq!(reputation.average_scaled, 50000);
         assert_eq!(reputation.review_count, 1);
     }
 
@@ -522,14 +535,82 @@ mod tests {
         client.set_reputation(
             &artisan,
             &ReputationData {
-                total_stars: 9,
+                average_scaled: 46000,
                 review_count: 2,
             },
         );
 
         let (average_scaled, count) = client.get_stats(&artisan);
-        assert_eq!(average_scaled, 450);
+        assert_eq!(average_scaled, 46000);
         assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_ema_biases_recent_ratings() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (_, client, escrow_contract_id) = setup_contracts(&env);
+
+        let artisan = Address::generate(&env);
+
+        // Build up a strong reputation with 10 five-star reviews
+        for i in 0..10 {
+            let reviewer = Address::generate(&env);
+            seed_escrow(
+                &env,
+                &escrow_contract_id,
+                i + 1,
+                &reviewer,
+                &artisan,
+                EscrowContractStatus::Released,
+            );
+            client.rate_artisan(
+                &reviewer,
+                &artisan,
+                &5,
+                &escrow_contract_id,
+                &(i as u64 + 1),
+            );
+        }
+
+        let (avg_before, count_before) = client.get_stats(&artisan);
+        assert_eq!(avg_before, 50000);
+        assert_eq!(count_before, 10);
+
+        // Add a single 1-star review
+        let bad_reviewer = Address::generate(&env);
+        seed_escrow(
+            &env,
+            &escrow_contract_id,
+            11,
+            &bad_reviewer,
+            &artisan,
+            EscrowContractStatus::Released,
+        );
+        client.rate_artisan(
+            &bad_reviewer,
+            &artisan,
+            &1,
+            &escrow_contract_id,
+            &11,
+        );
+
+        let (avg_after, count_after) = client.get_stats(&artisan);
+        assert_eq!(count_after, 11);
+
+        // EMA: (50000 * 8000 + 10000 * 2000) / 10000 = 42000
+        assert_eq!(avg_after, 42000);
+
+        // A simple average would give (10*5 + 1) / 11 = 4.636... = 46363
+        // EMA gives 42000 = 4.2, which is significantly lower,
+        // proving that the weighting algorithm correctly biases new ratings over old ones.
+        let simple_average_scaled = (10 * 5 * RATING_SCALE + 1 * RATING_SCALE) / 11;
+        assert!(
+            avg_after < simple_average_scaled,
+            "EMA average {} should be lower than simple average {} after a bad recent review",
+            avg_after,
+            simple_average_scaled
+        );
     }
 }
 

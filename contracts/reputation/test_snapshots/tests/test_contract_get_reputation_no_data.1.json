@@ -149,7 +149,7 @@
               "map": [
                 {
                   "key": {
-                    "symbol": "review_count"
+                    "symbol": "average_scaled"
                   },
                   "val": {
                     "u64": 0
@@ -157,7 +157,7 @@
                 },
                 {
                   "key": {
-                    "symbol": "total_stars"
+                    "symbol": "review_count"
                   },
                   "val": {
                     "u64": 0

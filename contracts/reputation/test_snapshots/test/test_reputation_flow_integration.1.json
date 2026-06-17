@@ -222,18 +222,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "average_scaled"
                       },
                       "val": {
-                        "u64": 2
+                        "u64": 46000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 8
+                        "u64": 2
                       }
                     }
                   ]
@@ -1095,7 +1095,7 @@
             "data": {
               "vec": [
                 {
-                  "u64": 400
+                  "u64": 46000
                 },
                 {
                   "u64": 2
@@ -1152,18 +1152,18 @@
               "map": [
                 {
                   "key": {
-                    "symbol": "review_count"
+                    "symbol": "average_scaled"
                   },
                   "val": {
-                    "u64": 2
+                    "u64": 46000
                   }
                 },
                 {
                   "key": {
-                    "symbol": "total_stars"
+                    "symbol": "review_count"
                   },
                   "val": {
-                    "u64": 8
+                    "u64": 2
                   }
                 }
               ]

@@ -58,18 +58,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "average_scaled"
                       },
                       "val": {
-                        "u64": 10
+                        "u64": 48000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 50
+                        "u64": 10
                       }
                     }
                   ]
@@ -120,18 +120,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "average_scaled"
                       },
                       "val": {
-                        "u64": 15
+                        "u64": 42000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 75
+                        "u64": 15
                       }
                     }
                   ]
@@ -258,18 +258,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "average_scaled"
                       },
                       "val": {
-                        "u64": 10
+                        "u64": 48000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 50
+                        "u64": 10
                       }
                     }
                   ]
@@ -329,18 +329,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "average_scaled"
                       },
                       "val": {
-                        "u64": 15
+                        "u64": 42000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 75
+                        "u64": 15
                       }
                     }
                   ]
@@ -418,18 +418,18 @@
               "map": [
                 {
                   "key": {
-                    "symbol": "review_count"
+                    "symbol": "average_scaled"
                   },
                   "val": {
-                    "u64": 10
+                    "u64": 48000
                   }
                 },
                 {
                   "key": {
-                    "symbol": "total_stars"
+                    "symbol": "review_count"
                   },
                   "val": {
-                    "u64": 50
+                    "u64": 10
                   }
                 }
               ]
@@ -484,18 +484,18 @@
               "map": [
                 {
                   "key": {
-                    "symbol": "review_count"
+                    "symbol": "average_scaled"
                   },
                   "val": {
-                    "u64": 15
+                    "u64": 42000
                   }
                 },
                 {
                   "key": {
-                    "symbol": "total_stars"
+                    "symbol": "review_count"
                   },
                   "val": {
-                    "u64": 75
+                    "u64": 15
                   }
                 }
               ]
