@@ -1,6 +1,9 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, token, vec, Address, Env, Symbol, Vec};
+mod events;
+
+use crate::events::{escrow_event_topics, EscrowEventType, EngagementInitializedEvent, FundsDepositedEvent, FundsReleasedEvent, ReclaimedEvent, DisputeInitiatedEvent, DisputeResolvedEvent, CleanupEvent};
+use soroban_sdk::{contract, contractimpl, contracttype, token, vec, Address, Env, Vec};
 
 // TTL constants for persistent storage (in ledgers)
 // Note: Each ledger is approximately 5 seconds
@@ -78,67 +81,6 @@ pub enum DataKey {
     Oracle,
 }
 
-#[contracttype]
-pub struct EngagementInitializedEvent {
-    pub id: u64,
-    pub client: Address,
-    pub artisan: Address,
-    pub arbitrator: Address,
-    pub token: Address,
-    pub amount: i128,
-}
-
-#[contracttype]
-pub struct FundsDepositedEvent {
-    pub id: u64,
-    pub client: Address,
-    pub amount: i128,
-    pub token: Address,
-}
-
-#[contracttype]
-pub struct FundsReleasedEvent {
-    pub id: u64,
-    pub client: Address,
-    pub artisan: Address,
-    pub amount: i128,
-    pub token: Address,
-}
-
-// Event emitted when a funded escrow is reclaimed by the client after the deadline
-#[contracttype]
-pub struct ReclaimedEvent {
-    pub id: u64,
-    pub client: Address,
-    pub artisan: Address,
-    pub amount: i128,
-    pub token: Address,
-    pub timestamp: u64,
-}
-
-// Event emitted when a dispute is initiated on an escrow
-#[contracttype]
-pub struct DisputeInitiatedEvent {
-    pub id: u64,
-    pub client: Address,
-    pub artisan: Address,
-    pub amount: i128,
-    pub token: Address,
-    pub initiator: Address,
-    pub timestamp: u64,
-}
-
-// Event emitted when an arbitrator resolves a dispute
-#[contracttype]
-pub struct DisputeResolvedEvent {
-    pub id: u64,
-    pub client: Address,
-    pub artisan: Address,
-    pub token: Address,
-    pub client_amount: i128,
-    pub artisan_amount: i128,
-    pub timestamp: u64,
-}
 
 #[contract]
 pub struct EscrowContract;
@@ -234,7 +176,7 @@ impl EscrowContract {
 
         // Emit event
         env.events().publish(
-            (Symbol::new(&env, "initialize"), engagement_id),
+            escrow_event_topics(&env, EscrowEventType::Initialized, engagement_id),
             EngagementInitializedEvent {
                 id: engagement_id,
                 client,
@@ -299,7 +241,7 @@ impl EscrowContract {
 
         // Emit event
         env.events().publish(
-            (Symbol::new(&env, "deposit"), engagement_id),
+            escrow_event_topics(&env, EscrowEventType::Funded, engagement_id),
             FundsDepositedEvent {
                 id: engagement_id,
                 client: escrow.client,
@@ -382,7 +324,7 @@ impl EscrowContract {
 
         // Emit event
         env.events().publish(
-            (Symbol::new(&env, "release"), engagement_id),
+            escrow_event_topics(&env, EscrowEventType::Released, engagement_id),
             FundsReleasedEvent {
                 id: engagement_id,
                 client: escrow.client,
@@ -525,7 +467,7 @@ impl EscrowContract {
 
         // Emit event
         env.events().publish(
-            (Symbol::new(&env, "reclaim"), engagement_id),
+            escrow_event_topics(&env, EscrowEventType::Reclaimed, engagement_id),
             ReclaimedEvent {
                 id: engagement_id,
                 client: escrow.client.clone(),
@@ -712,7 +654,7 @@ impl EscrowContract {
         // Emit event
         let current_time = env.ledger().timestamp();
         env.events().publish(
-            (Symbol::new(&env, "dispute_initiated"), engagement_id),
+            escrow_event_topics(&env, EscrowEventType::DisputeInitiated, engagement_id),
             DisputeInitiatedEvent {
                 id: engagement_id,
                 client: escrow.client.clone(),
@@ -805,7 +747,7 @@ impl EscrowContract {
         // Emit event
         let current_time = env.ledger().timestamp();
         env.events().publish(
-            (Symbol::new(&env, "dispute_resolved"), engagement_id),
+            escrow_event_topics(&env, EscrowEventType::DisputeResolved, engagement_id),
             DisputeResolvedEvent {
                 id: engagement_id,
                 client: escrow.client.clone(),
@@ -844,8 +786,10 @@ impl EscrowContract {
             escrow.client.require_auth();
 
             // Emit event before removal so indexers can archive the record
-            env.events()
-                .publish((Symbol::new(&env, "cleanup"), engagement_id), engagement_id);
+            env.events().publish(
+                escrow_event_topics(&env, EscrowEventType::Cleanup, engagement_id),
+                CleanupEvent { id: engagement_id },
+            );
 
             // Remove primary escrow entry
             env.storage().persistent().remove(&key);
