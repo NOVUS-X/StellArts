@@ -15,9 +15,11 @@ fn seed_escrow(
         artisan: artisan.clone(),
         arbitrator: Address::generate(env),
         token: Address::generate(env),
-        amount: 1_000,
+        material_amount: 1_000,
+        labor_amount: 0,
         status,
         deadline: env.ledger().timestamp() + 1_000,
+        materials_released: false,
     };
 
     env.as_contract(escrow_contract_id, || {

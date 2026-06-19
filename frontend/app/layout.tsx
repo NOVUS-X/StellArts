@@ -2,6 +2,7 @@ import * as React from "react";
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import { WalletProvider } from "../context/WalletContext";
 import { AuthProvider } from "../context/AuthContext";
 import { CurrencyProvider } from "../context/CurrencyContext";
@@ -44,17 +45,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <AuthProvider>
-          <WalletProvider>
-            <CurrencyProvider>
-              <ToastProvider>
-                <NotificationProvider>{children}</NotificationProvider>
-              </ToastProvider>
-            </CurrencyProvider>
-          </WalletProvider>
-        </AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <WalletProvider>
+              <CurrencyProvider>
+                <ToastProvider>
+                  <NotificationProvider>{children}</NotificationProvider>
+                </ToastProvider>
+              </CurrencyProvider>
+            </WalletProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

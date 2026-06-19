@@ -56,12 +56,19 @@ mod happy_path_tests {
         }
 
         /// Initialize an engagement with the default arbitrator and token
-        fn initialize_engagement(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
+        fn initialize_engagement(
+            &self,
+            client: &Address,
+            artisan: &Address,
+            material_amount: i128,
+            labor_amount: i128,
+        ) -> u64 {
             self.initialize_engagement_with_arbitrator(
                 client,
                 artisan,
                 &self.default_arbitrator.clone(),
-                amount,
+                material_amount,
+                labor_amount,
             )
         }
 
@@ -71,7 +78,8 @@ mod happy_path_tests {
             client: &Address,
             artisan: &Address,
             arbitrator: &Address,
-            amount: i128,
+            material_amount: i128,
+            labor_amount: i128,
         ) -> u64 {
             let deadline = self.env.ledger().timestamp() + 86400;
             self.client_contract.initialize(
@@ -79,7 +87,8 @@ mod happy_path_tests {
                 artisan,
                 arbitrator,
                 &self.token_address,
-                &amount,
+                &material_amount,
+                &labor_amount,
                 &deadline,
                 &soroban_sdk::vec![&self.env],
                 &0u32,
@@ -104,16 +113,30 @@ mod happy_path_tests {
         }
 
         /// Full workflow: initialize, mint, deposit
-        fn full_deposit_workflow(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
-            let engagement_id = self.initialize_engagement(client, artisan, amount);
-            self.mint_tokens(client, amount);
+        fn full_deposit_workflow(
+            &self,
+            client: &Address,
+            artisan: &Address,
+            material_amount: i128,
+            labor_amount: i128,
+        ) -> u64 {
+            let engagement_id =
+                self.initialize_engagement(client, artisan, material_amount, labor_amount);
+            self.mint_tokens(client, material_amount + labor_amount);
             self.deposit_funds(engagement_id);
             engagement_id
         }
 
         /// Full workflow: initialize, mint, deposit, release
-        fn full_workflow(&self, client: &Address, artisan: &Address, amount: i128) -> u64 {
-            let engagement_id = self.full_deposit_workflow(client, artisan, amount);
+        fn full_workflow(
+            &self,
+            client: &Address,
+            artisan: &Address,
+            material_amount: i128,
+            labor_amount: i128,
+        ) -> u64 {
+            let engagement_id =
+                self.full_deposit_workflow(client, artisan, material_amount, labor_amount);
             self.release_funds(engagement_id);
             engagement_id
         }
@@ -131,15 +154,17 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
+        let labor_amount: i128 = 0;
 
-        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount);
+        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount, labor_amount);
 
         assert_eq!(engagement_id, 1, "First engagement should have ID 1");
 
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.client, client);
         assert_eq!(escrow.artisan, artisan);
-        assert_eq!(escrow.amount, amount);
+        assert_eq!(escrow.material_amount, amount);
+        assert_eq!(escrow.labor_amount, labor_amount);
         assert_eq!(escrow.status, Status::Pending);
     }
 
@@ -173,8 +198,10 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let escrow_amount: i128 = 5000;
+        let labor_amount: i128 = 0;
 
-        let engagement_id = ctx.initialize_engagement(&client, &artisan, escrow_amount);
+        let engagement_id =
+            ctx.initialize_engagement(&client, &artisan, escrow_amount, labor_amount);
         ctx.mint_tokens(&client, 10000);
 
         let initial_client_balance = ctx.token_client.balance(&client);
@@ -195,7 +222,7 @@ mod happy_path_tests {
 
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.status, Status::Funded);
-        assert_eq!(escrow.amount, escrow_amount);
+        assert_eq!(escrow.material_amount, escrow_amount);
     }
 
     /// Test 4: Release Funds to Artisan
@@ -205,8 +232,10 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let escrow_amount: i128 = 5000;
+        let labor_amount: i128 = 0;
 
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, escrow_amount);
+        let engagement_id =
+            ctx.full_deposit_workflow(&client, &artisan, escrow_amount, labor_amount);
 
         let artisan_balance_before = ctx.token_client.balance(&artisan);
         ctx.release_funds(engagement_id);
@@ -233,8 +262,9 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
+        let labor_amount: i128 = 0;
 
-        let engagement_id = ctx.full_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_workflow(&client, &artisan, amount, labor_amount);
 
         // Verify final balances
         assert_eq!(
@@ -272,12 +302,12 @@ mod happy_path_tests {
         // First engagement
         let (client1, artisan1) = create_addresses(&ctx.env);
         let amount1 = 1000i128;
-        let id1 = ctx.full_deposit_workflow(&client1, &artisan1, amount1);
+        let id1 = ctx.full_deposit_workflow(&client1, &artisan1, amount1, 0);
 
         // Second engagement
         let (client2, artisan2) = create_addresses(&ctx.env);
         let amount2 = 2000i128;
-        let id2 = ctx.full_deposit_workflow(&client2, &artisan2, amount2);
+        let id2 = ctx.full_deposit_workflow(&client2, &artisan2, amount2, 0);
 
         // Verify both are funded
         assert_eq!(
@@ -302,7 +332,7 @@ mod happy_path_tests {
         let (client, artisan) = create_addresses(&ctx.env);
         let large_amount: i128 = 1_000_000_000_000;
 
-        ctx.full_workflow(&client, &artisan, large_amount);
+        ctx.full_workflow(&client, &artisan, large_amount, 0);
 
         assert_eq!(ctx.token_client.balance(&artisan), large_amount);
         assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
@@ -315,8 +345,9 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
+        let labor_amount: i128 = 0;
 
-        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount);
+        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount, labor_amount);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -337,7 +368,7 @@ mod happy_path_tests {
             let (client, artisan) = create_addresses(&ctx.env);
             let amount: i128 = 1000 * i as i128;
 
-            let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+            let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
 
             // After deposit, contract should hold the amount (no other engagements pending)
             assert_eq!(
@@ -361,9 +392,10 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
+        let labor_amount: i128 = 0;
 
         // Initialize and check state
-        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount);
+        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount, labor_amount);
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.status, Status::Pending);
         assert_eq!(escrow.client, client);
@@ -375,7 +407,7 @@ mod happy_path_tests {
         let escrow = ctx.get_escrow(engagement_id);
         assert_eq!(escrow.status, Status::Funded);
         assert_eq!(escrow.client, client);
-        assert_eq!(escrow.amount, amount);
+        assert_eq!(escrow.material_amount, amount);
 
         // Release and check final state
         ctx.release_funds(engagement_id);
@@ -391,6 +423,7 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
+        let labor_amount: i128 = 0;
 
         // set a short deadline a few seconds in the future
         let now = ctx.env.ledger().timestamp();
@@ -401,6 +434,7 @@ mod happy_path_tests {
             &ctx.default_arbitrator,
             &ctx.token_address,
             &amount,
+            &labor_amount,
             &deadline,
             &soroban_sdk::vec![&ctx.env],
             &0u32,
@@ -445,7 +479,7 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
         let original_deadline = ctx.get_escrow(engagement_id).deadline;
         let new_deadline = original_deadline + 3600;
 
@@ -463,7 +497,7 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
         let original_deadline = ctx.get_escrow(engagement_id).deadline;
         let new_deadline = original_deadline + 7200;
 
@@ -483,7 +517,7 @@ mod happy_path_tests {
         let (client, artisan) = create_addresses(&ctx.env);
         let unauthorized = Address::generate(&ctx.env);
         let amount: i128 = 5000;
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
         let new_deadline = ctx.get_escrow(engagement_id).deadline + 3600;
 
         ctx.client_contract
@@ -496,7 +530,7 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
         let new_deadline = ctx.get_escrow(engagement_id).deadline + 3600;
 
         ctx.client_contract
@@ -511,7 +545,7 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
         let original_deadline = ctx.get_escrow(engagement_id).deadline;
 
         ctx.client_contract
@@ -526,7 +560,7 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
         let current_deadline = ctx.get_escrow(engagement_id).deadline;
 
         ctx.client_contract
@@ -541,7 +575,7 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
 
         // Verify initial state is Funded
         assert_eq!(ctx.get_escrow(engagement_id).status, Status::Funded);
@@ -562,7 +596,7 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
 
         // Verify initial state is Funded
         assert_eq!(ctx.get_escrow(engagement_id).status, Status::Funded);
@@ -584,7 +618,7 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize but don't deposit (escrow remains Pending)
-        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount);
+        let engagement_id = ctx.initialize_engagement(&client, &artisan, amount, 0);
 
         // Attempt to dispute Pending escrow should fail
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -599,7 +633,7 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
 
         // First dispute succeeds
         ctx.client_contract.dispute(&engagement_id, &client);
@@ -618,7 +652,7 @@ mod happy_path_tests {
         let amount: i128 = 5000;
 
         // Setup: Initialize, mint, and deposit
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
 
         // Third party attempts to dispute
         let unauthorized = Address::generate(&ctx.env);
@@ -635,7 +669,7 @@ mod happy_path_tests {
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
         let engagement_id =
-            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount, 0);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -669,7 +703,7 @@ mod happy_path_tests {
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
         let engagement_id =
-            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount, 0);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -704,7 +738,7 @@ mod happy_path_tests {
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
         let engagement_id =
-            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount, 0);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -730,7 +764,7 @@ mod happy_path_tests {
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
         let engagement_id =
-            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount, 0);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -753,7 +787,7 @@ mod happy_path_tests {
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit (but don't dispute)
         let engagement_id =
-            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount, 0);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -772,7 +806,7 @@ mod happy_path_tests {
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
         let engagement_id =
-            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount, 0);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -827,7 +861,7 @@ mod happy_path_tests {
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
         let engagement_id =
-            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount, 0);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -849,7 +883,7 @@ mod happy_path_tests {
 
         // Setup: Initialize with per-escrow arbitrator, mint, and deposit
         let engagement_id =
-            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount);
+            ctx.initialize_engagement_with_arbitrator(&client, &artisan, &arbitrator, amount, 0);
         ctx.mint_tokens(&client, amount);
         ctx.deposit_funds(engagement_id);
 
@@ -888,6 +922,7 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
+        let labor_amount: i128 = 0;
 
         let now = ctx.env.ledger().timestamp();
         let deadline = now + 10;
@@ -897,6 +932,7 @@ mod happy_path_tests {
             &ctx.default_arbitrator,
             &ctx.token_address,
             &amount,
+            &labor_amount,
             &deadline,
             &soroban_sdk::vec![&ctx.env],
             &0u32,
@@ -919,6 +955,7 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
+        let labor_amount: i128 = 0;
 
         let now = ctx.env.ledger().timestamp();
         let deadline = now + 10;
@@ -928,6 +965,7 @@ mod happy_path_tests {
             &ctx.default_arbitrator,
             &ctx.token_address,
             &amount,
+            &labor_amount,
             &deadline,
             &soroban_sdk::vec![&ctx.env],
             &0u32,
@@ -955,6 +993,7 @@ mod happy_path_tests {
         let ctx = TestContext::new();
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
+        let labor_amount: i128 = 0;
 
         let now = ctx.env.ledger().timestamp();
         let deadline = now + 10;
@@ -964,6 +1003,7 @@ mod happy_path_tests {
             &ctx.default_arbitrator,
             &ctx.token_address,
             &amount,
+            &labor_amount,
             &deadline,
             &soroban_sdk::vec![&ctx.env],
             &0u32,
@@ -1001,7 +1041,7 @@ mod happy_path_tests {
         let unauthorized = Address::generate(&ctx.env);
         let amount: i128 = 5000;
 
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
 
         // Third party attempts to approve early reclaim
         ctx.client_contract
@@ -1016,7 +1056,7 @@ mod happy_path_tests {
         let (client, artisan) = create_addresses(&ctx.env);
         let amount: i128 = 5000;
 
-        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount);
+        let engagement_id = ctx.full_deposit_workflow(&client, &artisan, amount, 0);
 
         // Client approves twice
         ctx.client_contract
@@ -1091,7 +1131,11 @@ mod ttl_snapshot_tests {
             });
         }
 
-        fn initialize_and_fund(&self, amount: i128) -> (u64, Address, Address) {
+        fn initialize_and_fund(
+            &self,
+            material_amount: i128,
+            labor_amount: i128,
+        ) -> (u64, Address, Address) {
             let client_addr = Address::generate(&self.env);
             let artisan_addr = Address::generate(&self.env);
             let arbitrator = Address::generate(&self.env);
@@ -1101,12 +1145,14 @@ mod ttl_snapshot_tests {
                 &artisan_addr,
                 &arbitrator,
                 &self.token_address,
-                &amount,
+                &material_amount,
+                &labor_amount,
                 &deadline,
                 &soroban_sdk::vec![&self.env],
                 &0u32,
             );
-            self.token_asset_client.mint(&client_addr, &amount);
+            self.token_asset_client
+                .mint(&client_addr, &(material_amount + labor_amount));
             self.client.deposit(&id, &self.token_address);
             (id, client_addr, artisan_addr)
         }
@@ -1116,7 +1162,7 @@ mod ttl_snapshot_tests {
     #[test]
     fn test_ttl_record_persists_after_30_days() {
         let ctx = TtlCtx::new();
-        let (id, _, _) = ctx.initialize_and_fund(1_000);
+        let (id, _, _) = ctx.initialize_and_fund(1_000, 0);
 
         // Advance ~30 days (30 * DAY_LEDGERS)
         ctx.jump_ledgers(30 * DAY_LEDGERS);
@@ -1146,6 +1192,7 @@ mod ttl_snapshot_tests {
             &arbitrator,
             &ctx.token_address,
             &1_000i128,
+            &0i128,
             &deadline,
             &soroban_sdk::vec![&ctx.env],
             &0u32,
@@ -1174,7 +1221,7 @@ mod ttl_snapshot_tests {
     #[test]
     fn test_ttl_extends_on_release() {
         let ctx = TtlCtx::new();
-        let (id, _, artisan_addr) = ctx.initialize_and_fund(2_000);
+        let (id, _, artisan_addr) = ctx.initialize_and_fund(2_000, 0);
 
         // Advance 10 days, then release
         ctx.jump_ledgers(10 * DAY_LEDGERS);
@@ -1208,6 +1255,7 @@ mod ttl_snapshot_tests {
             &arbitrator,
             &ctx.token_address,
             &500i128,
+            &0i128,
             &deadline,
             &soroban_sdk::vec![&ctx.env],
             &0u32,
@@ -1236,7 +1284,7 @@ mod ttl_snapshot_tests {
     #[test]
     fn test_ttl_extends_on_dispute() {
         let ctx = TtlCtx::new();
-        let (id, client_addr, _) = ctx.initialize_and_fund(3_000);
+        let (id, client_addr, _) = ctx.initialize_and_fund(3_000, 0);
 
         ctx.jump_ledgers(5 * DAY_LEDGERS);
         ctx.client.dispute(&id, &client_addr);
@@ -1310,6 +1358,7 @@ mod multisig_tests {
             &arbitrator,
             &ctx.token_address,
             &amount,
+            &0i128,
             &deadline,
             &vec![&ctx.env], // empty → no multisig
             &0u32,
@@ -1348,6 +1397,7 @@ mod multisig_tests {
             &arbitrator,
             &ctx.token_address,
             &amount,
+            &0i128,
             &deadline,
             &signers,
             &2u32, // 2-of-2
@@ -1393,6 +1443,7 @@ mod multisig_tests {
             &arbitrator,
             &ctx.token_address,
             &amount,
+            &0i128,
             &deadline,
             &signers,
             &2u32,
@@ -1426,6 +1477,7 @@ mod multisig_tests {
             &arbitrator,
             &ctx.token_address,
             &amount,
+            &0i128,
             &deadline,
             &signers,
             &1u32, // 1-of-2
@@ -1460,6 +1512,7 @@ mod multisig_tests {
             &arbitrator,
             &ctx.token_address,
             &amount,
+            &0i128,
             &deadline,
             &signers,
             &1u32,
@@ -1490,6 +1543,7 @@ mod multisig_tests {
             &arbitrator,
             &ctx.token_address,
             &amount,
+            &0i128,
             &deadline,
             &signers,
             &1u32,
@@ -1519,6 +1573,7 @@ mod multisig_tests {
             &arbitrator,
             &ctx.token_address,
             &1_000i128,
+            &0i128,
             &deadline,
             &signers,
             &0u32, // invalid
@@ -1543,6 +1598,7 @@ mod multisig_tests {
             &arbitrator,
             &ctx.token_address,
             &1_000i128,
+            &0i128,
             &deadline,
             &signers,
             &3u32, // threshold > signers count
@@ -1602,6 +1658,7 @@ mod cleanup_tests {
                 &arbitrator,
                 &self.token_address,
                 &amount,
+                &0i128,
                 &deadline,
                 &vec![&self.env],
                 &0u32,
@@ -1624,6 +1681,7 @@ mod cleanup_tests {
                 &arbitrator,
                 &self.token_address,
                 &amount,
+                &0i128,
                 &deadline,
                 &vec![&self.env],
                 &0u32,
@@ -1719,6 +1777,7 @@ mod cleanup_tests {
             &arbitrator,
             &ctx.token_address,
             &amount,
+            &0i128,
             &deadline,
             &vec![&ctx.env],
             &0u32,
@@ -1746,5 +1805,356 @@ mod cleanup_tests {
         assert!(!ctx.env.as_contract(&ctx.contract_id, || {
             ctx.env.storage().persistent().has(&DataKey::Escrow(id2))
         }));
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Issue #297 – Material/Labor Split tests
+// ─────────────────────────────────────────────────────────────────────────────
+#[cfg(test)]
+mod material_split_tests {
+    use crate::{DataKey, EscrowContract, EscrowContractClient, Status};
+    use soroban_sdk::testutils::{Address as AddressTestUtils, Ledger};
+    use soroban_sdk::{token, vec, Address, Env};
+
+    struct MatCtx {
+        env: Env,
+        contract_id: Address,
+        token_address: Address,
+        client: EscrowContractClient<'static>,
+        token_client: token::Client<'static>,
+        token_asset_client: token::StellarAssetClient<'static>,
+    }
+
+    impl MatCtx {
+        fn new() -> Self {
+            let env = Env::default();
+            env.mock_all_auths_allowing_non_root_auth();
+            let contract_id = env.register_contract(None, EscrowContract);
+            let token_admin = Address::generate(&env);
+            let tc = env.register_stellar_asset_contract_v2(token_admin);
+            let token_address = tc.address();
+            let client = EscrowContractClient::new(&env, &contract_id);
+            let token_client = token::Client::new(&env, &token_address);
+            let token_asset_client = token::StellarAssetClient::new(&env, &token_address);
+            MatCtx {
+                env,
+                contract_id,
+                token_address,
+                client,
+                token_client,
+                token_asset_client,
+            }
+        }
+
+        fn get_escrow(&self, id: u64) -> crate::Escrow {
+            self.env.as_contract(&self.contract_id, || {
+                self.env
+                    .storage()
+                    .persistent()
+                    .get(&DataKey::Escrow(id))
+                    .expect("escrow exists")
+            })
+        }
+    }
+
+    /// MS-1: release_materials transfers only the material_amount to artisan
+    /// and marks materials_released = true.
+    #[test]
+    fn test_release_materials_transfers_correct_amount() {
+        let ctx = MatCtx::new();
+        let client = Address::generate(&ctx.env);
+        let artisan = Address::generate(&ctx.env);
+        let mat = 1_000i128;
+        let lab = 2_000i128;
+
+        let id = ctx.client.initialize(
+            &client,
+            &artisan,
+            &Address::generate(&ctx.env),
+            &ctx.token_address,
+            &mat,
+            &lab,
+            &(ctx.env.ledger().timestamp() + 86400),
+            &vec![&ctx.env],
+            &0u32,
+        );
+        ctx.token_asset_client.mint(&client, &(mat + lab));
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        let artisan_balance_before = ctx.token_client.balance(&artisan);
+        ctx.client
+            .release_materials(&id, &ctx.token_address, &client);
+        let artisan_balance_after = ctx.token_client.balance(&artisan);
+
+        // Artisan receives exactly the material amount
+        assert_eq!(artisan_balance_after, artisan_balance_before + mat);
+
+        // Contract still holds the labor amount
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), lab);
+
+        // State is updated
+        let escrow = ctx.get_escrow(id);
+        assert!(escrow.materials_released);
+        assert_eq!(escrow.material_amount, mat);
+        assert_eq!(escrow.labor_amount, lab);
+        assert_eq!(escrow.status, Status::Funded);
+    }
+
+    /// MS-2: release_materials blocks double-spending (second call panics).
+    #[test]
+    #[should_panic(expected = "Materials have already been released for this engagement")]
+    fn test_release_materials_double_spending_blocked() {
+        let ctx = MatCtx::new();
+        let client = Address::generate(&ctx.env);
+        let artisan = Address::generate(&ctx.env);
+        let mat = 1_000i128;
+        let lab = 2_000i128;
+
+        let id = ctx.client.initialize(
+            &client,
+            &artisan,
+            &Address::generate(&ctx.env),
+            &ctx.token_address,
+            &mat,
+            &lab,
+            &(ctx.env.ledger().timestamp() + 86400),
+            &vec![&ctx.env],
+            &0u32,
+        );
+        ctx.token_asset_client.mint(&client, &(mat + lab));
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        // First call succeeds
+        ctx.client
+            .release_materials(&id, &ctx.token_address, &client);
+        // Second call must panic
+        ctx.client
+            .release_materials(&id, &ctx.token_address, &client);
+    }
+
+    /// MS-3: release_materials can also be called by the artisan.
+    #[test]
+    fn test_release_materials_by_artisan() {
+        let ctx = MatCtx::new();
+        let client = Address::generate(&ctx.env);
+        let artisan = Address::generate(&ctx.env);
+        let mat = 1_000i128;
+        let lab = 2_000i128;
+
+        let id = ctx.client.initialize(
+            &client,
+            &artisan,
+            &Address::generate(&ctx.env),
+            &ctx.token_address,
+            &mat,
+            &lab,
+            &(ctx.env.ledger().timestamp() + 86400),
+            &vec![&ctx.env],
+            &0u32,
+        );
+        ctx.token_asset_client.mint(&client, &(mat + lab));
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        let artisan_balance_before = ctx.token_client.balance(&artisan);
+        // Artisan calls release_materials themselves
+        ctx.client
+            .release_materials(&id, &ctx.token_address, &artisan);
+        assert_eq!(
+            ctx.token_client.balance(&artisan),
+            artisan_balance_before + mat
+        );
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), lab);
+    }
+
+    /// MS-4: Unauthorized third party cannot call release_materials.
+    #[test]
+    #[should_panic(expected = "Only client or artisan can release materials")]
+    fn test_release_materials_unauthorized_fails() {
+        let ctx = MatCtx::new();
+        let client = Address::generate(&ctx.env);
+        let artisan = Address::generate(&ctx.env);
+        let unauthorized = Address::generate(&ctx.env);
+        let mat = 1_000i128;
+        let lab = 2_000i128;
+
+        let id = ctx.client.initialize(
+            &client,
+            &artisan,
+            &Address::generate(&ctx.env),
+            &ctx.token_address,
+            &mat,
+            &lab,
+            &(ctx.env.ledger().timestamp() + 86400),
+            &vec![&ctx.env],
+            &0u32,
+        );
+        ctx.token_asset_client.mint(&client, &(mat + lab));
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        // Third party tries to release materials
+        ctx.client
+            .release_materials(&id, &ctx.token_address, &unauthorized);
+    }
+
+    /// MS-5: release after materials_released transfers only labor_amount.
+    #[test]
+    fn test_release_after_materials_released_transfers_labor_only() {
+        let ctx = MatCtx::new();
+        let client = Address::generate(&ctx.env);
+        let artisan = Address::generate(&ctx.env);
+        let mat = 1_000i128;
+        let lab = 2_000i128;
+
+        let id = ctx.client.initialize(
+            &client,
+            &artisan,
+            &Address::generate(&ctx.env),
+            &ctx.token_address,
+            &mat,
+            &lab,
+            &(ctx.env.ledger().timestamp() + 86400),
+            &vec![&ctx.env],
+            &0u32,
+        );
+        ctx.token_asset_client.mint(&client, &(mat + lab));
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        // Release materials first
+        ctx.client
+            .release_materials(&id, &ctx.token_address, &client);
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), lab);
+
+        // Now release labor
+        let artisan_before = ctx.token_client.balance(&artisan);
+        ctx.client.release(&id, &ctx.token_address);
+        assert_eq!(ctx.token_client.balance(&artisan), artisan_before + lab);
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
+
+        let escrow = ctx.get_escrow(id);
+        assert_eq!(escrow.status, Status::Released);
+    }
+
+    /// MS-6: reclaim after materials_released refunds only labor_amount to client.
+    #[test]
+    fn test_reclaim_after_materials_released_refunds_labor_only() {
+        let ctx = MatCtx::new();
+        let client = Address::generate(&ctx.env);
+        let artisan = Address::generate(&ctx.env);
+        let mat = 1_000i128;
+        let lab = 2_000i128;
+
+        let deadline = ctx.env.ledger().timestamp() + 10;
+        let id = ctx.client.initialize(
+            &client,
+            &artisan,
+            &Address::generate(&ctx.env),
+            &ctx.token_address,
+            &mat,
+            &lab,
+            &deadline,
+            &vec![&ctx.env],
+            &0u32,
+        );
+        ctx.token_asset_client.mint(&client, &(mat + lab));
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        // Release materials – material funds go to artisan
+        ctx.client
+            .release_materials(&id, &ctx.token_address, &client);
+        assert_eq!(ctx.token_client.balance(&artisan), mat);
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), lab);
+
+        // Fast-forward past deadline + grace period
+        ctx.env.ledger().set_timestamp(deadline + 86400 + 1);
+
+        // Client reclaims – only gets labor back (material is already with artisan)
+        let client_before = ctx.token_client.balance(&client);
+        ctx.client.reclaim(&id, &ctx.token_address);
+        let client_after = ctx.token_client.balance(&client);
+        assert_eq!(client_after, client_before + lab);
+
+        // Artisan keeps the material amount they received
+        assert_eq!(ctx.token_client.balance(&artisan), mat);
+
+        // Contract is empty
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
+
+        let escrow = ctx.get_escrow(id);
+        assert_eq!(escrow.status, Status::Refunded);
+    }
+
+    /// MS-7: reclaim without materials_released refunds the full amount.
+    #[test]
+    fn test_reclaim_without_materials_released_refunds_full() {
+        let ctx = MatCtx::new();
+        let client = Address::generate(&ctx.env);
+        let artisan = Address::generate(&ctx.env);
+        let mat = 1_000i128;
+        let lab = 2_000i128;
+        let total = mat + lab;
+
+        let deadline = ctx.env.ledger().timestamp() + 10;
+        let id = ctx.client.initialize(
+            &client,
+            &artisan,
+            &Address::generate(&ctx.env),
+            &ctx.token_address,
+            &mat,
+            &lab,
+            &deadline,
+            &vec![&ctx.env],
+            &0u32,
+        );
+        ctx.token_asset_client.mint(&client, &total);
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        // Fast-forward past deadline + grace period (no release_materials called)
+        ctx.env.ledger().set_timestamp(deadline + 86400 + 1);
+
+        let client_before = ctx.token_client.balance(&client);
+        ctx.client.reclaim(&id, &ctx.token_address);
+        assert_eq!(
+            ctx.token_client.balance(&client),
+            client_before + total,
+            "Client should get full refund when materials not released"
+        );
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
+
+        let escrow = ctx.get_escrow(id);
+        assert_eq!(escrow.status, Status::Refunded);
+    }
+
+    /// MS-8: release without calling release_materials transfers everything.
+    #[test]
+    fn test_release_without_materials_released_transfers_full() {
+        let ctx = MatCtx::new();
+        let client = Address::generate(&ctx.env);
+        let artisan = Address::generate(&ctx.env);
+        let mat = 1_000i128;
+        let lab = 2_000i128;
+        let total = mat + lab;
+
+        let id = ctx.client.initialize(
+            &client,
+            &artisan,
+            &Address::generate(&ctx.env),
+            &ctx.token_address,
+            &mat,
+            &lab,
+            &(ctx.env.ledger().timestamp() + 86400),
+            &vec![&ctx.env],
+            &0u32,
+        );
+        ctx.token_asset_client.mint(&client, &total);
+        ctx.client.deposit(&id, &ctx.token_address);
+
+        let artisan_before = ctx.token_client.balance(&artisan);
+        ctx.client.release(&id, &ctx.token_address);
+        assert_eq!(ctx.token_client.balance(&artisan), artisan_before + total);
+
+        let escrow = ctx.get_escrow(id);
+        assert_eq!(escrow.status, Status::Released);
+        assert!(!escrow.materials_released);
     }
 }
