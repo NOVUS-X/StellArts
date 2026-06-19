@@ -85,6 +85,11 @@ class GeolocationService:
             }
             await cache.redis.hset(f"artisan_geo:{artisan_id}", mapping=artisan_data)
 
+            # Set a 15-minute TTL on the hash; the geo sorted-set member
+            # (artisan_locations) does not support per-member expiry, so the
+            # hash's presence acts as the liveness signal.
+            await cache.redis.expire(f"artisan_geo:{artisan_id}", 900)
+
             return True
         except Exception as e:
             print(f"Error adding artisan location to Redis: {e}")
@@ -136,10 +141,21 @@ class GeolocationService:
             )
 
             nearby_artisans = []
+            expired_ids: list[str] = []
             for result in results:
                 artisan_id = int(result[0])
                 distance_m = float(result[1])
                 coordinates = result[2]
+
+                # Liveness check: the geo sorted-set member does not auto-expire,
+                # so we use the presence of the artisan_geo hash (which has a TTL)
+                # as the authoritative liveness signal.
+                hash_key = f"artisan_geo:{artisan_id}"
+                is_alive = await cache.redis.exists(hash_key)
+                if not is_alive:
+                    # Collect expired members to remove from the geo index.
+                    expired_ids.append(str(artisan_id))
+                    continue
 
                 nearby_artisans.append(
                     {
@@ -149,6 +165,10 @@ class GeolocationService:
                         "longitude": coordinates[0],
                     }
                 )
+
+            # Evict stale members from the geo sorted-set to keep the index lean.
+            if expired_ids:
+                await cache.redis.zrem(self.redis_key, *expired_ids)
 
             return nearby_artisans
 

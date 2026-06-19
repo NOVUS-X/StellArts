@@ -18,6 +18,7 @@ from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.artisan import (
     ArtisanAvailabilityUpdate,
+    ArtisanLocationRealtimeUpdate,
     ArtisanLocationUpdate,
     ArtisanOut,
     ArtisanProfileCreate,
@@ -229,6 +230,38 @@ async def update_artisan_location(
             detail="Failed to update location",
         )
     return updated_artisan
+
+
+@router.put("/location/realtime")
+async def update_artisan_location_realtime(
+    location_data: ArtisanLocationRealtimeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_artisan),
+):
+    """Push real-time artisan location to Redis (no PostgreSQL write).
+
+    Location data is stored in the Redis geo sorted-set (artisan_locations)
+    and the per-artisan hash (artisan_geo:{id}) with a 15-minute TTL.
+    The entry expires automatically after 15 minutes of inactivity;
+    find_nearby_artisans filters and cleans up stale members on reads.
+    """
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
+        )
+
+    success = await geolocation_service.add_artisan_location(
+        artisan.id, location_data.latitude, location_data.longitude
+    )
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Location service unavailable",
+        )
+
+    return {"status": "ok"}
 
 
 @router.post("/geocode", response_model=GeolocationResponse)
