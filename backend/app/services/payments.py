@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 from decimal import ROUND_DOWN, Decimal
@@ -17,8 +18,13 @@ from stellar_sdk import (
 )
 from stellar_sdk.exceptions import BadRequestError, BadResponseError
 
+from app.models.artisan import Artisan
 from app.models.booking import Booking
+from app.models.client import Client
 from app.models.payment import Payment, PaymentStatus
+from app.schemas.notification import NotificationCreate
+from app.services import notification_service
+from app.services.notification_manager import manager
 
 # Stellar config
 HORIZON = os.getenv("STELLAR_HORIZON", "https://horizon-testnet.stellar.org")
@@ -196,7 +202,7 @@ def release_payment(
         result = soroban.submit_soroban_transaction(signed_xdr)
         tx_hash = result["hash"]
 
-        return _record_payment(
+        payment_record = _record_payment(
             db,
             booking_id,
             tx_hash,
@@ -208,6 +214,26 @@ def release_payment(
             held.asset_code,
             held.asset_issuer,
         )
+        
+        # Send notification
+        booking = db.query(Booking).filter(Booking.id == booking_uuid).first()
+        if booking:
+            artisan = db.query(Artisan).filter(Artisan.id == booking.artisan_id).first()
+            if artisan:
+                async def send_release_notification():
+                    await notification_service.send_notification_to_user(
+                        db,
+                        NotificationCreate(
+                            user_id=artisan.user_id,
+                            type="payment_released",
+                            title="Payment Released!",
+                            message=f"Your payment of {amount} {held.asset_code} for booking {booking_id[:8]} has been released.",
+                            reference_id=booking_uuid,
+                        ),
+                    )
+                asyncio.create_task(send_release_notification())
+                
+        return payment_record
     except Exception as e:
         return {
             "status": "error",
@@ -274,7 +300,7 @@ def refund_payment(
     try:
         resp = server.submit_transaction(tx)
         tx_hash = resp["hash"]
-        return _record_payment(
+        payment_record = _record_payment(
             db,
             booking_id,
             tx_hash,
@@ -286,6 +312,27 @@ def refund_payment(
             held.asset_code,
             held.asset_issuer,
         )
+        
+        # Send notification
+        booking_uuid = uuid.UUID(booking_id)
+        booking = db.query(Booking).filter(Booking.id == booking_uuid).first()
+        if booking:
+            client = db.query(Client).filter(Client.id == booking.client_id).first()
+            if client:
+                async def send_refund_notification():
+                    await notification_service.send_notification_to_user(
+                        db,
+                        NotificationCreate(
+                            user_id=client.user_id,
+                            type="payment_refunded",
+                            title="Payment Refunded!",
+                            message=f"Your payment of {amount} {held.asset_code} for booking {booking_id[:8]} has been refunded.",
+                            reference_id=booking_uuid,
+                        ),
+                    )
+                asyncio.create_task(send_refund_notification())
+                
+        return payment_record
     except (BadRequestError, BadResponseError) as e:
         db.rollback()
         return {"status": "error", "message": str(e)}

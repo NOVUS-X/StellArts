@@ -34,11 +34,13 @@ from app.schemas.booking import (
     ReviewResponse,
 )
 from app.services import notification_service
+from app.schemas.notification import NotificationCreate
 from app.services.ai_service import ai_service
 from app.services.completion_verification import assess_booking_completion
 from app.services.geolocation import geolocation_service
 from app.services.scheduling import scheduling_service
 from app.services.soroban import transition_to_in_progress
+from app.services.notification_manager import manager
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +345,76 @@ def update_booking_status(
     booking.status = new_status
     db.commit()
     db.refresh(booking)
+    
+    # Send notifications
+    async def send_notifications():
+        # Get client and artisan user IDs
+        client = db.query(Client).filter(Client.id == booking.client_id).first()
+        artisan = db.query(Artisan).filter(Artisan.id == booking.artisan_id).first()
+        
+        if new_status == BookingStatus.CONFIRMED:
+            # Notify client that booking was accepted
+            if client:
+                await notification_service.send_notification_to_user(
+                    db,
+                    NotificationCreate(
+                        user_id=client.user_id,
+                        type="booking_confirmed",
+                        title="Booking Confirmed!",
+                        message=f"Your booking for {booking.service} has been accepted by the artisan.",
+                        reference_id=booking.id,
+                    ),
+                )
+        elif new_status == BookingStatus.CANCELLED:
+            # Notify both client and artisan
+            if client:
+                await notification_service.send_notification_to_user(
+                    db,
+                    NotificationCreate(
+                        user_id=client.user_id,
+                        type="booking_cancelled",
+                        title="Booking Cancelled",
+                        message=f"Your booking for {booking.service} has been cancelled.",
+                        reference_id=booking.id,
+                    ),
+                )
+            if artisan:
+                await notification_service.send_notification_to_user(
+                    db,
+                    NotificationCreate(
+                        user_id=artisan.user_id,
+                        type="booking_cancelled",
+                        title="Booking Cancelled",
+                        message=f"The booking for {booking.service} has been cancelled.",
+                        reference_id=booking.id,
+                    ),
+                )
+        elif new_status == BookingStatus.COMPLETED:
+            if artisan:
+                await notification_service.send_notification_to_user(
+                    db,
+                    NotificationCreate(
+                        user_id=artisan.user_id,
+                        type="booking_completed",
+                        title="Booking Completed!",
+                        message=f"The booking for {booking.service} has been marked as completed.",
+                        reference_id=booking.id,
+                    ),
+                )
+        elif new_status == BookingStatus.IN_PROGRESS:
+            if client:
+                await notification_service.send_notification_to_user(
+                    db,
+                    NotificationCreate(
+                        user_id=client.user_id,
+                        type="booking_started",
+                        title="Booking Started!",
+                        message=f"Your booking for {booking.service} has started.",
+                        reference_id=booking.id,
+                    ),
+                )
+    
+    asyncio.create_task(send_notifications())
 
     return {
         "message": f"Booking {booking_id} status updated",
