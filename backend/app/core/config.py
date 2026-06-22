@@ -74,6 +74,36 @@ class Settings(BaseSettings):
     VISION_MODEL: str = "gpt-4o-mini"
     JOB_COMPLETION_ACCEPTANCE_THRESHOLD: float = 0.75
 
+    # Vision-to-Scope Ingestion Gateway Configuration
+    # Media Storage
+    MEDIA_STORAGE_TYPE: str = "local"  # "local" or "s3"
+    MEDIA_TEMP_DIR: str = "/tmp/stellarts_media"
+    MEDIA_MAX_SIZE_MB: int = 50  # Maximum file size in MB
+    MEDIA_MAX_TOTAL_SIZE_MB: int = 100  # Maximum total payload size in MB
+    
+    # S3 Configuration (if MEDIA_STORAGE_TYPE == "s3")
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: str | None = None
+    AWS_REGION: str = "us-east-1"
+    AWS_S3_BUCKET: str | None = None
+    AWS_S3_PREFIX: str = "job-ingest/"
+    
+    # AI Quality Validation Configuration
+    AI_VALIDATION_PROVIDER: str = "openai"  # "openai" or "anthropic"
+    OPENAI_API_KEY: str | None = None
+    ANTHROPIC_API_KEY: str | None = None
+    AI_VALIDATION_MODEL: str = "gpt-4o"  # or "claude-3-5-sonnet-20241022"
+    AI_VALIDATION_TIMEOUT_SECONDS: int = 30
+    
+    # Allowed media types
+    ALLOWED_IMAGE_TYPES: list[str] = ["image/jpeg", "image/png", "image/webp"]
+    ALLOWED_VIDEO_TYPES: list[str] = ["video/mp4"]
+    ALLOWED_AUDIO_TYPES: list[str] = ["audio/mpeg", "audio/wav", "audio/mp3"]
+    
+    # Analysis Node Queue Configuration
+    ANALYSIS_QUEUE_TYPE: str = "redis"  # "redis" or "sqs"
+    ANALYSIS_QUEUE_NAME: str = "job_analysis_queue"
+    
     # Stellar/Soroban Configuration
     STELLAR_NETWORK: str = "standalone"  # standalone, testnet, or mainnet
     STELLAR_RPC_URL: str = "http://localhost:8002/soroban/rpc"
