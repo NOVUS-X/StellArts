@@ -113,6 +113,28 @@ StellArts contracts are upgradeable using a delegated pattern. Only the stored *
 | - | Raise Conflict | `dispute` | Client/Artisan |
 | - | Resolve Conflict | `arbitrate` | Arbitrator |
 
+**Escrow Event Schema**
+To support indexers and the backend, escrow contract events now follow a strict topic structure:
+- Primary topic: `Escrow`
+- Secondary topic: one of:
+  - `Initialized`
+  - `Funded`
+  - `Released`
+  - `Reclaimed`
+  - `DisputeInitiated`
+  - `DisputeResolved`
+  - `Cleanup`
+- Third topic: engagement ID
+
+Each event payload also includes structured data keyed to the event type, for example:
+- `Initialized`: client, artisan, arbitrator, token, amount
+- `Funded`: client, amount, token
+- `Released`: client, artisan, amount, token
+- `Reclaimed`: client, artisan, amount, token, timestamp
+- `DisputeInitiated`: client, artisan, amount, token, initiator, timestamp
+- `DisputeResolved`: client, artisan, token, client_amount, artisan_amount, timestamp
+- `Cleanup`: id
+
 **Example: Create Engagement**
 ```bash
 stellar contract invoke --id $ESCROW_ID --network testnet --source CLIENT_ACCOUNT -- \
