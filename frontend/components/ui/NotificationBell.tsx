@@ -86,8 +86,13 @@ export default function NotificationBell() {
     return date.toLocaleDateString();
   };
 
-  const handleNotificationClick = async (notificationId: string) => {
-    await markAsRead(notificationId);
+  const handleNotificationClick = async (notification: { id: string; reference_id: string | null }) => {
+    await markAsRead(notification.id);
+    if (notification.reference_id) {
+      // Navigate to relevant page (e.g., booking)
+      // For now, just log or navigate to dashboard/bookings
+      console.log("Navigate to booking with id:", notification.reference_id);
+    }
   };
 
   const handleMarkAllRead = async () => {
@@ -173,7 +178,7 @@ export default function NotificationBell() {
               notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  onClick={() => handleNotificationClick(notification.id)}
+                  onClick={() => handleNotificationClick(notification)}
                   className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 ${
                     !notification.read ? "bg-blue-50" : ""
                   }`}
