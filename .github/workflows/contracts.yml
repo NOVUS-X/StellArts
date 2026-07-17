@@ -51,12 +51,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-target-
 
-      - name: Pin ed25519-dalek dependency
-        working-directory: contracts
-        run: |
-          cargo generate-lockfile
-          cargo update -p ed25519-dalek --precise 2.1.1
-
       - name: Check formatting
         working-directory: contracts
         run: cargo fmt --all -- --check
