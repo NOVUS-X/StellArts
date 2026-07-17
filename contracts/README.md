@@ -132,6 +132,23 @@ stellar contract invoke --id $REPUTATION_ID --network testnet --source ANYONE --
   get_stats --user ARTISAN_ADDR
 ```
 
+## 📡 Event Schema
+
+The Escrow contract emits structured events to make it easy for backend indexers to listen and react to state changes. All events follow a strict topic schema: `["Escrow", "<Action>"]`.
+
+### Available Events
+
+| Topics | Action | Payload Struct | Description |
+|:---|:---|:---|:---|
+| `["Escrow", "Initialized"]` | `initialize` | `EngagementInitializedEvent` | Emitted when a new escrow agreement is created. |
+| `["Escrow", "Funded"]` | `deposit` | `FundsDepositedEvent` | Emitted when the client deposits funds into the escrow. |
+| `["Escrow", "MaterialsReleased"]` | `release_materials` | `MaterialsReleasedEvent` | Emitted when material funds are released to the artisan. |
+| `["Escrow", "Released"]` | `release` | `FundsReleasedEvent` | Emitted when funds are fully released to the artisan. |
+| `["Escrow", "Reclaimed"]` | `reclaim` | `ReclaimedEvent` | Emitted when funds are returned to the client. |
+| `["Escrow", "Disputed"]` | `dispute` | `DisputeInitiatedEvent` | Emitted when a dispute is initiated. |
+| `["Escrow", "Resolved"]` | `resolve_dispute`| `DisputeResolvedEvent` | Emitted when a dispute is resolved by the arbitrator. |
+| `["Escrow", "Cleanup"]` | `cleanup_expired` | `CleanupEvent` | Emitted when an old escrow is cleaned up. |
+
 ## 🧪 Testing
 
 ```bash
