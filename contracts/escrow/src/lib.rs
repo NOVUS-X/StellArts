@@ -160,7 +160,10 @@ impl EscrowContract {
 
         // Emit event
         env.events().publish(
-            (Symbol::new(&env, "Escrow"), Symbol::new(&env, "Initialized")),
+            (
+                Symbol::new(&env, "Escrow"),
+                Symbol::new(&env, "Initialized"),
+            ),
             EngagementInitializedEvent {
                 id: engagement_id,
                 client,
@@ -286,7 +289,10 @@ impl EscrowContract {
 
         // Emit event
         env.events().publish(
-            (Symbol::new(&env, "Escrow"), Symbol::new(&env, "MaterialsReleased")),
+            (
+                Symbol::new(&env, "Escrow"),
+                Symbol::new(&env, "MaterialsReleased"),
+            ),
             MaterialsReleasedEvent {
                 id: engagement_id,
                 client: escrow.client.clone(),
@@ -867,8 +873,10 @@ impl EscrowContract {
             escrow.client.require_auth();
 
             // Emit event before removal so indexers can archive the record
-            env.events()
-                .publish((Symbol::new(&env, "Escrow"), Symbol::new(&env, "Cleanup")), CleanupEvent { id: engagement_id });
+            env.events().publish(
+                (Symbol::new(&env, "Escrow"), Symbol::new(&env, "Cleanup")),
+                CleanupEvent { id: engagement_id },
+            );
 
             // Remove primary escrow entry
             env.storage().persistent().remove(&key);
