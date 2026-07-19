@@ -23,6 +23,8 @@ from app.schemas.artisan import (
     ArtisanProfileCreate,
     ArtisanProfileResponse,
     ArtisanProfileUpdate,
+    FastLocationUpdate,
+    FastLocationResponse,
     GeolocationRequest,
     GeolocationResponse,
     NearbyArtisansRequest,
@@ -193,13 +195,59 @@ async def update_artisan_profile(
     return updated_artisan
 
 
-@router.put("/location", response_model=ArtisanOut)
+@router.put("/location", response_model=FastLocationResponse)
 async def update_artisan_location(
+    location_data: FastLocationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_artisan),
+):
+    """Fast location update - stores coordinates in Redis only (no PostgreSQL writes).
+
+    Use this endpoint for high-frequency location updates from artisan mobile devices.
+    Location expires after 15 minutes of inactivity.
+    """
+    from app.services.geolocation import LOCATION_TTL_SECONDS
+
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
+        )
+
+    # Add location to Redis geospatial index with TTL
+    success = await geolocation_service.add_artisan_location(
+        artisan.id,
+        location_data.latitude,
+        location_data.longitude,
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update location in Redis",
+        )
+
+    return FastLocationResponse(
+        artisan_id=artisan.id,
+        latitude=location_data.latitude,
+        longitude=location_data.longitude,
+        ttl_seconds=LOCATION_TTL_SECONDS,
+    )
+
+
+@router.put("/location/full", response_model=ArtisanOut)
+async def update_artisan_location_full(
     location_data: ArtisanLocationUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_artisan),
 ):
-    """Update artisan location with optional geocoding - artisan only"""
+    """Update artisan location with optional geocoding - artisan only.
+
+    This endpoint updates both Redis and PostgreSQL. For high-frequency updates,
+    use PUT /location instead.
+    """
     service = ArtisanService(db)
     artisan = service.get_artisan_by_user_id(current_user.id)
     if not artisan:

@@ -60,6 +60,32 @@ class ArtisanLocationUpdate(BaseModel):
         return v
 
 
+class FastLocationUpdate(BaseModel):
+    latitude: float = Field(..., ge=-90, le=90, description="Latitude coordinate")
+    longitude: float = Field(..., ge=-180, le=180, description="Longitude coordinate")
+
+
+class FastLocationResponse(BaseModel):
+    artisan_id: int
+    latitude: float
+    longitude: float
+    ttl_seconds: int = 900
+
+    @field_validator("latitude")
+    @classmethod
+    def validate_latitude(cls, v):
+        if v is not None and (v < -90 or v > 90):
+            raise ValueError("Latitude must be between -90 and 90 degrees")
+        return v
+
+    @field_validator("longitude")
+    @classmethod
+    def validate_longitude(cls, v):
+        if v is not None and (v < -180 or v > 180):
+            raise ValueError("Longitude must be between -180 and 180 degrees")
+        return v
+
+
 class PortfolioCreate(BaseModel):
     title: str = Field(..., max_length=200)
     description: str | None = None
