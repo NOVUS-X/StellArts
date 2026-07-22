@@ -19,7 +19,7 @@ import os
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -36,31 +36,6 @@ from app.models.user import User
 
 ENDPOINT = "/api/v1/artisans/location"
 VALID_PAYLOAD = {"latitude": 6.5244, "longitude": 3.3792}
-
-
-def _make_user(role: str, user_id: int = 1) -> User:
-    """Build an in-memory User ORM object without hitting a DB."""
-    user = User()
-    user.id = user_id
-    user.email = f"{role}{user_id}@test.com"
-    user.full_name = f"Test {role.title()}"
-    user.role = role
-    user.is_active = True
-    return user
-
-
-def _make_artisan(artisan_id: int = 10, user_id: int = 1) -> Artisan:
-    """Build an in-memory Artisan ORM object."""
-    artisan = Artisan()
-    artisan.id = artisan_id
-    artisan.user_id = user_id
-    artisan.is_available = True
-    return artisan
-
-
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_access_token(subject=user_id)
-    return {"Authorization": f"Bearer {token}"}
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +74,12 @@ def _register_and_login(test_client: TestClient, role: str, suffix: str) -> str:
     password = "StrongPass1!"
     test_client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": password, "role": role, "full_name": f"{role.title()} {suffix}"},
+        json={
+            "email": email,
+            "password": password,
+            "role": role,
+            "full_name": f"{role.title()} {suffix}",
+        },
     )
     resp = test_client.post(
         "/api/v1/auth/login",
@@ -165,25 +145,6 @@ class TestLocationRedisWrites:
     Verify correct Redis GEOADD + TTL behaviour using deep mocks so tests
     do not require a live Redis instance.
     """
-
-    def _build_client_with_redis_mock(self, db_session, artisan_user: User, artisan: Artisan):
-        """
-        Return (test_client, mock_redis) with the artisan pre-wired in the DB.
-        """
-        db_session.add(artisan_user)
-        db_session.commit()
-        db_session.refresh(artisan_user)
-
-        artisan.user_id = artisan_user.id
-        db_session.add(artisan)
-        db_session.commit()
-        db_session.refresh(artisan)
-
-        mock_redis = AsyncMock()
-        mock_redis.geoadd = AsyncMock(return_value=1)
-        mock_redis.set = AsyncMock(return_value=True)
-
-        return mock_redis
 
     def test_successful_location_update_returns_200(self, test_client, db_session):
         """

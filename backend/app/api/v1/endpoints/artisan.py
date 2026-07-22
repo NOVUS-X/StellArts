@@ -34,7 +34,7 @@ from app.schemas.artisan import (
 )
 from app.services.artisan import ArtisanService
 from app.services.artisan_service import find_nearby_artisans_cached
-from app.services.geolocation import geolocation_service
+from app.services.geolocation import LOCATION_TTL_SECONDS, geolocation_service
 
 router = APIRouter(prefix="/artisans")
 
@@ -206,8 +206,6 @@ async def update_artisan_location(
     Use this endpoint for high-frequency location updates from artisan mobile devices.
     Location expires after 15 minutes of inactivity.
     """
-    from app.services.geolocation import LOCATION_TTL_SECONDS
-
     service = ArtisanService(db)
     artisan = service.get_artisan_by_user_id(current_user.id)
 
