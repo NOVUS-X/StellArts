@@ -3,6 +3,8 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
+import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -13,10 +15,9 @@ from app.core.auth import (
     require_admin,
     require_artisan,
 )
-
-# Import correct dependencies
-from app.db.session import get_db  # Or use app.db.database depending on your setup
+from app.db.session import get_db
 from app.models.artisan import Artisan
+from app.models.booking import Booking
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.artisan import (
@@ -26,8 +27,8 @@ from app.schemas.artisan import (
     ArtisanProfileCreate,
     ArtisanProfileResponse,
     ArtisanProfileUpdate,
-    FastLocationUpdate,
     FastLocationResponse,
+    FastLocationUpdate,
     GeolocationRequest,
     GeolocationResponse,
     NearbyArtisansRequest,
@@ -430,9 +431,6 @@ def upload_portfolio_image(
     The file is stored locally under /tmp/stellarts_uploads and the generated
     URL is returned.  In production this would be replaced by an S3/CDN upload.
     """
-    import os
-    import uuid
-
     service = ArtisanService(db)
     artisan = service.get_artisan_by_user_id(current_user.id)
     if not artisan:
@@ -535,8 +533,6 @@ def get_artisan_bookings(
     if not artisan:
         raise HTTPException(status_code=404, detail="Artisan profile not found")
 
-    from app.models.booking import Booking
-
     bookings = db.query(Booking).filter(Booking.artisan_id == artisan.id).all()
 
     return {
@@ -600,8 +596,6 @@ def get_artisan_profile(artisan_id: int, db: Session = Depends(get_db)):
     specialty_str = None
     if artisan.specialties:
         try:
-            import json
-
             specs = json.loads(artisan.specialties)
             if isinstance(specs, list):
                 # Take the first one as primary or join them
