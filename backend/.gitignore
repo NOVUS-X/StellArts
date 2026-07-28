@@ -65,3 +65,4 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+static/tmp/

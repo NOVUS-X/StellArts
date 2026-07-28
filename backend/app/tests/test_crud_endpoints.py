@@ -1,4 +1,10 @@
+import csv
+import io
 from datetime import datetime
+from decimal import Decimal
+from uuid import UUID
+
+from .conftest import TestingSessionLocal
 
 
 def get_auth_headers(client, email, password, role):
@@ -155,3 +161,109 @@ def test_artisan_availability_rejects_non_artisan(client):
         headers=headers,
     )
     assert resp.status_code == 403
+
+
+def test_artisan_can_export_completed_jobs_as_csv(client):
+    from app.models.artisan import Artisan
+    from app.models.booking import Booking, BookingStatus
+    from app.models.payment import Payment, PaymentStatus
+    from app.models.review import Review
+
+    artisan_headers = get_auth_headers(
+        client, "export-art@test.com", "Pass123!", "artisan"
+    )
+    artisan_profile = {
+        "business_name": "Export Biz",
+        "description": "Export-ready services",
+        "hourly_rate": 75.0,
+        "specialties": ["painting"],
+    }
+    profile_resp = client.post(
+        "api/v1/artisans/profile", json=artisan_profile, headers=artisan_headers
+    )
+    assert profile_resp.status_code == 200
+
+    client_headers = get_auth_headers(
+        client, "export-cli@test.com", "Pass123!", "client"
+    )
+
+    completed_booking_resp = client.post(
+        "api/v1/bookings/create",
+        json={
+            "artisan_id": profile_resp.json()["id"],
+            "service": "Wall painting",
+            "estimated_hours": 3,
+            "estimated_cost": 225.0,
+            "date": "2025-01-15T10:00:00",
+            "location": "12 Main St",
+            "notes": "Use matte finish",
+        },
+        headers=client_headers,
+    )
+    assert completed_booking_resp.status_code == 201
+    completed_booking_id = UUID(completed_booking_resp.json()["id"])
+
+    pending_booking_resp = client.post(
+        "api/v1/bookings/create",
+        json={
+            "artisan_id": profile_resp.json()["id"],
+            "service": "Ceiling repair",
+            "estimated_hours": 2,
+            "estimated_cost": 180.0,
+            "date": "2025-01-16T09:00:00",
+            "location": "14 Main St",
+            "notes": "Pending job",
+        },
+        headers=client_headers,
+    )
+    assert pending_booking_resp.status_code == 201
+
+    db = TestingSessionLocal()
+    try:
+        artisan = (
+            db.query(Artisan).filter(Artisan.id == profile_resp.json()["id"]).first()
+        )
+        completed_booking = (
+            db.query(Booking).filter(Booking.id == completed_booking_id).first()
+        )
+        assert artisan is not None
+        assert completed_booking is not None
+        client_id = completed_booking.client_id
+
+        completed_booking.status = BookingStatus.COMPLETED
+        db.add(
+            Payment(
+                booking_id=completed_booking.id,
+                amount=Decimal("225.00"),
+                status=PaymentStatus.RELEASED,
+            )
+        )
+        db.add(
+            Review(
+                booking_id=completed_booking.id,
+                client_id=completed_booking.client_id,
+                artisan_id=artisan.id,
+                rating=5,
+                comment="Excellent work",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    export_resp = client.get("api/v1/artisans/me/export", headers=artisan_headers)
+
+    assert export_resp.status_code == 200
+    assert export_resp.headers["content-type"].startswith("text/csv")
+    assert "attachment;" in export_resp.headers["content-disposition"]
+    assert ".csv" in export_resp.headers["content-disposition"]
+
+    rows = list(csv.DictReader(io.StringIO(export_resp.text)))
+    assert len(rows) == 1
+    assert rows[0] == {
+        "Date": "2025-01-15",
+        "Job Title": "Wall painting",
+        "Client ID": str(client_id),
+        "Amount Earned": "225.00",
+        "Rating": "5",
+    }

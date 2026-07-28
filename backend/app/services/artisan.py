@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import and_, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.cache import cache
 from app.models.artisan import Artisan
+from app.models.booking import Booking, BookingStatus
+from app.models.payment import PaymentStatus
 from app.schemas.artisan import (
     ArtisanProfileCreate,
     ArtisanProfileUpdate,
@@ -155,6 +158,61 @@ class ArtisanService:
     def get_artisan_by_user_id(self, user_id: int) -> Artisan | None:
         """Get artisan by user ID"""
         return self.db.query(Artisan).filter(Artisan.user_id == user_id).first()
+
+    def get_completed_jobs_export_rows(self, artisan_id: int) -> list[dict[str, str]]:
+        """Return completed jobs and earnings formatted for CSV export."""
+        bookings = (
+            self.db.query(Booking)
+            .options(selectinload(Booking.payments), selectinload(Booking.review))
+            .filter(
+                Booking.artisan_id == artisan_id,
+                Booking.status == BookingStatus.COMPLETED,
+            )
+            .order_by(Booking.date.desc(), Booking.created_at.desc())
+            .all()
+        )
+
+        rows: list[dict[str, str]] = []
+        for booking in bookings:
+            amount_earned = sum(
+                Decimal(payment.amount)
+                for payment in booking.payments
+                if payment.status
+                not in {
+                    PaymentStatus.FAILED,
+                    PaymentStatus.REFUNDED,
+                    PaymentStatus.DISPUTED,
+                }
+            )
+
+            if amount_earned == 0:
+                amount_earned = Decimal(
+                    booking.estimated_cost
+                    or booking.labor_cost
+                    or booking.material_cost
+                    or 0
+                )
+
+            rating = ""
+            if booking.review:
+                rating = str(booking.review[0].rating)
+
+            booking_date = booking.date or booking.created_at
+            rows.append(
+                {
+                    "Date": (
+                        booking_date.date().isoformat()
+                        if booking_date is not None
+                        else ""
+                    ),
+                    "Job Title": booking.service,
+                    "Client ID": str(booking.client_id),
+                    "Amount Earned": f"{amount_earned:.2f}",
+                    "Rating": rating,
+                }
+            )
+
+        return rows
 
     def list_artisans(
         self,

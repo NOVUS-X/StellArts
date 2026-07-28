@@ -128,17 +128,6 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "amount"
-                      },
-                      "val": {
-                        "i128": {
-                          "hi": 0,
-                          "lo": 1000
-                        }
-                      }
-                    },
-                    {
-                      "key": {
                         "symbol": "arbitrator"
                       },
                       "val": {
@@ -167,6 +156,36 @@
                       },
                       "val": {
                         "u64": 1000
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "labor_amount"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 0
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "material_amount"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 1000
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "materials_released"
+                      },
+                      "val": {
+                        "bool": false
                       }
                     },
                     {
@@ -341,17 +360,6 @@
               "map": [
                 {
                   "key": {
-                    "symbol": "amount"
-                  },
-                  "val": {
-                    "i128": {
-                      "hi": 0,
-                      "lo": 1000
-                    }
-                  }
-                },
-                {
-                  "key": {
                     "symbol": "arbitrator"
                   },
                   "val": {
@@ -380,6 +388,36 @@
                   },
                   "val": {
                     "u64": 1000
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "labor_amount"
+                  },
+                  "val": {
+                    "i128": {
+                      "hi": 0,
+                      "lo": 0
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "material_amount"
+                  },
+                  "val": {
+                    "i128": {
+                      "hi": 0,
+                      "lo": 1000
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "materials_released"
+                  },
+                  "val": {
+                    "bool": false
                   }
                 },
                 {
@@ -424,7 +462,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'client did not participate in engagement' from contract function 'Symbol(obj#35)'"
+                  "string": "caught panic 'client did not participate in engagement' from contract function 'Symbol(obj#41)'"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"

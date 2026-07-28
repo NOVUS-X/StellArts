@@ -20,6 +20,7 @@ from app.models.payment import Payment
 from app.models.review import Review
 from app.models.portfolio import Portfolio
 from app.models.calendar import ArtisanCalendarConfig, ArtisanCalendarEvent
+from app.models.open_request import OpenRequest
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

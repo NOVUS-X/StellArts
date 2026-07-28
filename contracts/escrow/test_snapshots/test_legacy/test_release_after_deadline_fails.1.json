@@ -189,17 +189,6 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "amount"
-                      },
-                      "val": {
-                        "i128": {
-                          "hi": 0,
-                          "lo": 1000
-                        }
-                      }
-                    },
-                    {
-                      "key": {
                         "symbol": "arbitrator"
                       },
                       "val": {
@@ -228,6 +217,36 @@
                       },
                       "val": {
                         "u64": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "labor_amount"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 0
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "material_amount"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 1000
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "materials_released"
+                      },
+                      "val": {
+                        "bool": false
                       }
                     },
                     {
