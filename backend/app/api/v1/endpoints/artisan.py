@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import csv
+import io
 import json
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import (
@@ -145,6 +148,43 @@ def get_my_artisan_profile(
             status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
         )
     return artisan
+
+
+@router.get("/me/export")
+def export_my_work_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_artisan),
+):
+    """Export completed jobs and earnings for the authenticated artisan."""
+    service = ArtisanService(db)
+    artisan = service.get_artisan_by_user_id(current_user.id)
+    if not artisan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artisan profile not found"
+        )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date", "Job Title", "Client ID", "Amount Earned", "Rating"])
+
+    for row in service.get_completed_jobs_export_rows(artisan.id):
+        writer.writerow(
+            [
+                row["Date"],
+                row["Job Title"],
+                row["Client ID"],
+                row["Amount Earned"],
+                row["Rating"],
+            ]
+        )
+
+    filename = f"artisan-work-history-{artisan.id}.csv"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers=headers,
+    )
 
 
 # Other artisan-related endpoints from main

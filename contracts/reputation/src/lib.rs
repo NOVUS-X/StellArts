@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractclient, contractimpl, contracttype, Address, Env};
+use soroban_sdk::{contract, contractclient, contractimpl, contracttype, Address, Env, Vec};
 
 /// Storage key for user reputation data and per-engagement rating flags.
 #[contracttype]
@@ -10,6 +10,10 @@ enum DataKey {
     EngagementRated(Address, u64),
     HasRated(Address, Address),
     Admin,
+    /// Total number of individual ratings recorded for a given artisan.
+    RatingCount(Address),
+    /// Individual rating entry for a given artisan, keyed by a 0-based index.
+    Rating(Address, u32),
 }
 
 #[contracttype]
@@ -25,6 +29,19 @@ pub struct RateArtisanEvent {
 pub struct ReputationData {
     pub total_stars: u64,
     pub review_count: u64,
+}
+
+/// A single, individual rating left for an artisan.
+///
+/// These are stored one-per-storage-entry (rather than as one large
+/// collection) so that they can be paginated without ever having to
+/// load an artisan's entire rating history into memory at once.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Rating {
+    pub rater: Address,
+    pub stars: u64,
+    pub timestamp: u64,
 }
 
 /// Mirrors the escrow contract status layout for cross-contract decoding.
@@ -115,6 +132,48 @@ fn read_admin(env: &Env) -> Address {
         .expect("Admin not set")
 }
 
+fn rating_count_key(user: &Address) -> DataKey {
+    DataKey::RatingCount(user.clone())
+}
+
+/// Read the total number of individual ratings stored for `user`.
+pub fn read_rating_count(env: &Env, user: &Address) -> u32 {
+    env.storage()
+        .persistent()
+        .get(&rating_count_key(user))
+        .unwrap_or(0)
+}
+
+fn write_rating_count(env: &Env, user: &Address, count: u32) {
+    env.storage()
+        .persistent()
+        .set(&rating_count_key(user), &count);
+}
+
+fn rating_key(user: &Address, index: u32) -> DataKey {
+    DataKey::Rating(user.clone(), index)
+}
+
+fn write_rating(env: &Env, user: &Address, index: u32, rating: &Rating) {
+    env.storage()
+        .persistent()
+        .set(&rating_key(user, index), rating);
+}
+
+fn read_rating(env: &Env, user: &Address, index: u32) -> Rating {
+    env.storage()
+        .persistent()
+        .get(&rating_key(user, index))
+        .expect("rating not found")
+}
+
+/// Append a new individual rating entry for `user` and bump their rating count.
+fn append_rating(env: &Env, user: &Address, rating: &Rating) {
+    let index = read_rating_count(env, user);
+    write_rating(env, user, index, rating);
+    write_rating_count(env, user, index + 1);
+}
+
 #[contract]
 pub struct ReputationContract;
 
@@ -191,12 +250,23 @@ impl ReputationContract {
         mark_caller_rated_artisan(&env, &caller, &artisan);
         mark_engagement_rated(&env, &escrow_contract_id, engagement_id);
 
+        let timestamp = env.ledger().timestamp();
+        append_rating(
+            &env,
+            &artisan,
+            &Rating {
+                rater: caller.clone(),
+                stars,
+                timestamp,
+            },
+        );
+
         env.events().publish(
             (),
             RateArtisanEvent {
                 artisan,
                 stars,
-                timestamp: env.ledger().timestamp(),
+                timestamp,
             },
         );
     }
@@ -210,6 +280,42 @@ impl ReputationContract {
         }
         let average_scaled = (data.total_stars * 100) / data.review_count;
         (average_scaled, data.review_count)
+    }
+
+    /// Get the total number of individual ratings recorded for a user.
+    pub fn get_rating_count(env: Env, user: Address) -> u32 {
+        read_rating_count(&env, &user)
+    }
+
+    /// Get a page of an artisan's individual ratings.
+    ///
+    /// `offset` is the 0-based index of the first rating to return (ratings
+    /// are ordered oldest-first, in the order they were submitted).
+    /// `limit` caps the maximum number of ratings returned in a single call.
+    ///
+    /// This only reads the requested slice of storage entries -- it never
+    /// loads a user's entire rating history at once -- so it stays within
+    /// Soroban's per-call read limits regardless of how many ratings a user
+    /// has accumulated.
+    ///
+    /// Returns an empty `Vec` if `offset` is beyond the number of stored
+    /// ratings, or if `limit` is zero.
+    pub fn get_ratings(env: Env, user: Address, offset: u32, limit: u32) -> Vec<Rating> {
+        let count = read_rating_count(&env, &user);
+        let mut ratings = Vec::new(&env);
+
+        if limit == 0 || offset >= count {
+            return ratings;
+        }
+
+        let end = count.min(offset.saturating_add(limit));
+        let mut i = offset;
+        while i < end {
+            ratings.push_back(read_rating(&env, &user, i));
+            i += 1;
+        }
+
+        ratings
     }
 }
 
@@ -656,6 +762,213 @@ mod tests {
                 review_count: 2,
             },
         );
+    }
+
+    #[test]
+    fn test_get_ratings_empty_when_no_ratings() {
+        let env = Env::default();
+        let (client, _, _) = setup_contracts(&env);
+
+        let artisan = Address::generate(&env);
+        let ratings = client.get_ratings(&artisan, &0, &10);
+
+        assert_eq!(ratings.len(), 0);
+        assert_eq!(client.get_rating_count(&artisan), 0);
+    }
+
+    #[test]
+    fn test_get_ratings_pagination_basic_page() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, escrow_contract_id, _) = setup_contracts(&env);
+
+        let artisan = Address::generate(&env);
+        let stars_sequence = [5u64, 4, 3, 2, 1];
+
+        for (i, stars) in stars_sequence.iter().enumerate() {
+            let reviewer = Address::generate(&env);
+            let engagement_id = i as u64 + 1;
+            seed_escrow(
+                &env,
+                &escrow_contract_id,
+                engagement_id,
+                &reviewer,
+                &artisan,
+                EscrowContractStatus::Released,
+            );
+            client.rate_artisan(
+                &reviewer,
+                &artisan,
+                stars,
+                &escrow_contract_id,
+                &engagement_id,
+            );
+        }
+
+        assert_eq!(client.get_rating_count(&artisan), 5);
+
+        // First page: offset 0, limit 2 -> first two ratings in submission order.
+        let page1 = client.get_ratings(&artisan, &0, &2);
+        assert_eq!(page1.len(), 2);
+        assert_eq!(page1.get(0).unwrap().stars, 5);
+        assert_eq!(page1.get(1).unwrap().stars, 4);
+
+        // Second page: offset 2, limit 2 -> next two ratings.
+        let page2 = client.get_ratings(&artisan, &2, &2);
+        assert_eq!(page2.len(), 2);
+        assert_eq!(page2.get(0).unwrap().stars, 3);
+        assert_eq!(page2.get(1).unwrap().stars, 2);
+
+        // Final (partial) page: offset 4, limit 2 -> only one rating left.
+        let page3 = client.get_ratings(&artisan, &4, &2);
+        assert_eq!(page3.len(), 1);
+        assert_eq!(page3.get(0).unwrap().stars, 1);
+    }
+
+    #[test]
+    fn test_get_ratings_offset_beyond_count_returns_empty() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, escrow_contract_id, _) = setup_contracts(&env);
+
+        let artisan = Address::generate(&env);
+        let reviewer = Address::generate(&env);
+        seed_escrow(
+            &env,
+            &escrow_contract_id,
+            1,
+            &reviewer,
+            &artisan,
+            EscrowContractStatus::Released,
+        );
+        client.rate_artisan(&reviewer, &artisan, &5, &escrow_contract_id, &1);
+
+        let ratings = client.get_ratings(&artisan, &10, &5);
+        assert_eq!(ratings.len(), 0);
+    }
+
+    #[test]
+    fn test_get_ratings_limit_zero_returns_empty() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, escrow_contract_id, _) = setup_contracts(&env);
+
+        let artisan = Address::generate(&env);
+        let reviewer = Address::generate(&env);
+        seed_escrow(
+            &env,
+            &escrow_contract_id,
+            1,
+            &reviewer,
+            &artisan,
+            EscrowContractStatus::Released,
+        );
+        client.rate_artisan(&reviewer, &artisan, &5, &escrow_contract_id, &1);
+
+        let ratings = client.get_ratings(&artisan, &0, &0);
+        assert_eq!(ratings.len(), 0);
+    }
+
+    #[test]
+    fn test_get_ratings_limit_larger_than_remaining() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, escrow_contract_id, _) = setup_contracts(&env);
+
+        let artisan = Address::generate(&env);
+        for (i, stars) in [5u64, 3, 4].iter().enumerate() {
+            let reviewer = Address::generate(&env);
+            let engagement_id = i as u64 + 1;
+            seed_escrow(
+                &env,
+                &escrow_contract_id,
+                engagement_id,
+                &reviewer,
+                &artisan,
+                EscrowContractStatus::Released,
+            );
+            client.rate_artisan(
+                &reviewer,
+                &artisan,
+                stars,
+                &escrow_contract_id,
+                &engagement_id,
+            );
+        }
+
+        // Requesting far more than remains should just return what's left.
+        let ratings = client.get_ratings(&artisan, &1, &100);
+        assert_eq!(ratings.len(), 2);
+        assert_eq!(ratings.get(0).unwrap().stars, 3);
+        assert_eq!(ratings.get(1).unwrap().stars, 4);
+    }
+
+    #[test]
+    fn test_get_ratings_isolated_between_artisans() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, escrow_contract_id, _) = setup_contracts(&env);
+
+        let artisan1 = Address::generate(&env);
+        let artisan2 = Address::generate(&env);
+
+        let reviewer1 = Address::generate(&env);
+        let reviewer2 = Address::generate(&env);
+
+        seed_escrow(
+            &env,
+            &escrow_contract_id,
+            1,
+            &reviewer1,
+            &artisan1,
+            EscrowContractStatus::Released,
+        );
+        seed_escrow(
+            &env,
+            &escrow_contract_id,
+            2,
+            &reviewer2,
+            &artisan2,
+            EscrowContractStatus::Released,
+        );
+
+        client.rate_artisan(&reviewer1, &artisan1, &5, &escrow_contract_id, &1);
+        client.rate_artisan(&reviewer2, &artisan2, &2, &escrow_contract_id, &2);
+
+        let ratings1 = client.get_ratings(&artisan1, &0, &10);
+        let ratings2 = client.get_ratings(&artisan2, &0, &10);
+
+        assert_eq!(ratings1.len(), 1);
+        assert_eq!(ratings1.get(0).unwrap().stars, 5);
+
+        assert_eq!(ratings2.len(), 1);
+        assert_eq!(ratings2.get(0).unwrap().stars, 2);
+    }
+
+    #[test]
+    fn test_get_ratings_records_rater_and_timestamp() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, escrow_contract_id, _) = setup_contracts(&env);
+
+        let artisan = Address::generate(&env);
+        let reviewer = Address::generate(&env);
+        seed_escrow(
+            &env,
+            &escrow_contract_id,
+            1,
+            &reviewer,
+            &artisan,
+            EscrowContractStatus::Released,
+        );
+
+        client.rate_artisan(&reviewer, &artisan, &4, &escrow_contract_id, &1);
+
+        let ratings = client.get_ratings(&artisan, &0, &1);
+        let rating = ratings.get(0).unwrap();
+        assert_eq!(rating.stars, 4);
+        assert_eq!(rating.rater, reviewer);
+        assert_eq!(rating.timestamp, env.ledger().timestamp());
     }
 }
 

@@ -9,6 +9,7 @@ soroban-sdk.workspace = true
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+ed25519-dalek = "=2.2.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

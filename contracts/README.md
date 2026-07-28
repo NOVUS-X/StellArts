@@ -6,12 +6,13 @@ Soroban smart contracts for the StellArts platform, built on the Stellar blockch
 
 ### 1. Escrow Contract (`escrow`)
 Manages secure payment escrow between clients and artisans with multi-stage lifecycle and dispute resolution.
-- **Engagement Initialization**: Setup a new service agreement.
+- **Engagement Initialization**: Setup a new service agreement (optionally with milestone percentages).
 - **Fund Escrow**: Client locks funds into the contract.
 - **Job Start**: Transition from funded to in-progress (verified by oracle).
-- **Fund Release**: Client releases funds to the artisan upon satisfaction.
-- **Reclaim**: Client retrieves funds if artisan fails to deliver by a deadline.
-- **Dispute Resolution**: Independent arbitrator can resolve conflicts.
+- **Fund Release**: Client releases funds to the artisan upon satisfaction (all-or-nothing or per-milestone).
+- **Milestone Releases**: For larger jobs, unlock a percentage of funds as each milestone completes.
+- **Reclaim**: Client retrieves remaining funds if artisan fails to deliver by a deadline.
+- **Dispute Resolution**: Independent arbitrator can resolve conflicts over remaining funds.
 
 ### 2. Reputation Contract (`reputation`)
 Handles transparent, on-chain scoring for artisans based on completed engagements.
@@ -109,14 +110,46 @@ StellArts contracts are upgradeable using a delegated pattern. Only the stored *
 | 1 | Create Engagement | `initialize` | Application/Client |
 | 2 | Lock Funds | `deposit` | Client |
 | 3 | Start Work | `start_job` | Oracle |
-| 4 | Pay Artisan | `release` | Client |
+| 4a | Pay Artisan (all-or-nothing) | `release` | Client |
+| 4b | Pay Artisan (per milestone) | `release_milestone` | Client |
 | - | Raise Conflict | `dispute` | Client/Artisan |
-| - | Resolve Conflict | `arbitrate` | Arbitrator |
+| - | Resolve Conflict | `resolve_dispute` | Arbitrator |
 
-**Example: Create Engagement**
+### Milestone Workflow
+For larger artisanal jobs (e.g. renovations), pass milestone percentages at `initialize`. Percentages must be non-zero and sum to **exactly 100** (e.g. `[25, 25, 50]`).
+
+1. `initialize(..., milestones=[25, 25, 50])` — stores ordered milestones; next index starts at `0`.
+2. `deposit` — client locks the full `material_amount + labor_amount`.
+3. `release_milestone` — client unlocks funds for the **current** milestone only (must proceed in order).
+4. Repeat `release_milestone` until the final milestone; status becomes `Released`.
+5. Query helpers: `get_milestones`, `get_next_milestone`.
+
+Notes:
+- An empty milestone list keeps the legacy all-or-nothing `release` path (and optional `release_materials`).
+- Milestone escrows must use `release_milestone` — calling `release` / `release_materials` will fail.
+- The last milestone pays any remainder so rounding never leaves dust in the contract.
+- `reclaim` / `resolve_dispute` operate on the **remaining** locked balance after partial milestone payouts.
+
+**Example: Create Engagement with Milestones**
 ```bash
 stellar contract invoke --id $ESCROW_ID --network testnet --source CLIENT_ACCOUNT -- \
-  initialize --client CLIENT_ADDR --artisan ARTISAN_ADDR --amount 1000 --deadline 1713873600
+  initialize \
+    --client CLIENT_ADDR \
+    --artisan ARTISAN_ADDR \
+    --arbitrator ARBITRATOR_ADDR \
+    --token TOKEN_ADDR \
+    --material_amount 10000 \
+    --labor_amount 0 \
+    --deadline 1713873600 \
+    --multisig_signers '[]' \
+    --multisig_threshold 0 \
+    --milestones '[25,25,50]'
+```
+
+**Example: Release Current Milestone**
+```bash
+stellar contract invoke --id $ESCROW_ID --network testnet --source CLIENT_ACCOUNT -- \
+  release_milestone --engagement_id 1 --token TOKEN_ADDR
 ```
 
 ### Reputation Workflow
