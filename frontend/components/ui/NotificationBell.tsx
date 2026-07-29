@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useNotifications } from "../../context/NotificationContext";
+import { useRouter } from "next/navigation";
+import { useNotifications, Notification } from "../../context/NotificationContext";
 import { useAuth } from "../../context/AuthContext";
 
 export default function NotificationBell() {
@@ -15,6 +16,7 @@ export default function NotificationBell() {
   const { isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -38,6 +40,7 @@ export default function NotificationBell() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "booking_confirmed":
+      case "booking_created":
         return "✓";
       case "booking_started":
         return "🔧";
@@ -45,6 +48,8 @@ export default function NotificationBell() {
         return "✅";
       case "booking_cancelled":
         return "❌";
+      case "bid_received":
+        return "💬";
       case "payment_released":
         return "💰";
       case "payment_refunded":
@@ -58,20 +63,23 @@ export default function NotificationBell() {
     switch (type) {
       case "booking_confirmed":
       case "booking_completed":
-        return "text-green-600";
+      case "booking_created":
+        return "text-green-600 dark:text-green-400";
       case "booking_started":
-        return "text-blue-600";
+      case "bid_received":
+        return "text-blue-600 dark:text-blue-400";
       case "booking_cancelled":
-        return "text-red-600";
+        return "text-red-600 dark:text-red-400";
       case "payment_released":
       case "payment_refunded":
-        return "text-yellow-600";
+        return "text-amber-600 dark:text-amber-400";
       default:
-        return "text-gray-600";
+        return "text-gray-600 dark:text-gray-400";
     }
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "";
     const date = new Date(dateString);
     const now = new Date();
     const diffInMs = now.getTime() - date.getTime();
@@ -86,8 +94,21 @@ export default function NotificationBell() {
     return date.toLocaleDateString();
   };
 
-  const handleNotificationClick = async (notificationId: string) => {
-    await markAsRead(notificationId);
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.read && !notification.is_read) {
+      await markAsRead(notification.id);
+    }
+
+    setIsOpen(false);
+
+    // Redirect to relevant section/page
+    if (notification.type.startsWith("payment")) {
+      router.push("/analytics");
+    } else if (notification.type.startsWith("booking") || notification.type.startsWith("bid")) {
+      router.push("/dashboard");
+    } else {
+      router.push("/dashboard");
+    }
   };
 
   const handleMarkAllRead = async () => {
@@ -96,18 +117,20 @@ export default function NotificationBell() {
 
   const handleDeleteNotification = async (
     e: React.MouseEvent,
-    notificationId: string,
+    notificationId: string
   ) => {
     e.stopPropagation();
     await deleteNotification(notificationId);
   };
+
+  const recentNotifications = notifications.slice(0, 10);
 
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Bell Icon */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors rounded-full hover:bg-gray-100"
+        className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-accent"
         aria-label="Notifications"
       >
         <svg
@@ -132,30 +155,28 @@ export default function NotificationBell() {
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-hidden z-50">
+        <div className="absolute right-0 mt-2 w-96 bg-background rounded-lg shadow-xl border border-border max-h-96 overflow-hidden z-50">
           {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">
-                Notifications
-              </h3>
-              {unreadCount > 0 && (
-                <button
-                  onClick={handleMarkAllRead}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Mark all as read
-                </button>
-              )}
-            </div>
+          <div className="px-4 py-3 border-b border-border bg-muted/50 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground">
+              Notifications
+            </h3>
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllRead}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+              >
+                Mark all as read
+              </button>
+            )}
           </div>
 
           {/* Notifications List */}
-          <div className="overflow-y-auto max-h-80">
-            {notifications.length === 0 ? (
-              <div className="px-4 py-8 text-center text-gray-500">
+          <div className="overflow-y-auto max-h-80 divide-y divide-border">
+            {recentNotifications.length === 0 ? (
+              <div className="px-4 py-8 text-center text-muted-foreground">
                 <svg
-                  className="mx-auto h-12 w-12 text-gray-400 mb-2"
+                  className="mx-auto h-12 w-12 text-muted-foreground/50 mb-2"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -170,36 +191,52 @@ export default function NotificationBell() {
                 <p className="text-sm">No notifications yet</p>
               </div>
             ) : (
-              notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  onClick={() => handleNotificationClick(notification.id)}
-                  className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 ${
-                    !notification.read ? "bg-blue-50" : ""
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
+              recentNotifications.map((notification) => {
+                const isUnread = !notification.read && !notification.is_read;
+                return (
+                  <div
+                    key={notification.id}
+                    onClick={() => handleNotificationClick(notification)}
+                    className={`px-4 py-3 cursor-pointer transition-colors hover:bg-accent/80 flex items-start gap-3 ${
+                      isUnread
+                        ? "bg-blue-50/70 dark:bg-blue-950/30 font-medium"
+                        : "bg-background"
+                    }`}
+                  >
                     <span
-                      className={`text-xl ${getNotificationColor(notification.type)}`}
+                      className={`text-lg mt-0.5 ${getNotificationColor(
+                        notification.type
+                      )}`}
                     >
                       {getNotificationIcon(notification.type)}
                     </span>
+
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
-                        {notification.title}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                      <div className="flex items-center justify-between">
+                        <p
+                          className={`text-sm text-foreground ${
+                            isUnread ? "font-semibold" : "font-normal"
+                          }`}
+                        >
+                          {notification.title}
+                        </p>
+                        {isUnread && (
+                          <span className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-400 inline-block ml-1" />
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                         {notification.message}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-[10px] text-muted-foreground/70 mt-1">
                         {formatDate(notification.created_at)}
                       </p>
                     </div>
+
                     <button
                       onClick={(e) =>
                         handleDeleteNotification(e, notification.id)
                       }
-                      className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
                       aria-label="Delete notification"
                     >
                       <svg
@@ -217,8 +254,8 @@ export default function NotificationBell() {
                       </svg>
                     </button>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

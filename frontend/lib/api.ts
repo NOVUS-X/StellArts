@@ -204,6 +204,7 @@ export interface NotificationItem {
   title: string;
   message: string;
   read: boolean;
+  is_read?: boolean;
   reference_id: string | null;
   created_at: string;
   updated_at: string;
