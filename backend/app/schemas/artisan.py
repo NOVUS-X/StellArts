@@ -71,20 +71,6 @@ class FastLocationResponse(BaseModel):
     longitude: float
     ttl_seconds: int = 900
 
-    @field_validator("latitude")
-    @classmethod
-    def validate_latitude(cls, v):
-        if v is not None and (v < -90 or v > 90):
-            raise ValueError("Latitude must be between -90 and 90 degrees")
-        return v
-
-    @field_validator("longitude")
-    @classmethod
-    def validate_longitude(cls, v):
-        if v is not None and (v < -180 or v > 180):
-            raise ValueError("Longitude must be between -180 and 180 degrees")
-        return v
-
 
 class PortfolioCreate(BaseModel):
     title: str = Field(..., max_length=200)
@@ -170,9 +156,8 @@ class ArtisanOut(BaseModel):
     @classmethod
     def parse_specialties(cls, v):
         if isinstance(v, str):
-            import json
-
             try:
+                import json
                 return json.loads(v)
             except json.JSONDecodeError:
                 return []
