@@ -229,17 +229,6 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "amount"
-                      },
-                      "val": {
-                        "i128": {
-                          "hi": 0,
-                          "lo": 5000
-                        }
-                      }
-                    },
-                    {
-                      "key": {
                         "symbol": "arbitrator"
                       },
                       "val": {
@@ -268,6 +257,36 @@
                       },
                       "val": {
                         "u64": 86400
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "labor_amount"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 0
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "material_amount"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 5000
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "materials_released"
+                      },
+                      "val": {
+                        "bool": false
                       }
                     },
                     {
@@ -910,6 +929,12 @@
                   }
                 },
                 {
+                  "i128": {
+                    "hi": 0,
+                    "lo": 0
+                  }
+                },
+                {
                   "u64": 86400
                 },
                 {
@@ -917,6 +942,9 @@
                 },
                 {
                   "u32": 0
+                },
+                {
+                  "vec": []
                 }
               ]
             }
@@ -942,17 +970,6 @@
             ],
             "data": {
               "map": [
-                {
-                  "key": {
-                    "symbol": "amount"
-                  },
-                  "val": {
-                    "i128": {
-                      "hi": 0,
-                      "lo": 5000
-                    }
-                  }
-                },
                 {
                   "key": {
                     "symbol": "arbitrator"
@@ -983,6 +1000,28 @@
                   },
                   "val": {
                     "u64": 1
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "labor_amount"
+                  },
+                  "val": {
+                    "i128": {
+                      "hi": 0,
+                      "lo": 0
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "material_amount"
+                  },
+                  "val": {
+                    "i128": {
+                      "hi": 0,
+                      "lo": 5000
+                    }
                   }
                 },
                 {
@@ -1514,7 +1553,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Distribution amounts must equal the escrowed amount' from contract function 'Symbol(obj#335)'"
+                  "string": "caught panic 'Distribution amounts must equal the remaining escrowed amount' from contract function 'Symbol(obj#377)'"
                 },
                 {
                   "u64": 1

@@ -68,5 +68,27 @@ class AIService:
         """
         return counter_offer > (range_max * Decimal("3.0"))
 
+    @staticmethod
+    async def validate_media_quality(file_path: str, filename: str) -> dict:
+        """
+        Mock Vision-to-Scope ingestion validation.
+        In a real scenario, this would call GPT-4o or Claude 3.5.
+        """
+        # Simple heuristic for testing: reject files containing 'blurry' in name
+        if "blurry" in filename.lower():
+            return {
+                "is_valid": False,
+                "feedback": "I can't see the underside of the beam—could you snap another photo?",
+            }
+
+        # Another heuristic: reject files containing 'dark'
+        if "dark" in filename.lower():
+            return {
+                "is_valid": False,
+                "feedback": "The photo is too poorly lit. Please provide a brighter image.",
+            }
+
+        return {"is_valid": True, "feedback": "Media quality is acceptable."}
+
 
 ai_service = AIService()

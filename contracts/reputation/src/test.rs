@@ -171,3 +171,60 @@ fn test_reputation_isolation_between_artisans() {
     assert_eq!(rep2.total_stars, 4);
     assert_eq!(rep2.review_count, 1);
 }
+
+#[test]
+fn test_reputation_flow_with_paginated_ratings() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, escrow_contract_id, _) = setup(&env);
+
+    let artisan = Address::generate(&env);
+    let star_sequence = [5u64, 4, 3, 5, 2, 4, 1];
+
+    for (index, stars) in star_sequence.iter().enumerate() {
+        let reviewer = Address::generate(&env);
+        let engagement_id = index as u64 + 1;
+        seed_escrow(
+            &env,
+            &escrow_contract_id,
+            engagement_id,
+            &reviewer,
+            &artisan,
+            EscrowContractStatus::Released,
+        );
+        client.rate_artisan(
+            &reviewer,
+            &artisan,
+            stars,
+            &escrow_contract_id,
+            &engagement_id,
+        );
+    }
+
+    // Total count reflects every rating, independent of pagination.
+    assert_eq!(client.get_rating_count(&artisan), 7);
+
+    // Walk through the full history three ratings at a time and confirm
+    // the pages line up end-to-end with the order ratings were submitted.
+    let page_size = 3u32;
+    let mut collected_stars: soroban_sdk::Vec<u64> = soroban_sdk::Vec::new(&env);
+    let mut offset = 0u32;
+    loop {
+        let page = client.get_ratings(&artisan, &offset, &page_size);
+        if page.is_empty() {
+            break;
+        }
+        for rating in page.iter() {
+            collected_stars.push_back(rating.stars);
+        }
+        offset += page_size;
+    }
+
+    let expected: soroban_sdk::Vec<u64> = soroban_sdk::Vec::from_array(&env, star_sequence);
+    assert_eq!(collected_stars, expected);
+
+    // Requesting past the end of the history returns an empty page rather
+    // than panicking, so callers can reliably detect "no more results".
+    let empty_page = client.get_ratings(&artisan, &7, &3);
+    assert!(empty_page.is_empty());
+}

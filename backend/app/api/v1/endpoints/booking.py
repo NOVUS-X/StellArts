@@ -356,6 +356,45 @@ def update_booking_status(
     db.commit()
     db.refresh(booking)
 
+    # Trigger real-time notifications based on new status
+    try:
+        if (
+            new_status == BookingStatus.CONFIRMED
+            and booking.client
+            and booking.client.user_id
+        ):
+            asyncio.create_task(
+                notification_service.create_notification(
+                    db=db,
+                    user_id=booking.client.user_id,
+                    type="booking_confirmed",
+                    title="Booking Confirmed",
+                    message=f"Your booking for '{booking.service}' has been accepted.",
+                    reference_id=str(booking.id),
+                )
+            )
+        elif new_status == BookingStatus.CANCELLED:
+            # Notify client if artisan cancelled, or notify artisan if client cancelled
+            recipient_user_id = None
+            if is_artisan and booking.client and booking.client.user_id:
+                recipient_user_id = booking.client.user_id
+            elif is_client and booking.artisan and booking.artisan.user_id:
+                recipient_user_id = booking.artisan.user_id
+
+            if recipient_user_id:
+                asyncio.create_task(
+                    notification_service.create_notification(
+                        db=db,
+                        user_id=recipient_user_id,
+                        type="booking_cancelled",
+                        title="Booking Cancelled",
+                        message=f"Booking for '{booking.service}' has been cancelled.",
+                        reference_id=str(booking.id),
+                    )
+                )
+    except Exception as e:
+        logger.warning(f"Failed to send booking status notification: {e}")
+
     return {
         "message": f"Booking {booking_id} status updated",
         "updated_by": current_user.id,
@@ -414,6 +453,22 @@ def submit_bid(
 
     db.commit()
     db.refresh(booking)
+
+    # Trigger real-time notification to client
+    try:
+        if booking.client and booking.client.user_id:
+            asyncio.create_task(
+                notification_service.create_notification(
+                    db=db,
+                    user_id=booking.client.user_id,
+                    type="bid_received",
+                    title="New Pitch Received",
+                    message=f"Artisan submitted a pitch/bid for '{booking.service}'.",
+                    reference_id=str(booking.id),
+                )
+            )
+    except Exception as e:
+        logger.warning(f"Failed to send bid notification: {e}")
 
     return {
         "status": "success",

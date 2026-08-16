@@ -423,6 +423,12 @@
                   }
                 },
                 {
+                  "i128": {
+                    "hi": 0,
+                    "lo": 0
+                  }
+                },
+                {
                   "u64": 86400
                 },
                 {
@@ -434,6 +440,9 @@
                 },
                 {
                   "u32": 3
+                },
+                {
+                  "vec": []
                 }
               ]
             }
@@ -457,7 +466,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'multisig_threshold must be between 1 and the number of signers' from contract function 'Symbol(obj#105)'"
+                  "string": "caught panic 'multisig_threshold must be between 1 and the number of signers' from contract function 'Symbol(obj#107)'"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -478,6 +487,12 @@
                   }
                 },
                 {
+                  "i128": {
+                    "hi": 0,
+                    "lo": 0
+                  }
+                },
+                {
                   "u64": 86400
                 },
                 {
@@ -489,6 +504,9 @@
                 },
                 {
                   "u32": 3
+                },
+                {
+                  "vec": []
                 }
               ]
             }
@@ -568,6 +586,12 @@
                       }
                     },
                     {
+                      "i128": {
+                        "hi": 0,
+                        "lo": 0
+                      }
+                    },
+                    {
                       "u64": 86400
                     },
                     {
@@ -579,6 +603,9 @@
                     },
                     {
                       "u32": 3
+                    },
+                    {
+                      "vec": []
                     }
                   ]
                 }

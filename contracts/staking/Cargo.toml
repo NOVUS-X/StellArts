@@ -1,0 +1,18 @@
+[package]
+name = "staking"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+soroban-sdk.workspace = true
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[features]
+testutils = ["soroban-sdk/testutils"]

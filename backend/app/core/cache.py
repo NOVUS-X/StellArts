@@ -64,6 +64,17 @@ class RedisClient:
 
         return bool(await self.redis.exists(key))
 
+    async def lpush(self, key: str, value: Any) -> bool:
+        """Push a value to the left of a list (queue)"""
+        if not self.redis:
+            return False
+
+        if isinstance(value, dict | list):
+            value = json.dumps(value)
+
+        await self.redis.lpush(key, value)
+        return True
+
 
 # Global Redis client instance
 cache = RedisClient()
