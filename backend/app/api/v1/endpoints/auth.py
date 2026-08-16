@@ -150,6 +150,7 @@ def logout(
 
     blacklist_token(access_jti, access_exp)
     blacklist_token(refresh_jti, refresh_exp)
+
     return {"message": "Successfully logged out", "user": current_user.email}
 
 
