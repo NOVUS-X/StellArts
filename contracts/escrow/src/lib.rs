@@ -5,6 +5,10 @@ use soroban_sdk::{contract, contractimpl, contracttype, token, vec, Address, Env
 // an unreasonably high fee; adjust if product requirements change.
 const MAX_FEE_BPS: u32 = 1_000;
 
+// Max share of the protocol fee that may be allocated to jury rewards,
+// out of 10_000 bps. 100% of the fee may be routed to the jury pool.
+const MAX_JURY_REWARD_BPS: u32 = 10_000;
+
 // TTL constants for persistent storage (in ledgers)
 // Note: Each ledger is approximately 5 seconds
 const ESCROW_TTL: u32 = 1_036_800; // ~60 days
@@ -101,6 +105,11 @@ pub enum DataKey {
     IsPaused,
     Lock,
     Treasury,
+    /// DAO dispute resolution contract authorized to resolve disputed escrows
+    /// on behalf of a selected jury (`resolve_dispute_dao`).
+    DisputeResolver,
+    /// Portion of the protocol fee (out of 10_000) allocated to jury rewards.
+    JuryRewardBps,
 }
 
 #[contracttype]
@@ -1157,6 +1166,225 @@ impl EscrowContract {
     /// Read the current treasury configuration, if any has been set.
     pub fn get_treasury(env: Env) -> Option<TreasuryConfig> {
         Self::get_treasury_config(&env)
+    }
+
+    /// Register the DAO dispute resolution contract that is allowed to call
+    /// `resolve_dispute_dao` to execute jury verdicts on disputed escrows.
+    /// Only the admin set via `init_admin` can call this.
+    pub fn set_dispute_resolver(env: Env, admin: Address, resolver: Address) {
+        let stored_admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("Admin not set");
+        if admin != stored_admin {
+            panic!("Only admin can configure the dispute resolver");
+        }
+        admin.require_auth();
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::DisputeResolver, &resolver);
+        env.storage().persistent().extend_ttl(
+            &DataKey::DisputeResolver,
+            TTL_THRESHOLD,
+            NEXT_ID_TTL,
+        );
+    }
+
+    /// Read the registered DAO dispute resolution contract, if any.
+    pub fn get_dispute_resolver(env: Env) -> Option<Address> {
+        env.storage().persistent().get(&DataKey::DisputeResolver)
+    }
+
+    /// Configure the portion of the protocol fee (out of 10_000 bps) that is
+    /// routed to the DAO dispute resolution contract as jury rewards when a
+    /// dispute is resolved via `resolve_dispute_dao`. The remainder of the fee
+    /// continues to flow to the treasury. Only the admin can call this.
+    pub fn set_jury_reward_bps(env: Env, admin: Address, bps: u32) {
+        let stored_admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("Admin not set");
+        if admin != stored_admin {
+            panic!("Only admin can configure jury rewards");
+        }
+        admin.require_auth();
+
+        if bps > MAX_JURY_REWARD_BPS {
+            panic!("jury_reward_bps exceeds maximum allowed");
+        }
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::JuryRewardBps, &bps);
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::JuryRewardBps, TTL_THRESHOLD, NEXT_ID_TTL);
+    }
+
+    /// Read the configured jury reward share of the protocol fee (out of 10_000).
+    pub fn get_jury_reward_bps(env: Env) -> u32 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::JuryRewardBps)
+            .unwrap_or(0)
+    }
+
+    /// Tokens still locked in the contract for this engagement.
+    /// Cross-contract helper so other contracts can compute dispute splits.
+    pub fn get_remaining_balance(env: Env, engagement_id: u64) -> i128 {
+        let escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Escrow(engagement_id))
+            .expect("Escrow not found");
+        Self::remaining_escrow_balance(&env, engagement_id, &escrow)
+    }
+
+    /// Execute a jury verdict on a disputed escrow.
+    ///
+    /// Only the dispute resolution contract registered via `set_dispute_resolver`
+    /// may call this. It mirrors `resolve_dispute` (same distribution invariant:
+    /// `client_amount + artisan_amount == remaining balance`) but the protocol fee
+    /// is split: `jury_reward_bps` of the fee is transferred to the resolver as
+    /// the jury reward pool, and the rest stays with the treasury.
+    ///
+    /// Returns the jury reward amount transferred to the resolver (0 when no
+    /// treasury/fee is configured), so the caller knows exactly how much to
+    /// distribute to the majority jurors.
+    pub fn resolve_dispute_dao(
+        env: Env,
+        engagement_id: u64,
+        client_amount: i128,
+        artisan_amount: i128,
+        token: Address,
+    ) -> i128 {
+        assert!(!Self::is_paused(&env), "contract is paused");
+        let key = DataKey::Escrow(engagement_id);
+        let mut escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("Escrow not found");
+
+        let resolver: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::DisputeResolver)
+            .expect("Dispute resolver not set");
+        resolver.require_auth();
+
+        if escrow.status != Status::Disputed {
+            panic!("Escrow must be in Disputed status to resolve");
+        }
+
+        if client_amount < 0 || artisan_amount < 0 {
+            panic!("Distribution amounts must be non-negative");
+        }
+
+        let remaining = Self::remaining_escrow_balance(&env, engagement_id, &escrow);
+        if client_amount + artisan_amount != remaining {
+            panic!("Distribution amounts must equal the remaining escrowed amount");
+        }
+
+        if token != escrow.token {
+            panic!("Token does not match the initialized token for this engagement");
+        }
+
+        Self::check_and_set_lock(&env);
+
+        if artisan_amount == 0 {
+            escrow.status = Status::Refunded;
+        } else if client_amount == 0 {
+            escrow.status = Status::Released;
+        } else {
+            escrow.status = Status::Resolved;
+        }
+
+        env.storage().persistent().set(&key, &escrow);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, ESCROW_TTL);
+
+        let current_time = env.ledger().timestamp();
+        env.events().publish(
+            (Symbol::new(&env, "dispute_resolved"), engagement_id),
+            DisputeResolvedEvent {
+                id: engagement_id,
+                client: escrow.client.clone(),
+                artisan: escrow.artisan.clone(),
+                token: escrow.token.clone(),
+                client_amount,
+                artisan_amount,
+                timestamp: current_time,
+            },
+        );
+
+        let token_client = token::Client::new(&env, &token);
+
+        // Client refunds are never fee'd.
+        if client_amount > 0 {
+            token_client.transfer(
+                &env.current_contract_address(),
+                &escrow.client,
+                &client_amount,
+            );
+        }
+
+        let mut jury_reward: i128 = 0;
+
+        // Protocol fee applies only to the artisan's share, proportionately.
+        if artisan_amount > 0 {
+            if let Some(cfg) = Self::get_treasury_config(&env) {
+                let fee = Self::calculate_fee(artisan_amount, cfg.fee_basis_points);
+                let artisan_payout = artisan_amount - fee;
+
+                // Split the fee: the configured share funds the jury reward pool
+                // (held by the dispute resolution contract); the rest is treasury.
+                let reward_bps = Self::get_jury_reward_bps(env.clone());
+                jury_reward = Self::calculate_fee(fee, reward_bps);
+                let treasury_share = fee - jury_reward;
+
+                if jury_reward > 0 {
+                    token_client.transfer(&env.current_contract_address(), &resolver, &jury_reward);
+                }
+
+                if treasury_share > 0 {
+                    token_client.transfer(
+                        &env.current_contract_address(),
+                        &cfg.treasury_address,
+                        &treasury_share,
+                    );
+                    env.events().publish(
+                        (Symbol::new(&env, "fee_collected"), engagement_id),
+                        FeeCollectedEvent {
+                            id: engagement_id,
+                            treasury: cfg.treasury_address,
+                            fee_amount: treasury_share,
+                            token: escrow.token.clone(),
+                        },
+                    );
+                }
+
+                token_client.transfer(
+                    &env.current_contract_address(),
+                    &escrow.artisan,
+                    &artisan_payout,
+                );
+            } else {
+                token_client.transfer(
+                    &env.current_contract_address(),
+                    &escrow.artisan,
+                    &artisan_amount,
+                );
+            }
+        }
+
+        Self::clear_lock(&env);
+
+        jury_reward
     }
 
     /// Transition escrow status from Funded to InProgress

@@ -1,6 +1,6 @@
 # StellArts Smart Contracts
 
-Soroban smart contracts for the StellArts platform, built on the Stellar blockchain. This repository contains the core logic for escrowed payments and artisan reputation management.
+Soroban smart contracts for the StellArts platform, built on the Stellar blockchain. This repository contains the core logic for escrowed payments, artisan reputation management, performance-bond staking, and DAO-based dispute resolution.
 
 ## 📦 Contracts
 
@@ -13,12 +13,40 @@ Manages secure payment escrow between clients and artisans with multi-stage life
 - **Milestone Releases**: For larger jobs, unlock a percentage of funds as each milestone completes.
 - **Reclaim**: Client retrieves remaining funds if artisan fails to deliver by a deadline.
 - **Dispute Resolution**: Independent arbitrator can resolve conflicts over remaining funds.
+- **DAO Dispute Resolution (Jury System)**: A registered `DisputeResolution` contract can execute a jury verdict via `resolve_dispute_dao`, splitting the protocol fee between the treasury and a jury reward pool (`set_dispute_resolver` / `set_jury_reward_bps`).
 
 ### 2. Reputation Contract (`reputation`)
 Handles transparent, on-chain scoring for artisans based on completed engagements.
 - **Rating Submission**: Clients rate artisans (1-5 stars).
 - **Global Stats**: Aggregated average ratings and review counts.
 - **Persistent History**: Unalterable reputation record for each artisan.
+
+### 3. Staking Contract (`staking`)
+Voluntary performance-bond staking for artisans (XLM, USDC, or any SAC-compatible token), with an optional unbonding period.
+
+### 4. Dispute Resolution Contract (`dispute_resolution`)
+Decentralizes dispute resolution: a jury of exactly **three highly-rated artisans** votes on a disputed escrow, and the majority verdict is executed against the escrow contract.
+
+#### Jury selection
+- `create_dispute` registers a disputed escrow (only the client or artisan can register, and only once per engagement).
+- `select_jury` receives a candidate pool from the caller (dispute party or admin). Every candidate is verified **on-chain**: the artisan's average rating (from the reputation contract) must be **strictly greater than 4.5** (`total_stars * 2 > review_count * 9`, exact integer math — a rating of exactly 4.5 is rejected), must not be a party to the dispute, and duplicates are dropped.
+- Exactly **3 jurors are selected uniformly at random** from the verified pool using the network-provided PRNG (`env.prng()`). The jury is persisted per dispute and **cannot be re-selected once voting begins**.
+
+#### Voting
+- Only the three selected jurors may vote (`vote`), and each juror votes **exactly once** — votes are immutable. Verdicts: `FavorClient` (full refund), `FavorArtisan` (full release), or `Split` (50/50).
+
+#### Majority resolution
+- `finalize` (callable by any juror, dispute party, or admin) requires **all three jurors to have voted** and resolves by majority (≥ 2 votes for the same verdict).
+- A **1-1-1 tie is never silently resolved**: `finalize` fails, the dispute stays open, and the escrow remains `Disputed` so the existing arbitrator fallback path stays available.
+- The verdict is executed via the escrow's `resolve_dispute_dao`, which pays the client/artisan shares (with the existing treasury fee rules) and transfers the **jury reward pool** (a configured portion of the protocol fee) back to this contract.
+
+#### Jury rewards
+- The reward pool is distributed **only to jurors who voted with the majority**, split exactly (remainder to the first majority juror). Minority/absent jurors receive nothing, rewards are paid exactly once (finalization is atomic and cannot repeat), and the contract can never pay out more than it received.
+
+#### Security & randomness assumptions
+- Every state-changing entrypoint enforces authorization (admin for configuration, dispute parties/admin for selection, jurors for votes, jurors/parties/admin for finalization).
+- `resolve_dispute_dao` on the escrow contract only accepts calls from the admin-registered resolver contract.
+- **Randomness**: Soroban has no secure on-chain randomness. The jury selection uses the network-provided `env.prng()`, seeded from the consensus transaction-set hash — it is **not** cryptographically unpredictable against a corrupt validator, and it is public within a ledger. It is the safest SDK-provided mechanism available on-chain; do not treat it as secret. The caller of `select_jury` supplies the candidate pool, so they can influence *which* eligible artisans are offered, but cannot inject ineligible members (eligibility is verified on-chain) and cannot choose the exact three — the random shuffle does. A future commit-reveal/oracle randomness upgrade can be dropped into `select_jury` without changing the rest of the flow.
 
 ## 🛠️ Development Setup
 
@@ -55,6 +83,12 @@ REPUTATION_ID=$(stellar contract deploy \
   --wasm target/wasm32-unknown-unknown/release/reputation.optimized.wasm \
   --network testnet \
   --source YOUR_ACCOUNT_NAME)
+
+# Deploy Dispute Resolution
+DISPUTE_RESOLUTION_ID=$(stellar contract deploy \
+  --wasm target/wasm32-unknown-unknown/release/dispute_resolution.optimized.wasm \
+  --network testnet \
+  --source YOUR_ACCOUNT_NAME)
 ```
 
 ### 2. Initialization
@@ -68,6 +102,24 @@ stellar contract invoke --id $ESCROW_ID --network testnet --source YOUR_ACCOUNT_
 # Initialize Reputation Admin
 stellar contract invoke --id $REPUTATION_ID --network testnet --source YOUR_ACCOUNT_NAME -- \
   init_admin --admin YOUR_ACCOUNT_ADDRESS
+
+# Initialize Dispute Resolution Admin
+stellar contract invoke --id $DISPUTE_RESOLUTION_ID --network testnet --source YOUR_ACCOUNT_NAME -- \
+  initialize --admin YOUR_ACCOUNT_ADDRESS
+
+# Point the Dispute Resolution contract at the escrow + reputation contracts
+stellar contract invoke --id $DISPUTE_RESOLUTION_ID --network testnet --source YOUR_ACCOUNT_NAME -- \
+  set_contracts --admin YOUR_ACCOUNT_ADDRESS \
+    --escrow_contract $ESCROW_ID \
+    --reputation_contract $REPUTATION_ID
+
+# Register the Dispute Resolution contract as the escrow's DAO resolver and
+# configure 50% of the protocol fee as the jury reward pool (5000 bps)
+stellar contract invoke --id $ESCROW_ID --network testnet --source YOUR_ACCOUNT_NAME -- \
+  set_dispute_resolver --admin YOUR_ACCOUNT_ADDRESS --resolver $DISPUTE_RESOLUTION_ID
+
+stellar contract invoke --id $ESCROW_ID --network testnet --source YOUR_ACCOUNT_NAME -- \
+  set_jury_reward_bps --admin YOUR_ACCOUNT_ADDRESS --bps 5000
 ```
 
 ### 3. Escrow Configuration
@@ -114,6 +166,35 @@ StellArts contracts are upgradeable using a delegated pattern. Only the stored *
 | 4b | Pay Artisan (per milestone) | `release_milestone` | Client |
 | - | Raise Conflict | `dispute` | Client/Artisan |
 | - | Resolve Conflict | `resolve_dispute` | Arbitrator |
+| - | Resolve Conflict (DAO jury) | `resolve_dispute_dao` | DisputeResolution contract |
+
+### Dispute Resolution Workflow (Jury System)
+| Step | Action | Function | Caller |
+|:---:|:---|:---|:---|
+| 1 | Register a disputed escrow | `create_dispute` | Client/Artisan |
+| 2 | Select 3 random jurors (rating > 4.5) | `select_jury` | Client/Artisan/Admin |
+| 3 | Cast a vote (once per juror) | `vote` | Selected juror |
+| 4 | Finalize by majority; distribute rewards | `finalize` | Juror/Party/Admin |
+
+**Example: Register a Dispute and Select a Jury**
+```bash
+# Register a disputed engagement
+stellar contract invoke --id $DISPUTE_RESOLUTION_ID --network testnet --source CLIENT_ACCOUNT -- \
+  create_dispute --caller CLIENT_ADDR --engagement_id 1
+
+# Select a jury from a pool of candidate artisan addresses
+stellar contract invoke --id $DISPUTE_RESOLUTION_ID --network testnet --source CLIENT_ACCOUNT -- \
+  select_jury --caller CLIENT_ADDR --engagement_id 1 \
+    --candidates '["ARTISAN_A","ARTISAN_B","ARTISAN_C","ARTISAN_D"]'
+
+# Jurors vote
+stellar contract invoke --id $DISPUTE_RESOLUTION_ID --network testnet --source JUROR_ACCOUNT -- \
+  vote --juror JUROR_ADDR --engagement_id 1 --verdict FavorArtisan
+
+# Anyone connected to the dispute finalizes it; majority jurors are paid
+stellar contract invoke --id $DISPUTE_RESOLUTION_ID --network testnet --source CLIENT_ACCOUNT -- \
+  finalize --caller CLIENT_ADDR --engagement_id 1
+```
 
 ### Milestone Workflow
 For larger artisanal jobs (e.g. renovations), pass milestone percentages at `initialize`. Percentages must be non-zero and sum to **exactly 100** (e.g. `[25, 25, 50]`).

@@ -1,5 +1,5 @@
 [package]
-name = "reputation"
+name = "dispute_resolution"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,6 +10,7 @@ soroban-sdk.workspace = true
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 escrow = { path = "../escrow" }
+reputation = { path = "../reputation" }
 
 [lib]
 crate-type = ["cdylib", "rlib"]

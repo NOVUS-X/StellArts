@@ -4,7 +4,7 @@
 .DEFAULT_GOAL := help
 
 # Contract names
-CONTRACTS = escrow reputation
+CONTRACTS = escrow reputation dispute_resolution
 
 help: ## Show this help message
 	@echo "StellArts Smart Contracts - Make Commands"
@@ -39,6 +39,11 @@ build-reputation: ## Build reputation contract only
 	@cd reputation && cargo build --release --target wasm32-unknown-unknown
 	@echo "✅ Reputation contract built!"
 
+build-dispute-resolution: ## Build dispute resolution contract only
+	@echo "🔨 Building dispute resolution contract..."
+	@cd dispute_resolution && cargo build --release --target wasm32-unknown-unknown
+	@echo "✅ Dispute resolution contract built!"
+
 test: ## Run all tests
 	@echo "🧪 Running tests..."
 	@cargo test
@@ -51,6 +56,10 @@ test-escrow: ## Run escrow contract tests
 test-reputation: ## Run reputation contract tests
 	@echo "🧪 Testing reputation contract..."
 	@cd reputation && cargo test
+
+test-dispute-resolution: ## Run dispute resolution contract tests
+	@echo "🧪 Testing dispute resolution contract..."
+	@cd dispute_resolution && cargo test
 
 test-coverage: ## Run tests with coverage
 	@echo "🧪 Running tests with coverage..."
@@ -81,6 +90,7 @@ optimize: build ## Optimize wasm files
 	@echo "⚡ Optimizing contracts..."
 	@stellar contract optimize --wasm target/wasm32-unknown-unknown/release/escrow.wasm
 	@stellar contract optimize --wasm target/wasm32-unknown-unknown/release/reputation.wasm
+	@stellar contract optimize --wasm target/wasm32-unknown-unknown/release/dispute_resolution.wasm
 	@echo "✅ Optimization complete!"
 
 deploy-testnet: build ## Deploy contracts to testnet

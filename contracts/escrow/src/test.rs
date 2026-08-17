@@ -2873,3 +2873,421 @@ mod milestone_tests {
         assert_eq!(ctx.client.get_next_milestone(&id), 2);
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Issue #373 – DAO dispute resolution (jury system) escrow-side tests
+// ─────────────────────────────────────────────────────────────────────────────
+#[cfg(test)]
+mod dao_dispute_tests {
+    use crate::{EscrowContract, EscrowContractClient, Status};
+    use soroban_sdk::testutils::Address as AddressTestUtils;
+    use soroban_sdk::{contract, contractimpl, token, vec, Address, Env};
+
+    /// Minimal probe contract used to verify that `resolve_dispute_dao`
+    /// accepts a real cross-contract call from the registered resolver with
+    /// mock auths disabled (the production auth path).
+    #[contract]
+    struct DaoProbe;
+
+    #[contractimpl]
+    impl DaoProbe {
+        pub fn resolve(
+            env: Env,
+            escrow_contract: Address,
+            engagement_id: u64,
+            client_amount: i128,
+            artisan_amount: i128,
+            token: Address,
+        ) -> i128 {
+            crate::EscrowContractClient::new(&env, &escrow_contract).resolve_dispute_dao(
+                &engagement_id,
+                &client_amount,
+                &artisan_amount,
+                &token,
+            )
+        }
+    }
+
+    struct DaoCtx {
+        env: Env,
+        contract_id: Address,
+        token_address: Address,
+        admin: Address,
+        resolver: Address,
+        treasury: Address,
+        client: EscrowContractClient<'static>,
+        token_client: token::Client<'static>,
+        token_asset_client: token::StellarAssetClient<'static>,
+    }
+
+    impl DaoCtx {
+        /// Setup with treasury (2.5%), jury reward (50% of fee) and a default
+        /// registered resolver.
+        fn new() -> Self {
+            let env = Env::default();
+            env.mock_all_auths_allowing_non_root_auth();
+            let contract_id = env.register_contract(None, EscrowContract);
+            let admin = Address::generate(&env);
+            let resolver = Address::generate(&env);
+            let treasury = Address::generate(&env);
+            let token_admin = Address::generate(&env);
+            let tc = env.register_stellar_asset_contract_v2(token_admin);
+            let token_address = tc.address();
+            let client = EscrowContractClient::new(&env, &contract_id);
+            let token_client = token::Client::new(&env, &token_address);
+            let token_asset_client = token::StellarAssetClient::new(&env, &token_address);
+
+            client.init_admin(&admin);
+            client.set_dispute_resolver(&admin, &resolver);
+            client.set_jury_reward_bps(&admin, &5_000);
+            client.init_treasury(&admin, &treasury, &250);
+
+            DaoCtx {
+                env,
+                contract_id,
+                token_address,
+                admin,
+                resolver,
+                treasury,
+                client,
+                token_client,
+                token_asset_client,
+            }
+        }
+
+        /// Create a funded and disputed escrow. Returns (id, client, artisan).
+        fn fund_and_dispute(&self, amount: i128) -> (u64, Address, Address) {
+            let client_addr = Address::generate(&self.env);
+            let artisan_addr = Address::generate(&self.env);
+            let arbitrator = Address::generate(&self.env);
+            let deadline = self.env.ledger().timestamp() + 86_400;
+            let id = self.client.initialize(
+                &client_addr,
+                &artisan_addr,
+                &arbitrator,
+                &self.token_address,
+                &amount,
+                &0i128,
+                &deadline,
+                &vec![&self.env],
+                &0u32,
+                &vec![&self.env],
+            );
+            self.token_asset_client.mint(&client_addr, &amount);
+            self.client.deposit(&id, &self.token_address);
+            self.client.dispute(&id, &client_addr);
+            (id, client_addr, artisan_addr)
+        }
+    }
+
+    /// DAO-1: Admin can register the DAO dispute resolver; it is readable.
+    #[test]
+    fn test_set_dispute_resolver_and_read() {
+        let ctx = DaoCtx::new();
+        let resolver = Address::generate(&ctx.env);
+        ctx.client.set_dispute_resolver(&ctx.admin, &resolver);
+        assert_eq!(ctx.client.get_dispute_resolver().unwrap(), resolver);
+    }
+
+    /// DAO-2: Non-admin cannot register the dispute resolver.
+    #[test]
+    #[should_panic(expected = "Only admin can configure the dispute resolver")]
+    fn test_set_dispute_resolver_unauthorized_fails() {
+        let ctx = DaoCtx::new();
+        let not_admin = Address::generate(&ctx.env);
+        let resolver = Address::generate(&ctx.env);
+        ctx.client.set_dispute_resolver(&not_admin, &resolver);
+    }
+
+    /// DAO-3: Jury reward share of the fee is configurable by the admin only.
+    #[test]
+    fn test_set_jury_reward_bps_and_read() {
+        let ctx = DaoCtx::new();
+        ctx.client.set_jury_reward_bps(&ctx.admin, &2_500);
+        assert_eq!(ctx.client.get_jury_reward_bps(), 2_500);
+    }
+
+    /// DAO-4: Non-admin cannot configure the jury reward share.
+    #[test]
+    #[should_panic(expected = "Only admin can configure jury rewards")]
+    fn test_set_jury_reward_bps_unauthorized_fails() {
+        let ctx = DaoCtx::new();
+        let not_admin = Address::generate(&ctx.env);
+        ctx.client.set_jury_reward_bps(&not_admin, &2_500);
+    }
+
+    /// DAO-5: Jury reward share cannot exceed 100% of the fee.
+    #[test]
+    #[should_panic(expected = "jury_reward_bps exceeds maximum allowed")]
+    fn test_set_jury_reward_bps_exceeds_max_fails() {
+        let ctx = DaoCtx::new();
+        ctx.client.set_jury_reward_bps(&ctx.admin, &10_001);
+    }
+
+    /// DAO-6: get_remaining_balance reports the locked amount.
+    #[test]
+    fn test_get_remaining_balance() {
+        let ctx = DaoCtx::new();
+        let (id, _, _) = ctx.fund_and_dispute(10_000);
+        assert_eq!(ctx.client.get_remaining_balance(&id), 10_000);
+    }
+
+    /// DAO-7: resolve_dispute_dao rejects callers that are not the resolver.
+    #[test]
+    #[should_panic]
+    fn test_resolve_dispute_dao_unauthorized_fails() {
+        let ctx = DaoCtx::new();
+        let (id, _, _) = ctx.fund_and_dispute(10_000);
+        // Clear mock auths: a plain user is not the registered resolver.
+        ctx.env.set_auths(&[]);
+        ctx.client
+            .resolve_dispute_dao(&id, &0i128, &10_000i128, &ctx.token_address);
+    }
+
+    /// DAO-8: Only Disputed escrows can be resolved by the DAO.
+    #[test]
+    #[should_panic(expected = "Escrow must be in Disputed status to resolve")]
+    fn test_resolve_dispute_dao_requires_disputed_state() {
+        let ctx = DaoCtx::new();
+        let client_addr = Address::generate(&ctx.env);
+        let artisan_addr = Address::generate(&ctx.env);
+        let arbitrator = Address::generate(&ctx.env);
+        let deadline = ctx.env.ledger().timestamp() + 86_400;
+        let id = ctx.client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &ctx.token_address,
+            &10_000i128,
+            &0i128,
+            &deadline,
+            &vec![&ctx.env],
+            &0u32,
+            &vec![&ctx.env],
+        );
+        ctx.token_asset_client.mint(&client_addr, &10_000i128);
+        ctx.client.deposit(&id, &ctx.token_address);
+        // Escrow is Funded, not Disputed.
+        ctx.client
+            .resolve_dispute_dao(&id, &0i128, &10_000i128, &ctx.token_address);
+    }
+
+    /// DAO-9: Distribution amounts must sum to the remaining balance.
+    #[test]
+    #[should_panic(expected = "Distribution amounts must equal the remaining escrowed amount")]
+    fn test_resolve_dispute_dao_invalid_amounts_fail() {
+        let ctx = DaoCtx::new();
+        let (id, _, _) = ctx.fund_and_dispute(10_000);
+        ctx.client
+            .resolve_dispute_dao(&id, &3_000i128, &3_000i128, &ctx.token_address);
+    }
+
+    /// DAO-10: Negative distribution amounts are rejected.
+    #[test]
+    #[should_panic(expected = "Distribution amounts must be non-negative")]
+    fn test_resolve_dispute_dao_negative_amounts_fail() {
+        let ctx = DaoCtx::new();
+        let (id, _, _) = ctx.fund_and_dispute(10_000);
+        ctx.client
+            .resolve_dispute_dao(&id, &(-1_000i128), &11_000i128, &ctx.token_address);
+    }
+
+    /// DAO-11: The token must match the escrow's token.
+    #[test]
+    #[should_panic(expected = "Token does not match the initialized token for this engagement")]
+    fn test_resolve_dispute_dao_token_mismatch_fails() {
+        let ctx = DaoCtx::new();
+        let (id, _, _) = ctx.fund_and_dispute(10_000);
+        let other_token = Address::generate(&ctx.env);
+        ctx.client
+            .resolve_dispute_dao(&id, &0i128, &10_000i128, &other_token);
+    }
+
+    /// DAO-12: Full release — fee is split between treasury and jury pool;
+    /// returns the jury reward amount; escrow transitions to Released.
+    #[test]
+    fn test_resolve_dispute_dao_full_release_fee_split() {
+        let ctx = DaoCtx::new();
+        let (id, _, artisan) = ctx.fund_and_dispute(10_000);
+
+        let jury_reward =
+            ctx.client
+                .resolve_dispute_dao(&id, &0i128, &10_000i128, &ctx.token_address);
+
+        // fee = 2.5% of 10,000 = 250; jury gets 50% (125), treasury 125.
+        assert_eq!(jury_reward, 125);
+        assert_eq!(ctx.token_client.balance(&ctx.resolver), 125);
+        assert_eq!(ctx.token_client.balance(&ctx.treasury), 125);
+        assert_eq!(ctx.token_client.balance(&artisan), 9_750);
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
+        assert_eq!(ctx.client.get_engagement(&id).status, Status::Released);
+    }
+
+    /// DAO-13: Full refund — client refunds are fee-free; no jury reward.
+    #[test]
+    fn test_resolve_dispute_dao_full_refund_no_fee() {
+        let ctx = DaoCtx::new();
+        let (id, client_addr, _) = ctx.fund_and_dispute(10_000);
+
+        let jury_reward =
+            ctx.client
+                .resolve_dispute_dao(&id, &10_000i128, &0i128, &ctx.token_address);
+
+        assert_eq!(jury_reward, 0);
+        assert_eq!(ctx.token_client.balance(&client_addr), 10_000);
+        assert_eq!(ctx.token_client.balance(&ctx.treasury), 0);
+        assert_eq!(ctx.token_client.balance(&ctx.resolver), 0);
+        assert_eq!(ctx.client.get_engagement(&id).status, Status::Refunded);
+    }
+
+    /// DAO-14: Split distribution transitions the escrow to Resolved.
+    #[test]
+    fn test_resolve_dispute_dao_split_status_resolved() {
+        let ctx = DaoCtx::new();
+        let (id, client_addr, artisan) = ctx.fund_and_dispute(10_000);
+
+        let jury_reward =
+            ctx.client
+                .resolve_dispute_dao(&id, &4_000i128, &6_000i128, &ctx.token_address);
+
+        // fee = 2.5% of 6,000 = 150, deducted from the artisan payout;
+        // the fee is then split: jury 75, treasury 75.
+        assert_eq!(jury_reward, 75);
+        assert_eq!(ctx.token_client.balance(&client_addr), 4_000);
+        assert_eq!(ctx.token_client.balance(&artisan), 5_850);
+        assert_eq!(ctx.token_client.balance(&ctx.treasury), 75);
+        assert_eq!(ctx.token_client.balance(&ctx.resolver), 75);
+        assert_eq!(ctx.token_client.balance(&ctx.contract_id), 0);
+        assert_eq!(ctx.client.get_engagement(&id).status, Status::Resolved);
+    }
+
+    /// DAO-15: With no treasury configured there is no fee and no jury pool.
+    #[test]
+    fn test_resolve_dispute_dao_without_treasury() {
+        let env = Env::default();
+        env.mock_all_auths_allowing_non_root_auth();
+        let contract_id = env.register_contract(None, EscrowContract);
+        let admin = Address::generate(&env);
+        let resolver = Address::generate(&env);
+        let token_admin = Address::generate(&env);
+        let tc = env.register_stellar_asset_contract_v2(token_admin);
+        let token_address = tc.address();
+        let client = EscrowContractClient::new(&env, &contract_id);
+        let token_asset_client = token::StellarAssetClient::new(&env, &token_address);
+
+        client.init_admin(&admin);
+        client.set_dispute_resolver(&admin, &resolver);
+
+        let client_addr = Address::generate(&env);
+        let artisan_addr = Address::generate(&env);
+        let arbitrator = Address::generate(&env);
+        let deadline = env.ledger().timestamp() + 86_400;
+        let id = client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &token_address,
+            &10_000i128,
+            &0i128,
+            &deadline,
+            &vec![&env],
+            &0u32,
+            &vec![&env],
+        );
+        token_asset_client.mint(&client_addr, &10_000i128);
+        client.deposit(&id, &token_address);
+        client.dispute(&id, &client_addr);
+
+        let jury_reward = client.resolve_dispute_dao(&id, &0i128, &10_000i128, &token_address);
+
+        assert_eq!(jury_reward, 0);
+        assert_eq!(
+            token::Client::new(&env, &token_address).balance(&artisan_addr),
+            10_000
+        );
+        assert_eq!(
+            token::Client::new(&env, &token_address).balance(&resolver),
+            0
+        );
+        assert_eq!(client.get_engagement(&id).status, Status::Released);
+    }
+
+    /// DAO-16: With a zero jury share, the whole fee goes to the treasury.
+    #[test]
+    fn test_resolve_dispute_dao_zero_jury_bps() {
+        let ctx = DaoCtx::new();
+        ctx.client.set_jury_reward_bps(&ctx.admin, &0);
+        let (id, _, _) = ctx.fund_and_dispute(10_000);
+
+        let jury_reward =
+            ctx.client
+                .resolve_dispute_dao(&id, &0i128, &10_000i128, &ctx.token_address);
+
+        assert_eq!(jury_reward, 0);
+        assert_eq!(ctx.token_client.balance(&ctx.treasury), 250);
+        assert_eq!(ctx.token_client.balance(&ctx.resolver), 0);
+    }
+
+    /// DAO-17: A registered resolver contract can resolve the dispute with
+    /// real (non-mocked) cross-contract authorization.
+    #[test]
+    fn test_resolve_dispute_dao_accepts_registered_resolver_contract() {
+        let env = Env::default();
+        env.mock_all_auths_allowing_non_root_auth();
+        let contract_id = env.register_contract(None, EscrowContract);
+        let probe_id = env.register_contract(None, DaoProbe);
+        let admin = Address::generate(&env);
+        let token_admin = Address::generate(&env);
+        let tc = env.register_stellar_asset_contract_v2(token_admin);
+        let token_address = tc.address();
+        let client = EscrowContractClient::new(&env, &contract_id);
+        let token_client = token::Client::new(&env, &token_address);
+        let token_asset_client = token::StellarAssetClient::new(&env, &token_address);
+
+        client.init_admin(&admin);
+        // The probe contract is the registered DAO resolver.
+        client.set_dispute_resolver(&admin, &probe_id);
+        client.set_jury_reward_bps(&admin, &5_000);
+        let treasury = Address::generate(&env);
+        client.init_treasury(&admin, &treasury, &250);
+
+        let client_addr = Address::generate(&env);
+        let artisan_addr = Address::generate(&env);
+        let arbitrator = Address::generate(&env);
+        let deadline = env.ledger().timestamp() + 86_400;
+        let id = client.initialize(
+            &client_addr,
+            &artisan_addr,
+            &arbitrator,
+            &token_address,
+            &10_000i128,
+            &0i128,
+            &deadline,
+            &vec![&env],
+            &0u32,
+            &vec![&env],
+        );
+        token_asset_client.mint(&client_addr, &10_000i128);
+        client.deposit(&id, &token_address);
+        client.dispute(&id, &client_addr);
+
+        // Disable mock auths: the cross-contract call must carry the probe's
+        // own authorization (the production auth path).
+        env.set_auths(&[]);
+
+        let jury_reward = DaoProbeClient::new(&env, &probe_id).resolve(
+            &contract_id,
+            &id,
+            &0i128,
+            &10_000i128,
+            &token_address,
+        );
+
+        assert_eq!(jury_reward, 125);
+        assert_eq!(token_client.balance(&probe_id), 125);
+        assert_eq!(token_client.balance(&treasury), 125);
+        assert_eq!(token_client.balance(&artisan_addr), 9_750);
+        assert_eq!(token_client.balance(&contract_id), 0);
+        assert_eq!(client.get_engagement(&id).status, Status::Released);
+    }
+}
