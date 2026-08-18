@@ -35,8 +35,6 @@ class AuthorizationError(HTTPException):
         )
 
 
-from fastapi import Request
-
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
