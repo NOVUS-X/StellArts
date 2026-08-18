@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
@@ -10,9 +12,11 @@ from app.core.auth import require_admin
 from app.db.session import get_db
 from app.models.booking import BookingStatus
 from app.models.dispute import Dispute, DisputeStatus
+from app.models.llm_request import LLMRequest
 from app.models.payment import PaymentStatus
 from app.models.user import User
 from app.schemas.dispute import DisputeResolve, DisputeResponse
+from app.services.job_matcher import job_matcher
 
 router = APIRouter(prefix="/admin")
 
@@ -260,3 +264,102 @@ def resolve_dispute(
         "payout_artisan_ratio": float(dispute.payout_artisan_ratio),
         "resolved_by": dispute.resolved_by,
     }
+
+
+@router.get("/llm/stats")
+async def get_llm_statistics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+):
+    """
+    Get LLM usage statistics for monitoring and cost analysis
+    """
+    query = db.query(LLMRequest)
+    
+    if start_date:
+        query = query.filter(LLMRequest.created_at >= start_date)
+    if end_date:
+        query = query.filter(LLMRequest.created_at <= end_date)
+    
+    requests = query.all()
+    
+    # Calculate statistics
+    total_requests = len(requests)
+    successful = len([r for r in requests if r.status == "success"])
+    errors = len([r for r in requests if r.status == "error"])
+    rate_limited = len([r for r in requests if r.status == "rate_limited"])
+    
+    avg_response_time = sum(
+        r.response_time_ms for r in requests if r.response_time_ms
+    ) / len(requests) if requests else 0
+    
+    # Group by provider
+    provider_stats = {}
+    for provider in ["openai", "gemini"]:
+        provider_requests = [r for r in requests if r.provider == provider]
+        provider_stats[provider] = {
+            "total": len(provider_requests),
+            "successful": len([r for r in provider_requests if r.status == "success"]),
+            "errors": len([r for r in provider_requests if r.status == "error"]),
+            "avg_response_time_ms": sum(
+                r.response_time_ms for r in provider_requests if r.response_time_ms
+            ) / len(provider_requests) if provider_requests else 0
+        }
+    
+    return {
+        "period": {
+            "start": start_date.isoformat() if start_date else None,
+            "end": end_date.isoformat() if end_date else None
+        },
+        "total_requests": total_requests,
+        "successful": successful,
+        "errors": errors,
+        "rate_limited": rate_limited,
+        "success_rate": successful / total_requests if total_requests > 0 else 0,
+        "avg_response_time_ms": round(avg_response_time, 2),
+        "by_provider": provider_stats
+    }
+
+
+@router.get("/specialty-taxonomy")
+async def get_specialty_taxonomy(
+    current_user: User = Depends(require_admin)
+):
+    """
+    Get the current specialty taxonomy
+    """
+    return {
+        "specialties": job_matcher.specialty_taxonomy,
+        "count": len(job_matcher.specialty_taxonomy)
+    }
+
+
+@router.post("/specialty-taxonomy")
+async def add_specialty_to_taxonomy(
+    specialty: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """
+    Add a new specialty to the taxonomy
+    """
+    # Validate naming convention (capitalize first letter)
+    specialty = specialty.strip().title()
+    
+    if specialty in job_matcher.specialty_taxonomy:
+        raise HTTPException(
+            status_code=400,
+            detail="Specialty already exists in taxonomy"
+        )
+    
+    job_matcher.specialty_taxonomy.append(specialty)
+    
+    # In production, persist to configuration file or database
+    
+    return {
+        "message": f"Added '{specialty}' to taxonomy",
+        "taxonomy": job_matcher.specialty_taxonomy
+    }
+

@@ -157,3 +157,31 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
+
+
+# LLM Service Exceptions
+class LLMServiceError(AppException):
+    """Base exception for LLM service errors"""
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    error_code = "llm_service_error"
+    message = "AI service is temporarily unavailable"
+
+
+class LLMRateLimitError(LLMServiceError):
+    """Raised when LLM provider rate limit is exceeded"""
+    error_code = "llm_rate_limit_error"
+    message = "AI service rate limit exceeded. Please try again in a moment."
+
+
+class LLMProviderError(LLMServiceError):
+    """Raised when LLM provider returns an error"""
+    error_code = "llm_provider_error"
+    message = "AI service provider error occurred"
+
+
+class JobMatchingError(AppException):
+    """Raised when job matching fails"""
+    status_code = status.HTTP_400_BAD_REQUEST
+    error_code = "job_matching_error"
+    message = "Failed to match job with artisans"
+
