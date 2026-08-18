@@ -22,3 +22,10 @@ stellar-sdk==13.1.0
 argon2-cffi==23.1.0
 fastapi-mail==1.4.1
 slowapi==0.1.9
+
+# AI/LLM Dependencies
+openai>=1.12.0
+google-generativeai>=0.3.2
+fuzzywuzzy>=0.18.0
+python-Levenshtein>=0.21.0
+

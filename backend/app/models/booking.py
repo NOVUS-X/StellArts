@@ -13,6 +13,7 @@ from sqlalchemy import (
     Text,
     Uuid,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -52,6 +53,16 @@ class Booking(Base):
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    # AI Job Matching fields
+    specialty_tags = Column(ARRAY(String), nullable=True)
+    matched_artisan_ids = Column(ARRAY(Integer), nullable=True)
+    
+    # AI Price Estimation fields
+    ai_estimate_min = Column(DECIMAL(10, 2), nullable=True)
+    ai_estimate_max = Column(DECIMAL(10, 2), nullable=True)
+    ai_estimate_confidence = Column(DECIMAL(3, 2), nullable=True)
+    ai_estimate_method = Column(String(20), nullable=True)  # 'llm', 'historical', 'none'
 
     client = relationship("Client", backref="bookings")
     artisan = relationship("Artisan", backref="bookings")

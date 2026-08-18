@@ -84,6 +84,22 @@ class Settings(BaseSettings):
     ESCROW_CONTRACT_ID: str | None = None
     REPUTATION_CONTRACT_ID: str | None = None
 
+    # LLM Provider Configuration
+    LLM_PROVIDER: str = "openai"  # 'openai' or 'gemini'
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    GEMINI_API_KEY: str | None = None
+    GEMINI_MODEL: str = "gemini-1.5-flash"
+    
+    # Job Matching Configuration
+    JOB_MATCHING_PROXIMITY_KM: float = 10.0
+    JOB_MATCHING_MAX_ARTISANS: int = 5
+    SPECIALTY_CONFIDENCE_THRESHOLD: float = 0.70
+    
+    # Price Estimation Configuration
+    PRICE_ESTIMATE_TIMEOUT_SECONDS: int = 3
+    HISTORICAL_DATA_MIN_SAMPLE_SIZE: int = 5
+
     model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore"}
 
 
