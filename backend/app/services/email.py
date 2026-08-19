@@ -43,9 +43,13 @@ async def send_verification_email(to: str, full_name: str, verify_url: str) -> N
     await fm.send_message(message)
 
 
-async def send_invoice_email(recipients: list[str], booking_id: str, pdf_bytes: bytes) -> None:
+async def send_invoice_email(
+    recipients: list[str], booking_id: str, pdf_bytes: bytes
+) -> None:
     """Send an email with the invoice PDF attached (async)."""
-    subject = f"{settings.PROJECT_NAME} - Invoice for Booking #{str(booking_id)[:8].upper()}"
+    subject = (
+        f"{settings.PROJECT_NAME} - Invoice for Booking #{str(booking_id)[:8].upper()}"
+    )
     body = (
         f"Hello,\n\n"
         f"The escrow payment for booking {booking_id} has been successfully released.\n\n"
@@ -58,11 +62,13 @@ async def send_invoice_email(recipients: list[str], booking_id: str, pdf_bytes: 
         recipients=recipients,
         body=body,
         subtype="plain",
-        attachments=[{
-            "file": pdf_bytes,
-            "filename": f"invoice-{str(booking_id)[:8].upper()}.pdf",
-            "mime_type": "application/pdf",
-        }]
+        attachments=[
+            {
+                "file": pdf_bytes,
+                "filename": f"invoice-{str(booking_id)[:8].upper()}.pdf",
+                "mime_type": "application/pdf",
+            }
+        ],
     )
 
     conf = ConnectionConfig(
