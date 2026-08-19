@@ -9,6 +9,7 @@ import { AuthProvider } from "../context/AuthContext";
 import { CurrencyProvider } from "../context/CurrencyContext";
 import { NotificationProvider } from "../context/NotificationContext";
 import { ToastProvider } from "../context/ToastContext";
+import { I18nProvider } from "../components/I18nProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -55,15 +56,17 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Toaster richColors position="top-right" />
-          <AuthProvider>
-            <WalletProvider>
-              <CurrencyProvider>
-                <ToastProvider>
-                  <NotificationProvider>{children}</NotificationProvider>
-                </ToastProvider>
-              </CurrencyProvider>
-            </WalletProvider>
-          </AuthProvider>
+          <I18nProvider>
+            <AuthProvider>
+              <WalletProvider>
+                <CurrencyProvider>
+                  <ToastProvider>
+                    <NotificationProvider>{children}</NotificationProvider>
+                  </ToastProvider>
+                </CurrencyProvider>
+              </WalletProvider>
+            </AuthProvider>
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>

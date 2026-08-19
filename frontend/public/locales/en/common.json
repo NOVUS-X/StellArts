@@ -1,0 +1,158 @@
+{
+  "nav": {
+    "features": "Features",
+    "useCases": "Use Cases",
+    "whyStellar": "Why Stellar",
+    "dashboard": "Dashboard",
+    "analytics": "Analytics",
+    "settings": "Settings",
+    "logout": "Log out",
+    "connectWallet": "Connect Wallet",
+    "disconnect": "Disconnect"
+  },
+  "hero": {
+    "badge": "Built on Stellar Blockchain",
+    "title": "Uber for Artisans",
+    "subtitle": "Connect. Trust. Transact.",
+    "description": "A decentralized marketplace platform designed to seamlessly connect artisans with clients within their geographical location. Leveraging Stellar blockchain for trusted, transparent, and fast transactions.",
+    "findArtisan": "Find an Artisan",
+    "joinAsArtisan": "Join as Artisan"
+  },
+  "features": {
+    "title": "Everything you need",
+    "subtitle": "A complete platform for artisans and clients",
+    "decentralized": {
+      "title": "Decentralized Payments",
+      "description": "Secure blockchain-based payments with escrow protection."
+    },
+    "booking": {
+      "title": "Smart Booking",
+      "description": "Schedule and manage appointments with ease."
+    },
+    "reviews": {
+      "title": "Verified Reviews",
+      "description": "Trustworthy reviews from real clients."
+    },
+    "matching": {
+      "title": "Smart Matching",
+      "description": "AI-powered artisan recommendations based on your needs."
+    },
+    "tracking": {
+      "title": "Real-time Tracking",
+      "description": "Track your service requests in real-time."
+    },
+    "analytics": {
+      "title": "Analytics Dashboard",
+      "description": "Comprehensive insights into your business performance."
+    }
+  },
+  "useCases": {
+    "title": "Use Cases",
+    "subtitle": "How Stellarts works for everyone",
+    "forClients": {
+      "title": "For Clients",
+      "description": "Find verified artisans, book services, and pay securely."
+    },
+    "forArtisans": {
+      "title": "For Artisans",
+      "description": "Grow your business, manage bookings, and get paid fast."
+    }
+  },
+  "stellar": {
+    "title": "Why Stellar Blockchain?",
+    "badge": "Technology",
+    "subtitle": "Built on enterprise-grade blockchain technology for security and speed",
+    "escrow": {
+      "title": "Escrow & Smart Contracts",
+      "description": "Enables trustless transactions between strangers."
+    },
+    "lowCost": {
+      "title": "Low Transaction Costs",
+      "description": "Affordable even for micro-payments."
+    },
+    "fastSettlement": {
+      "title": "Fast Settlement",
+      "description": "Near-instant confirmation of bookings and payments."
+    },
+    "financialInclusion": {
+      "title": "Financial Inclusion",
+      "description": "Accessible via mobile wallets, especially in emerging markets."
+    }
+  },
+  "cta": {
+    "title": "Ready to Get Started?",
+    "description": "Join thousands of artisans and clients building trust through decentralized transactions",
+    "getStarted": "Get Started Now",
+    "docs": "View Documentation"
+  },
+  "footer": {
+    "description": "Connecting artisans with clients through blockchain technology.",
+    "product": "Product",
+    "company": "Company",
+    "connect": "Connect",
+    "features": "Features",
+    "useCases": "Use Cases",
+    "pricing": "Pricing",
+    "about": "About",
+    "blog": "Blog",
+    "careers": "Careers",
+    "copyright": "© 2024 Stellarts. All rights reserved. Built on Stellar."
+  },
+  "auth": {
+    "login": {
+      "title": "Sign In",
+      "email": "Email",
+      "emailPlaceholder": "you@example.com",
+      "password": "Password",
+      "forgotPassword": "Forgot password?",
+      "submit": "Sign In",
+      "emailRequired": "Email is required.",
+      "emailInvalid": "Enter a valid email address.",
+      "passwordRequired": "Password is required."
+    },
+    "register": {
+      "title": "Create Account",
+      "fullName": "Full Name",
+      "phone": "Phone Number",
+      "email": "Email",
+      "role": "I want to",
+      "roleClient": "Hire an Artisan (Client)",
+      "roleArtisan": "Offer Services (Artisan)",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "submit": "Create Account",
+      "fullNameRequired": "Full name is required.",
+      "emailRequired": "Email is required.",
+      "emailInvalid": "Enter a valid email address.",
+      "passwordMin": "Password must be at least 8 characters long.",
+      "passwordUppercase": "Password must include at least one uppercase letter.",
+      "passwordLowercase": "Password must include at least one lowercase letter.",
+      "passwordNumber": "Password must include at least one number.",
+      "passwordSpecial": "Password must include at least one special character.",
+      "confirmPasswordRequired": "Please confirm your password.",
+      "passwordsMismatch": "Passwords do not match.",
+      "roleRequired": "Please choose how you want to use the platform."
+    }
+  },
+  "language": {
+    "en": "English",
+    "es": "Español",
+    "fr": "Français"
+  },
+  "artisans": {
+    "plumbers": "Plumbers",
+    "electricians": "Electricians",
+    "carpenters": "Carpenters",
+    "painters": "Painters",
+    "nearYou": "Near you",
+    "onDemand": "On demand",
+    "verified": "Verified",
+    "topRated": "Top rated",
+    "comingSoon": "Coming soon",
+    "available": "available"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome back!"
+  }
+}

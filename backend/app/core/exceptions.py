@@ -24,6 +24,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.i18n import get_locale_from_request, translate
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,20 +82,22 @@ def _error_code_from_status(status_code: int) -> str:
     return phrase.lower().replace(" ", "_").replace("-", "_")
 
 
-async def app_exception_handler(_request: Request, exc: AppException) -> JSONResponse:
+async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+    locale = get_locale_from_request(request)
     return JSONResponse(
         status_code=exc.status_code,
         content=_build_error_payload(
             error_code=exc.error_code,
-            message=exc.message,
+            message=translate(exc.error_code, locale),
             details=exc.details,
         ),
     )
 
 
 async def http_exception_handler(
-    _request: Request, exc: StarletteHTTPException
+    request: Request, exc: StarletteHTTPException
 ) -> JSONResponse:
+    locale = get_locale_from_request(request)
     detail = exc.detail
     details: dict[str, Any] = {}
     if isinstance(detail, dict):
@@ -108,7 +112,7 @@ async def http_exception_handler(
         message = (
             str(detail)
             if detail is not None
-            else _error_code_from_status(exc.status_code).replace("_", " ").capitalize()
+            else translate(_error_code_from_status(exc.status_code), locale)
         )
         error_code = _error_code_from_status(exc.status_code)
 
@@ -125,27 +129,27 @@ async def http_exception_handler(
 
 
 async def validation_exception_handler(
-    _request: Request, exc: RequestValidationError
+    request: Request, exc: RequestValidationError
 ) -> JSONResponse:
+    locale = get_locale_from_request(request)
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=_build_error_payload(
             error_code="validation_error",
-            message="Request validation failed",
+            message=translate("validation_error", locale),
             details={"errors": exc.errors()},
         ),
     )
 
 
-async def unhandled_exception_handler(
-    _request: Request, exc: Exception
-) -> JSONResponse:
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    locale = get_locale_from_request(request)
     logger.exception("Unhandled exception: %s", exc)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=_build_error_payload(
             error_code="internal_error",
-            message="Internal server error",
+            message=translate("internal_error", locale),
             details={},
         ),
     )

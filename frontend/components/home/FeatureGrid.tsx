@@ -1,61 +1,57 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "../ui/card";
 import { MapPin, Shield, Zap, Star, Globe, Users } from "lucide-react";
 
-const features = [
-  {
-    icon: MapPin,
-    title: "Artisan Discovery",
-    description:
-      "Search and book artisans within your area, filtered by skills, ratings, and availability.",
-  },
-  {
-    icon: Users,
-    title: "Geolocation Matching",
-    description:
-      "Uber-like system that intelligently maps clients to nearby artisans.",
-  },
-  {
-    icon: Shield,
-    title: "Secure Escrow Payments",
-    description:
-      "Clients deposit payments into escrow. Funds are released automatically once work is confirmed.",
-  },
-  {
-    icon: Star,
-    title: "Reputation & Reviews",
-    description:
-      "Ratings and feedback stored immutably to help build trust in the community.",
-  },
-  {
-    icon: Globe,
-    title: "Multi-currency Support",
-    description:
-      "Transact in your preferred local currency or stablecoin using Stellar's built-in DEX.",
-  },
-  {
-    icon: Zap,
-    title: "Low Fees & Fast Settlement",
-    description:
-      "Near-instant payments with minimal transaction costs powered by Stellar.",
-  },
-];
-
 export default function FeatureGrid() {
+  const { t } = useTranslation();
+
+  const features = [
+    {
+      icon: MapPin,
+      title: t("features.decentralized.title"),
+      description: t("features.decentralized.description"),
+    },
+    {
+      icon: Users,
+      title: t("features.matching.title"),
+      description: t("features.matching.description"),
+    },
+    {
+      icon: Shield,
+      title: t("features.booking.title"),
+      description: t("features.booking.description"),
+    },
+    {
+      icon: Star,
+      title: t("features.reviews.title"),
+      description: t("features.reviews.description"),
+    },
+    {
+      icon: Globe,
+      title: t("features.tracking.title"),
+      description: t("features.tracking.description"),
+    },
+    {
+      icon: Zap,
+      title: t("features.analytics.title"),
+      description: t("features.analytics.description"),
+    },
+  ];
+
   return (
     <section className="py-20 bg-muted/50" id="features">
       <div className="container mx-auto px-6 max-w-6xl">
         <div className="text-center mb-16">
           <span className="text-blue-600 dark:text-blue-400 font-semibold text-sm uppercase tracking-wide">
-            Features
+            {t("nav.features")}
           </span>
           <h2 className="text-4xl font-bold text-foreground mt-4">
-            Everything You Need
+            {t("features.title")}
           </h2>
           <p className="text-xl text-muted-foreground mt-4 max-w-2xl mx-auto">
-            Powerful features designed to create trust, transparency, and
-            seamless transactions
+            {t("features.subtitle")}
           </p>
         </div>
 
