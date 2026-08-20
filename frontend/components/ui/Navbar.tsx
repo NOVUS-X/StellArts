@@ -9,7 +9,9 @@ import { useWallet } from "../../context/WalletContext";
 import { useAuth } from "../../context/AuthContext";
 import CurrencySelector from "./CurrencySelector";
 import NotificationBell from "./NotificationBell";
+import LanguageSwitcher from "./LanguageSwitcher";
 import { Menu, X, Sun, Moon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -36,6 +38,7 @@ function ThemeToggle() {
 
 function WalletButton() {
   const { address, isConnected, connect, disconnect } = useWallet();
+  const { t } = useTranslation();
 
   if (isConnected && address) {
     const short = `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -50,7 +53,7 @@ function WalletButton() {
           onClick={disconnect}
           className="border-border text-muted-foreground hover:text-foreground"
         >
-          Disconnect
+          {t("nav.disconnect")}
         </Button>
       </div>
     );
@@ -61,13 +64,14 @@ function WalletButton() {
       onClick={connect}
       className="bg-blue-600 hover:bg-blue-700 text-white"
     >
-      Connect Wallet
+      {t("nav.connectWallet")}
     </Button>
   );
 }
 
 export default function Navbar() {
   const { isAuthenticated, logout } = useAuth();
+  const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -96,19 +100,19 @@ export default function Navbar() {
               href="/#features"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              Features
+              {t("nav.features")}
             </Link>
             <Link
               href="/#use-cases"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              Use Cases
+              {t("nav.useCases")}
             </Link>
             <Link
               href="/#why-stellar"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              Why Stellar
+              {t("nav.whyStellar")}
             </Link>
 
             {isAuthenticated && (
@@ -116,7 +120,7 @@ export default function Navbar() {
                 href="/dashboard"
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                Dashboard
+                {t("nav.dashboard")}
               </Link>
             )}
 
@@ -125,7 +129,7 @@ export default function Navbar() {
                 href="/analytics"
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                Analytics
+                {t("nav.analytics")}
               </Link>
             )}
 
@@ -134,11 +138,13 @@ export default function Navbar() {
                 href="/settings"
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                Settings
+                {t("nav.settings")}
               </Link>
             )}
 
             <CurrencySelector />
+
+            <LanguageSwitcher />
 
             {isAuthenticated && <NotificationBell />}
 
@@ -153,7 +159,7 @@ export default function Navbar() {
                 onClick={logout}
                 className="border-border text-muted-foreground hover:text-foreground"
               >
-                Log out
+                {t("nav.logout")}
               </Button>
             )}
           </div>
@@ -161,6 +167,7 @@ export default function Navbar() {
           {/* Mobile Controls */}
           <div className="md:hidden flex items-center gap-2">
             <CurrencySelector />
+            <LanguageSwitcher />
             <ThemeToggle />
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -183,21 +190,21 @@ export default function Navbar() {
               onClick={() => setIsMenuOpen(false)}
               className="block text-muted-foreground hover:text-foreground transition-colors"
             >
-              Features
+              {t("nav.features")}
             </Link>
             <Link
               href="/#use-cases"
               onClick={() => setIsMenuOpen(false)}
               className="block text-muted-foreground hover:text-foreground transition-colors"
             >
-              Use Cases
+              {t("nav.useCases")}
             </Link>
             <Link
               href="/#why-stellar"
               onClick={() => setIsMenuOpen(false)}
               className="block text-muted-foreground hover:text-foreground transition-colors"
             >
-              Why Stellar
+              {t("nav.whyStellar")}
             </Link>
 
             {isAuthenticated && (
@@ -206,7 +213,7 @@ export default function Navbar() {
                 onClick={() => setIsMenuOpen(false)}
                 className="block text-muted-foreground hover:text-foreground transition-colors"
               >
-                Dashboard
+                {t("nav.dashboard")}
               </Link>
             )}
 
@@ -216,7 +223,7 @@ export default function Navbar() {
                 onClick={() => setIsMenuOpen(false)}
                 className="block text-muted-foreground hover:text-foreground transition-colors"
               >
-                Analytics
+                {t("nav.analytics")}
               </Link>
             )}
 
@@ -226,7 +233,7 @@ export default function Navbar() {
                 onClick={() => setIsMenuOpen(false)}
                 className="block text-muted-foreground hover:text-foreground transition-colors"
               >
-                Settings
+                {t("nav.settings")}
               </Link>
             )}
 
@@ -248,7 +255,7 @@ export default function Navbar() {
                 }}
                 className="w-full border-border text-muted-foreground hover:text-foreground"
               >
-                Log out
+                {t("nav.logout")}
               </Button>
             )}
           </div>

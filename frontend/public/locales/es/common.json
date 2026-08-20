@@ -1,0 +1,158 @@
+{
+  "nav": {
+    "features": "Características",
+    "useCases": "Casos de Uso",
+    "whyStellar": "Por qué Stellar",
+    "dashboard": "Panel",
+    "analytics": "Analítica",
+    "settings": "Configuración",
+    "logout": "Cerrar sesión",
+    "connectWallet": "Conectar Billetera",
+    "disconnect": "Desconectar"
+  },
+  "hero": {
+    "badge": "Construido sobre la Blockchain de Stellar",
+    "title": "Uber para Artesanos",
+    "subtitle": "Conecta. Confía. Transacta.",
+    "description": "Una plataforma de mercado descentralizada diseñada para conectar sin problemas a los artesanos con los clientes dentro de su ubicación geográfica. Aprovechando la blockchain de Stellar para transacciones confiables, transparentes y rápidas.",
+    "findArtisan": "Encontrar un Artesano",
+    "joinAsArtisan": "Unirse como Artesano"
+  },
+  "features": {
+    "title": "Todo lo que necesitas",
+    "subtitle": "Una plataforma completa para artesanos y clientes",
+    "decentralized": {
+      "title": "Pagos Descentralizados",
+      "description": "Pagos seguros basados en blockchain con protección de depósito en garantía."
+    },
+    "booking": {
+      "title": "Reserva Inteligente",
+      "description": "Programa y administra citas con facilidad."
+    },
+    "reviews": {
+      "title": "Reseñas Verificadas",
+      "description": "Reseñas confiables de clientes reales."
+    },
+    "matching": {
+      "title": "Emparejamiento Inteligente",
+      "description": "Recomendaciones de artesanos impulsadas por IA según tus necesidades."
+    },
+    "tracking": {
+      "title": "Seguimiento en Tiempo Real",
+      "description": "Rastrea tus solicitudes de servicio en tiempo real."
+    },
+    "analytics": {
+      "title": "Panel de Analítica",
+      "description": "Información completa sobre el rendimiento de tu negocio."
+    }
+  },
+  "useCases": {
+    "title": "Casos de Uso",
+    "subtitle": "Cómo funciona Stellarts para todos",
+    "forClients": {
+      "title": "Para Clientes",
+      "description": "Encuentra artesanos verificados, reserva servicios y paga de forma segura."
+    },
+    "forArtisans": {
+      "title": "Para Artesanos",
+      "description": "Haz crecer tu negocio, administra reservas y recibe pagos rápidos."
+    }
+  },
+  "stellar": {
+    "title": "¿Por qué la Blockchain de Stellar?",
+    "badge": "Tecnología",
+    "subtitle": "Construido sobre tecnología blockchain de nivel empresarial para seguridad y velocidad",
+    "escrow": {
+      "title": "Depósito en Garantía y Contratos Inteligentes",
+      "description": "Permite transacciones sin confianza entre extraños."
+    },
+    "lowCost": {
+      "title": "Bajos Costos de Transacción",
+      "description": "Asequible incluso para micropagos."
+    },
+    "fastSettlement": {
+      "title": "Liquidación Rápida",
+      "description": "Confirmación casi instantánea de reservas y pagos."
+    },
+    "financialInclusion": {
+      "title": "Inclusión Financiera",
+      "description": "Accesible a través de billeteras móviles, especialmente en mercados emergentes."
+    }
+  },
+  "cta": {
+    "title": "¿Listo para Empezar?",
+    "description": "Únete a miles de artesanos y clientes construyendo confianza a través de transacciones descentralizadas",
+    "getStarted": "Empezar Ahora",
+    "docs": "Ver Documentación"
+  },
+  "footer": {
+    "description": "Conectando artesanos con clientes a través de la tecnología blockchain.",
+    "product": "Producto",
+    "company": "Empresa",
+    "connect": "Conectar",
+    "features": "Características",
+    "useCases": "Casos de Uso",
+    "pricing": "Precios",
+    "about": "Acerca de",
+    "blog": "Blog",
+    "careers": "Carreras",
+    "copyright": "© 2024 Stellarts. Todos los derechos reservados. Construido sobre Stellar."
+  },
+  "auth": {
+    "login": {
+      "title": "Iniciar Sesión",
+      "email": "Correo Electrónico",
+      "emailPlaceholder": "tu@ejemplo.com",
+      "password": "Contraseña",
+      "forgotPassword": "¿Olvidaste tu contraseña?",
+      "submit": "Iniciar Sesión",
+      "emailRequired": "El correo electrónico es obligatorio.",
+      "emailInvalid": "Ingresa un correo electrónico válido.",
+      "passwordRequired": "La contraseña es obligatoria."
+    },
+    "register": {
+      "title": "Crear Cuenta",
+      "fullName": "Nombre Completo",
+      "phone": "Número de Teléfono",
+      "email": "Correo Electrónico",
+      "role": "Yo quiero",
+      "roleClient": "Contratar un Artesano (Cliente)",
+      "roleArtisan": "Ofrecer Servicios (Artesano)",
+      "password": "Contraseña",
+      "confirmPassword": "Confirmar Contraseña",
+      "submit": "Crear Cuenta",
+      "fullNameRequired": "El nombre completo es obligatorio.",
+      "emailRequired": "El correo electrónico es obligatorio.",
+      "emailInvalid": "Ingresa un correo electrónico válido.",
+      "passwordMin": "La contraseña debe tener al menos 8 caracteres.",
+      "passwordUppercase": "La contraseña debe incluir al menos una letra mayúscula.",
+      "passwordLowercase": "La contraseña debe incluir al menos una letra minúscula.",
+      "passwordNumber": "La contraseña debe incluir al menos un número.",
+      "passwordSpecial": "La contraseña debe incluir al menos un carácter especial.",
+      "confirmPasswordRequired": "Por favor confirma tu contraseña.",
+      "passwordsMismatch": "Las contraseñas no coinciden.",
+      "roleRequired": "Elige cómo quieres usar la plataforma."
+    }
+  },
+  "language": {
+    "en": "English",
+    "es": "Español",
+    "fr": "Français"
+  },
+  "artisans": {
+    "plumbers": "Plomeros",
+    "electricians": "Electricistas",
+    "carpenters": "Carpinteros",
+    "painters": "Pintores",
+    "nearYou": "Cerca de ti",
+    "onDemand": "Bajo demanda",
+    "verified": "Verificado",
+    "topRated": "Mejor valorado",
+    "comingSoon": "Próximamente",
+    "available": "disponible"
+  },
+  "dashboard": {
+    "title": "Panel",
+    "welcome": "¡Bienvenido de nuevo!"
+  }
+}
