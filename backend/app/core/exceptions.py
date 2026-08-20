@@ -84,11 +84,13 @@ def _error_code_from_status(status_code: int) -> str:
 
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
     locale = get_locale_from_request(request)
+    translated = translate(exc.error_code, locale)
+    message = translated if translated != exc.error_code else exc.message
     return JSONResponse(
         status_code=exc.status_code,
         content=_build_error_payload(
             error_code=exc.error_code,
-            message=translate(exc.error_code, locale),
+            message=message,
             details=exc.details,
         ),
     )
