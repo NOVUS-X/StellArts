@@ -10,29 +10,31 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import Link from "next/link";
 import { Shield, Zap, DollarSign, Users, ArrowRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export default function Home() {
+  const { t } = useTranslation();
+
   const whyStellar = [
     {
       icon: Shield,
-      title: "Escrow & Smart Contracts",
-      description: "Enables trustless transactions between strangers.",
+      title: t("stellar.escrow.title"),
+      description: t("stellar.escrow.description"),
     },
     {
       icon: DollarSign,
-      title: "Low Transaction Costs",
-      description: "Affordable even for micro-payments.",
+      title: t("stellar.lowCost.title"),
+      description: t("stellar.lowCost.description"),
     },
     {
       icon: Zap,
-      title: "Fast Settlement",
-      description: "Near-instant confirmation of bookings and payments.",
+      title: t("stellar.fastSettlement.title"),
+      description: t("stellar.fastSettlement.description"),
     },
     {
       icon: Users,
-      title: "Financial Inclusion",
-      description:
-        "Accessible via mobile wallets, especially in emerging markets.",
+      title: t("stellar.financialInclusion.title"),
+      description: t("stellar.financialInclusion.description"),
     },
   ];
 
@@ -50,14 +52,13 @@ export default function Home() {
           <div className="container mx-auto px-6 max-w-6xl">
             <div className="text-center mb-16">
               <span className="text-blue-600 dark:text-blue-400 font-semibold text-sm uppercase tracking-wide">
-                Technology
+                {t("stellar.badge")}
               </span>
               <h2 className="text-4xl font-bold text-foreground mt-4">
-                Why Stellar Blockchain?
+                {t("stellar.title")}
               </h2>
               <p className="text-xl text-muted-foreground mt-4 max-w-2xl mx-auto">
-                Built on enterprise-grade blockchain technology for security and
-                speed
+                {t("stellar.subtitle")}
               </p>
             </div>
 
@@ -88,15 +89,14 @@ export default function Home() {
           </div>
         </section>
 
-        {/* CTA — intentionally stays brand blue in both modes */}
+        {/* CTA */}
         <section className="py-20 bg-gradient-to-br from-blue-600 to-blue-700">
           <div className="container mx-auto px-6 max-w-4xl text-center">
             <h2 className="text-4xl font-bold text-white mb-6">
-              Ready to Get Started?
+              {t("cta.title")}
             </h2>
             <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
-              Join thousands of artisans and clients building trust through
-              decentralized transactions
+              {t("cta.description")}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
@@ -105,7 +105,7 @@ export default function Home() {
                 className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8"
               >
                 <Link href="/register">
-                  Get Started Now
+                  {t("cta.getStarted")}
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Link>
               </Button>
@@ -120,7 +120,7 @@ export default function Home() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  View Documentation
+                  {t("cta.docs")}
                 </Link>
               </Button>
             </div>

@@ -53,7 +53,11 @@ async function request<T>(
 
   if (!text) return undefined as T;
 
-  return JSON.parse(text) as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch (e) {
+    throw new Error("Invalid server response format");
+  }
 }
 
 /* =========================
@@ -204,6 +208,7 @@ export interface NotificationItem {
   title: string;
   message: string;
   read: boolean;
+  is_read?: boolean;
   reference_id: string | null;
   created_at: string;
   updated_at: string;

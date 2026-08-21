@@ -3,11 +3,13 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { Toaster } from "sonner";
 import { WalletProvider } from "../context/WalletContext";
 import { AuthProvider } from "../context/AuthContext";
 import { CurrencyProvider } from "../context/CurrencyContext";
 import { NotificationProvider } from "../context/NotificationContext";
 import { ToastProvider } from "../context/ToastContext";
+import { I18nProvider } from "../components/I18nProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -53,15 +55,18 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            <WalletProvider>
-              <CurrencyProvider>
-                <ToastProvider>
-                  <NotificationProvider>{children}</NotificationProvider>
-                </ToastProvider>
-              </CurrencyProvider>
-            </WalletProvider>
-          </AuthProvider>
+          <Toaster richColors position="top-right" />
+          <I18nProvider>
+            <AuthProvider>
+              <WalletProvider>
+                <CurrencyProvider>
+                  <ToastProvider>
+                    <NotificationProvider>{children}</NotificationProvider>
+                  </ToastProvider>
+                </CurrencyProvider>
+              </WalletProvider>
+            </AuthProvider>
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>

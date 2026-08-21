@@ -1,4 +1,4 @@
-# app/api/v1/endpoints/payments.py
+import asyncio
 import logging
 import uuid
 from decimal import Decimal
@@ -15,7 +15,10 @@ from app.models.booking import Booking
 from app.models.client import Client
 from app.models.payment import Payment
 from app.models.user import User
+from app.services import notification_service
 from app.services import payments as payments_service
+from app.services.email import send_invoice_email
+from app.services.invoice import generate_invoice_pdf
 from app.services.payments import (
     prepare_payment,
     refund_payment,
@@ -286,6 +289,46 @@ def release(
     res = release_payment(db, req.booking_id, req.artisan_public, req.amount)
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message"))
+
+    try:
+        if (
+            booking.client
+            and booking.client.user
+            and booking.artisan
+            and booking.artisan.user
+        ):
+            client_user = booking.client.user
+            artisan_user = booking.artisan.user
+
+            pdf_bytes = generate_invoice_pdf(
+                booking, req.amount, client_user, artisan_user
+            )
+
+            recipients = [
+                email for email in [client_user.email, artisan_user.email] if email
+            ]
+            if recipients:
+                asyncio.create_task(
+                    send_invoice_email(recipients, str(booking.id), pdf_bytes)
+                )
+    except Exception as e:
+        logger.warning(f"Failed to generate and send invoice: {e}")
+
+    try:
+        if booking.artisan and booking.artisan.user_id:
+            asyncio.create_task(
+                notification_service.create_notification(
+                    db=db,
+                    user_id=booking.artisan.user_id,
+                    type="payment_released",
+                    title="Escrow Payment Released",
+                    message=f"Escrow payment of {req.amount} XLM released for booking '{booking.service}'.",
+                    reference_id=str(booking.id),
+                )
+            )
+    except Exception as e:
+        logger.warning(f"Failed to send release notification: {e}")
+
     return res
 
 
@@ -312,4 +355,20 @@ def refund(
     res = refund_payment(db, req.booking_id, req.client_public, req.amount)
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message"))
+
+    try:
+        if booking.client and booking.client.user_id:
+            asyncio.create_task(
+                notification_service.create_notification(
+                    db=db,
+                    user_id=booking.client.user_id,
+                    type="payment_refunded",
+                    title="Escrow Payment Refunded",
+                    message=f"Escrow payment of {req.amount} XLM refunded for booking '{booking.service}'.",
+                    reference_id=str(booking.id),
+                )
+            )
+    except Exception as e:
+        logger.warning(f"Failed to send refund notification: {e}")
+
     return res

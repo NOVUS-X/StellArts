@@ -34,14 +34,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+    const stored = typeof window !== "undefined" ? sessionStorage.getItem(STORAGE_KEY) : null;
     if (stored) {
       setToken(stored);
       api.users
         .me(stored)
         .then((u) => setUserState(u))
         .catch(() => {
-          localStorage.removeItem(STORAGE_KEY);
+          sessionStorage.removeItem(STORAGE_KEY);
           setToken(null);
           setUserState(null);
         })
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(newToken);
     setUserState(newUser);
     if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, newToken);
+      sessionStorage.setItem(STORAGE_KEY, newToken);
     }
   }, []);
 
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUserState(null);
     if (typeof window !== "undefined") {
-      localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(STORAGE_KEY);
     }
   }, []);
 

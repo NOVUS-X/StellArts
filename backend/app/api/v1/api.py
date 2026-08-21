@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     calendar,
     health,
     jobs,
+    notifications,
     open_requests,
     payments,
     stats,
@@ -32,3 +33,4 @@ api_router.include_router(
     open_requests.router, prefix="/requests", tags=["open_requests"]
 )
 api_router.include_router(tracking.router, tags=["tracking"])
+api_router.include_router(notifications.router, tags=["notifications"])

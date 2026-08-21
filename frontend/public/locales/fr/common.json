@@ -1,0 +1,158 @@
+{
+  "nav": {
+    "features": "Fonctionnalités",
+    "useCases": "Cas d'Usage",
+    "whyStellar": "Pourquoi Stellar",
+    "dashboard": "Tableau de bord",
+    "analytics": "Analytique",
+    "settings": "Paramètres",
+    "logout": "Déconnexion",
+    "connectWallet": "Connecter le Portefeuille",
+    "disconnect": "Déconnecter"
+  },
+  "hero": {
+    "badge": "Construit sur la Blockchain Stellar",
+    "title": "Uber pour les Artisans",
+    "subtitle": "Connectez. Faites confiance. Transigez.",
+    "description": "Une plateforme de marché décentralisée conçue pour connecter parfaitement les artisans avec les clients au sein de leur emplacement géographique. Exploitant la blockchain Stellar pour des transactions fiables, transparentes et rapides.",
+    "findArtisan": "Trouver un Artisan",
+    "joinAsArtisan": "Rejoindre en tant qu'Artisan"
+  },
+  "features": {
+    "title": "Tout ce dont vous avez besoin",
+    "subtitle": "Une plateforme complète pour les artisans et les clients",
+    "decentralized": {
+      "title": "Paiements Décentralisés",
+      "description": "Paiements sécurisés basés sur la blockchain avec protection en séquestre."
+    },
+    "booking": {
+      "title": "Réservation Intelligente",
+      "description": "Planifiez et gérez vos rendez-vous facilement."
+    },
+    "reviews": {
+      "title": "Avis Vérifiés",
+      "description": "Avis fiables de vrais clients."
+    },
+    "matching": {
+      "title": "Appariement Intelligent",
+      "description": "Recommandations d'artisans basées sur l'IA selon vos besoins."
+    },
+    "tracking": {
+      "title": "Suivi en Temps Réel",
+      "description": "Suivez vos demandes de service en temps réel."
+    },
+    "analytics": {
+      "title": "Tableau de Bord Analytique",
+      "description": "Aperçu complet des performances de votre entreprise."
+    }
+  },
+  "useCases": {
+    "title": "Cas d'Usage",
+    "subtitle": "Comment Stellarts fonctionne pour tous",
+    "forClients": {
+      "title": "Pour les Clients",
+      "description": "Trouvez des artisans vérifiés, réservez des services et payez en toute sécurité."
+    },
+    "forArtisans": {
+      "title": "Pour les Artisans",
+      "description": "Développez votre entreprise, gérez les réservations et recevez vos paiements rapidement."
+    }
+  },
+  "stellar": {
+    "title": "Pourquoi la Blockchain Stellar?",
+    "badge": "Technologie",
+    "subtitle": "Construit sur une technologie blockchain de niveau entreprise pour la sécurité et la rapidité",
+    "escrow": {
+      "title": "Séquestre et Contrats Intelligents",
+      "description": "Permet des transactions sans confiance entre étrangers."
+    },
+    "lowCost": {
+      "title": "Faibles Coûts de Transaction",
+      "description": "Abordable même pour les micro-paiements."
+    },
+    "fastSettlement": {
+      "title": "Règlement Rapide",
+      "description": "Confirmation quasi instantanée des réservations et paiements."
+    },
+    "financialInclusion": {
+      "title": "Inclusion Financière",
+      "description": "Accessible via les portefeuilles mobiles, surtout dans les marchés émergents."
+    }
+  },
+  "cta": {
+    "title": "Prêt à Commencer?",
+    "description": "Rejoignez des milliers d'artisans et de clients qui établissent la confiance grâce aux transactions décentralisées",
+    "getStarted": "Commencer Maintenant",
+    "docs": "Voir la Documentation"
+  },
+  "footer": {
+    "description": "Connecter les artisans avec les clients grâce à la technologie blockchain.",
+    "product": "Produit",
+    "company": "Entreprise",
+    "connect": "Connecter",
+    "features": "Fonctionnalités",
+    "useCases": "Cas d'Usage",
+    "pricing": "Tarifs",
+    "about": "À propos",
+    "blog": "Blog",
+    "careers": "Carrières",
+    "copyright": "© 2024 Stellarts. Tous droits réservés. Construit sur Stellar."
+  },
+  "auth": {
+    "login": {
+      "title": "Se Connecter",
+      "email": "E-mail",
+      "emailPlaceholder": "vous@exemple.com",
+      "password": "Mot de passe",
+      "forgotPassword": "Mot de passe oublié?",
+      "submit": "Se Connecter",
+      "emailRequired": "L'e-mail est obligatoire.",
+      "emailInvalid": "Entrez une adresse e-mail valide.",
+      "passwordRequired": "Le mot de passe est obligatoire."
+    },
+    "register": {
+      "title": "Créer un Compte",
+      "fullName": "Nom Complet",
+      "phone": "Numéro de Téléphone",
+      "email": "E-mail",
+      "role": "Je veux",
+      "roleClient": "Engager un Artisan (Client)",
+      "roleArtisan": "Offrir des Services (Artisan)",
+      "password": "Mot de passe",
+      "confirmPassword": "Confirmer le Mot de passe",
+      "submit": "Créer un Compte",
+      "fullNameRequired": "Le nom complet est obligatoire.",
+      "emailRequired": "L'e-mail est obligatoire.",
+      "emailInvalid": "Entrez une adresse e-mail valide.",
+      "passwordMin": "Le mot de passe doit contenir au moins 8 caractères.",
+      "passwordUppercase": "Le mot de passe doit contenir au moins une lettre majuscule.",
+      "passwordLowercase": "Le mot de passe doit contenir au moins une lettre minuscule.",
+      "passwordNumber": "Le mot de passe doit contenir au moins un chiffre.",
+      "passwordSpecial": "Le mot de passe doit contenir au moins un caractère spécial.",
+      "confirmPasswordRequired": "Veuillez confirmer votre mot de passe.",
+      "passwordsMismatch": "Les mots de passe ne correspondent pas.",
+      "roleRequired": "Veuillez choisir comment vous souhaitez utiliser la plateforme."
+    }
+  },
+  "language": {
+    "en": "English",
+    "es": "Español",
+    "fr": "Français"
+  },
+  "artisans": {
+    "plumbers": "Plombiers",
+    "electricians": "Électriciens",
+    "carpenters": "Charpentiers",
+    "painters": "Peintres",
+    "nearYou": "Près de chez vous",
+    "onDemand": "À la demande",
+    "verified": "Vérifié",
+    "topRated": "Mieux noté",
+    "comingSoon": "Bientôt disponible",
+    "available": "disponible"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "welcome": "Bon retour!"
+  }
+}
