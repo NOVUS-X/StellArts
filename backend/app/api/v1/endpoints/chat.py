@@ -3,20 +3,28 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
-from sqlalchemy import or_, and_, desc, func
-from sqlalchemy.orm import Session
+from fastapi import (
+    APIRouter,
+    Depends,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from jose import JWTError
+from sqlalchemy import and_, desc, or_
+from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
-from app.db.session import get_db
 from app.core.cache import cache
+from app.core.security import decode_token
 from app.core.websocket import manager
+from app.db.session import get_db
 from app.models.message import Message
 from app.models.user import User
-from app.schemas.message import ConversationOut, MessageCreate, MessageOut, WebSocketEvent
-from app.core.security import decode_token, is_token_blacklisted
-
+from app.schemas.message import (
+    ConversationOut,
+    MessageOut,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -30,17 +38,6 @@ def get_conversations(
     Get a list of all conversations for the current user.
     """
     # Find all messages where user is sender or receiver
-    subquery = (
-        db.query(
-            Message.id,
-            func.max(Message.created_at).over(
-                partition_by=func.least(Message.sender_id, Message.receiver_id),
-            ).label("max_created_at")
-        )
-        .filter(or_(Message.sender_id == current_user.id, Message.receiver_id == current_user.id))
-        .subquery()
-    )
-
     # Note: Complex query for latest messages grouped by conversation can be simplified:
     conversations = {}
     messages = (
@@ -57,7 +54,7 @@ def get_conversations(
             unread_count = db.query(Message).filter(
                 Message.sender_id == other_user_id,
                 Message.receiver_id == current_user.id,
-                Message.is_read == False
+                Message.is_read.is_(False)
             ).count()
 
             conversations[other_user_id] = {
@@ -110,7 +107,7 @@ def mark_messages_read(
     db.query(Message).filter(
         Message.sender_id == other_user_id,
         Message.receiver_id == current_user.id,
-        Message.is_read == False
+        Message.is_read.is_(False)
     ).update({"is_read": True})
     db.commit()
     return {"status": "success"}
@@ -185,7 +182,7 @@ async def chat_websocket(
                     db.add(msg)
                     db.commit()
                     db.refresh(msg)
-                    
+
                     # Convert to dict
                     msg_dict = {
                         "id": msg.id,
@@ -195,13 +192,13 @@ async def chat_websocket(
                         "is_read": msg.is_read,
                         "created_at": msg.created_at.isoformat()
                     }
-                    
+
                     event = {"type": "chat_message", "data": msg_dict}
-                    
+
                     # Publish to receiver's Redis channel
                     if cache.redis:
                         await cache.redis.publish(f"chat:{receiver_id}", json.dumps(event))
-                    
+
                     # Also send back to sender
                     await manager.send_personal_message(event, user.id)
 

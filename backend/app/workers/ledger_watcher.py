@@ -1,7 +1,5 @@
 import asyncio
 import logging
-from app.core.config import settings
-from app.db.session import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +18,7 @@ async def poll_ledger_events():
             #    Update db.Booking status to COMPLETED
             # 4. If event == "FundsDeposited":
             #    Update db.Payment status to HELD
-            
+
             # Mock sleep for event loop
             await asyncio.sleep(10)
         except Exception as e:
