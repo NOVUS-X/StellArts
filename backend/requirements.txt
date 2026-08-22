@@ -22,3 +22,4 @@ stellar-sdk==13.1.0
 argon2-cffi==23.1.0
 fastapi-mail==1.4.1
 slowapi==0.1.9
+reportlab==4.0.7

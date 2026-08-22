@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -14,6 +15,7 @@ from app.api.v1.api import api_router
 from app.core.cache import cache
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
+from app.core.i18n import get_locale_from_request
 from app.core.limiter import limiter
 from app.db.session import get_db
 from app.workers.soroban_event_worker import run_worker
@@ -72,6 +74,21 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+@app.middleware("http")
+async def locale_middleware(request: Request, call_next):
+    """Resolve the client locale from Accept-Language and make it available
+    on ``request.state.locale`` for downstream handlers.
+
+    Also adds a ``Content-Language`` response header.
+    """
+    locale = get_locale_from_request(request)
+    request.state.locale = locale
+    response: Response = await call_next(request)
+    response.headers["Content-Language"] = locale
+    return response
+
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)

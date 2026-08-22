@@ -12,7 +12,7 @@ soroban-sdk = { workspace = true, features = ["testutils"] }
 escrow = { path = "../escrow" }
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [features]

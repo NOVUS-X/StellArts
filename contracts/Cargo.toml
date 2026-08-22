@@ -3,6 +3,7 @@ members = [
     "escrow",
     "reputation",
     "staking",
+    "dispute_resolution",
 ]
 resolver = "2"
 

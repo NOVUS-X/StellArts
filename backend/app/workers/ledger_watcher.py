@@ -3,6 +3,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 async def poll_ledger_events():
     """
     Background worker that continuously polls the Soroban RPC for Escrow events.
@@ -23,7 +24,8 @@ async def poll_ledger_events():
             await asyncio.sleep(10)
         except Exception as e:
             logger.error(f"Error polling ledger events: {e}")
-            await asyncio.sleep(30) # Backoff on error
+            await asyncio.sleep(30)  # Backoff on error
+
 
 if __name__ == "__main__":
     asyncio.run(poll_ledger_events())

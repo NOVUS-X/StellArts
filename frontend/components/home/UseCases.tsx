@@ -1,41 +1,42 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "../ui/card";
 import { MapPin, Globe, Wrench } from "lucide-react";
 
-const useCases = [
-  {
-    icon: Wrench,
-    title: "Urban Communities",
-    description:
-      "Quick discovery of trusted artisans for emergency home repairs.",
-  },
-  {
-    icon: MapPin,
-    title: "Small Towns",
-    description: "Artisans gain visibility beyond personal networks.",
-  },
-  {
-    icon: Globe,
-    title: "Cross-border Work",
-    description:
-      "Migrant artisans can get verified and receive fair payments securely.",
-  },
-];
-
 export default function UseCases() {
+  const { t } = useTranslation();
+
+  const useCases = [
+    {
+      icon: Wrench,
+      title: t("useCases.forClients.title"),
+      description: t("useCases.forClients.description"),
+    },
+    {
+      icon: MapPin,
+      title: t("useCases.forArtisans.title"),
+      description: t("useCases.forArtisans.description"),
+    },
+    {
+      icon: Globe,
+      title: t("stellar.financialInclusion.title"),
+      description: t("stellar.financialInclusion.description"),
+    },
+  ];
+
   return (
     <section className="py-20 bg-blue-600" id="use-cases">
       <div className="container mx-auto px-6 max-w-6xl">
         <div className="text-center mb-16">
           <span className="text-blue-200 font-semibold text-sm uppercase tracking-wide">
-            Use Cases
+            {t("useCases.title")}
           </span>
           <h2 className="text-4xl font-bold text-white mt-4">
-            Who Benefits from Stellarts?
+            {t("useCases.subtitle")}
           </h2>
           <p className="text-xl text-blue-100 mt-4 max-w-2xl mx-auto">
-            Empowering communities across different settings
+            {t("hero.description")}
           </p>
         </div>
 
