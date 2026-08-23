@@ -82,15 +82,16 @@ def create_open_request(
     summary="List open requests with optional location filtering",
 )
 def list_open_requests(
-    lat: float
-    | None = Query(None, ge=-90, le=90, description="Latitude for location filtering"),
-    lng: float
-    | None = Query(
+    lat: float | None = Query(
+        None, ge=-90, le=90, description="Latitude for location filtering"
+    ),
+    lng: float | None = Query(
         None, ge=-180, le=180, description="Longitude for location filtering"
     ),
     radius_km: float = Query(50, gt=0, description="Search radius in kilometers"),
-    status_filter: str
-    | None = Query(None, alias="status", description="Filter by status"),
+    status_filter: str | None = Query(
+        None, alias="status", description="Filter by status"
+    ),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(20, ge=1, le=100, description="Maximum number of records"),
     db: Session = Depends(get_db),

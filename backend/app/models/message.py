@@ -17,4 +17,6 @@ class Message(Base):
 
     # Relationships (Optional, but helpful)
     sender = relationship("User", foreign_keys=[sender_id], backref="sent_messages")
-    receiver = relationship("User", foreign_keys=[receiver_id], backref="received_messages")
+    receiver = relationship(
+        "User", foreign_keys=[receiver_id], backref="received_messages"
+    )

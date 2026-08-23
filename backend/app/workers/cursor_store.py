@@ -15,12 +15,10 @@ def get_cursor(db: Session) -> str:
 
 def save_cursor(db: Session, event_id: str) -> None:
     db.execute(
-        text(
-            """
+        text("""
             INSERT INTO worker_state (key, value)
             VALUES (:key, :value)
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-        """
-        ),
+        """),
         {"key": CURSOR_KEY, "value": event_id},
     )

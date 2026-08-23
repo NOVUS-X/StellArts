@@ -42,20 +42,31 @@ def get_conversations(
     conversations = {}
     messages = (
         db.query(Message)
-        .filter(or_(Message.sender_id == current_user.id, Message.receiver_id == current_user.id))
+        .filter(
+            or_(
+                Message.sender_id == current_user.id,
+                Message.receiver_id == current_user.id,
+            )
+        )
         .order_by(desc(Message.created_at))
         .all()
     )
 
     for msg in messages:
-        other_user_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
+        other_user_id = (
+            msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
+        )
         if other_user_id not in conversations:
             other_user = db.query(User).filter(User.id == other_user_id).first()
-            unread_count = db.query(Message).filter(
-                Message.sender_id == other_user_id,
-                Message.receiver_id == current_user.id,
-                Message.is_read.is_(False)
-            ).count()
+            unread_count = (
+                db.query(Message)
+                .filter(
+                    Message.sender_id == other_user_id,
+                    Message.receiver_id == current_user.id,
+                    Message.is_read.is_(False),
+                )
+                .count()
+            )
 
             conversations[other_user_id] = {
                 "other_user_id": other_user_id,
@@ -83,8 +94,14 @@ def get_chat_history(
         db.query(Message)
         .filter(
             or_(
-                and_(Message.sender_id == current_user.id, Message.receiver_id == other_user_id),
-                and_(Message.sender_id == other_user_id, Message.receiver_id == current_user.id),
+                and_(
+                    Message.sender_id == current_user.id,
+                    Message.receiver_id == other_user_id,
+                ),
+                and_(
+                    Message.sender_id == other_user_id,
+                    Message.receiver_id == current_user.id,
+                ),
             )
         )
         .order_by(desc(Message.created_at))
@@ -107,13 +124,14 @@ def mark_messages_read(
     db.query(Message).filter(
         Message.sender_id == other_user_id,
         Message.receiver_id == current_user.id,
-        Message.is_read.is_(False)
+        Message.is_read.is_(False),
     ).update({"is_read": True})
     db.commit()
     return {"status": "success"}
 
 
 # WebSocket logic
+
 
 async def listen_to_redis(user_id: int):
     """Listen to Redis channel for the user and forward to their active WebSockets."""
@@ -135,9 +153,7 @@ async def listen_to_redis(user_id: int):
 
 @router.websocket("/ws")
 async def chat_websocket(
-    websocket: WebSocket,
-    token: str = Query(...),
-    db: Session = Depends(get_db)
+    websocket: WebSocket, token: str = Query(...), db: Session = Depends(get_db)
 ):
     try:
         payload = decode_token(token)
@@ -175,9 +191,7 @@ async def chat_websocket(
                 if receiver_id and content:
                     # Save to DB
                     msg = Message(
-                        sender_id=user.id,
-                        receiver_id=receiver_id,
-                        content=content
+                        sender_id=user.id, receiver_id=receiver_id, content=content
                     )
                     db.add(msg)
                     db.commit()
@@ -190,14 +204,16 @@ async def chat_websocket(
                         "receiver_id": msg.receiver_id,
                         "content": msg.content,
                         "is_read": msg.is_read,
-                        "created_at": msg.created_at.isoformat()
+                        "created_at": msg.created_at.isoformat(),
                     }
 
                     event = {"type": "chat_message", "data": msg_dict}
 
                     # Publish to receiver's Redis channel
                     if cache.redis:
-                        await cache.redis.publish(f"chat:{receiver_id}", json.dumps(event))
+                        await cache.redis.publish(
+                            f"chat:{receiver_id}", json.dumps(event)
+                        )
 
                     # Also send back to sender
                     await manager.send_personal_message(event, user.id)
@@ -209,8 +225,8 @@ async def chat_websocket(
                         "type": "typing_indicator",
                         "data": {
                             "sender_id": user.id,
-                            "is_typing": payload.get("is_typing", True)
-                        }
+                            "is_typing": payload.get("is_typing", True),
+                        },
                     }
                     await cache.redis.publish(f"chat:{receiver_id}", json.dumps(event))
 
