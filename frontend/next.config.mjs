@@ -58,6 +58,23 @@ const nextConfig = {
     }
     return config;
   },
+  async headers() {
+    return [
+      {
+        // Never let the browser/CDN cache the SW file itself — the browser
+        // must always fetch a fresh sw.js to detect updates. Service-Worker-
+        // Allowed widens scope to root even though the file lives at /sw.js.
+        source: "/sw.js",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
+          },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

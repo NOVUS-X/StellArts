@@ -10,6 +10,7 @@ import { CurrencyProvider } from "../context/CurrencyContext";
 import { NotificationProvider } from "../context/NotificationContext";
 import { ToastProvider } from "../context/ToastContext";
 import { I18nProvider } from "../components/I18nProvider";
+import { ServiceWorkerRegister } from "../components/ServiceWorkerRegister";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -55,6 +56,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <ServiceWorkerRegister />
           <Toaster richColors position="top-right" />
           <I18nProvider>
             <AuthProvider>
