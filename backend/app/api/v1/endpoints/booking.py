@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from decimal import Decimal
 from uuid import UUID
@@ -29,6 +30,7 @@ from app.schemas.booking import (
     BookingResponse,
     BookingStatusUpdate,
     ClientSuppliesOverrideRequest,
+    JobEstimateResponse,
     ProposedSlotResponse,
     ProposeSlotsRequest,
     ReviewCreate,
@@ -47,112 +49,108 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/bookings")
 
 
+@router.post("/estimate", response_model=JobEstimateResponse)
+async def estimate_booking(
+    booking_data: BookingCreate,
+    current_user: User = Depends(require_client),
+):
+    """Classify a job and estimate its price before the client submits a booking."""
+    return await ai_service.analyze_job(
+        booking_data.service, booking_data.location, booking_data.estimated_hours
+    )
+
+
 @router.post(
     "/create", response_model=BookingResponse, status_code=status.HTTP_201_CREATED
 )
-def create_booking(
+async def create_booking(
     booking_data: BookingCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_client),
 ):
-    """
-    Create a new booking - client only
-
-    This endpoint allows clients to create bookings for artisan services.
-    The booking is created with PENDING status and requires artisan confirmation.
-    """
-    # Require verified email before creating bookings (configurable)
+    """Create a pending booking with AI-derived tags, costs, and matched notifications."""
     if settings.REQUIRE_EMAIL_VERIFICATION and not current_user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Email verification required before creating a booking. "
-                "Check your inbox or request a new verification email."
-            ),
+            detail="Email verification required before creating a booking. Check your inbox or request a new verification email.",
         )
-    # Find or create the client profile for the current user
 
     client = db.query(Client).filter(Client.user_id == current_user.id).first()
-
     if not client:
-        # Auto-onboard: Create a client profile if it doesn't exist
         client = Client(user_id=current_user.id)
         db.add(client)
-        db.flush()  # Get the client.id without committing yet
-
-    # Verify that artisan_id exists in the database
+        db.flush()
 
     artisan = db.query(Artisan).filter(Artisan.id == booking_data.artisan_id).first()
-
     if not artisan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Artisan with id {booking_data.artisan_id} not found",
         )
-
-    # Check if artisan is active (optional validation)
     if hasattr(artisan, "is_active") and not artisan.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot book with an inactive artisan",
         )
 
-    # Use AIService for dynamic bid range calculation and smart pitching
-
-    # Get artisan's hourly rate (default to 50 if not set)
+    analysis = await ai_service.analyze_job(
+        booking_data.service, booking_data.location, booking_data.estimated_hours
+    )
+    estimated_hours = booking_data.estimated_hours or analysis["estimated_hours"]
     hourly_rate = artisan.hourly_rate or Decimal("50.00")
-    estimated_hours = (
-        booking_data.estimated_hours or 2.0
-    )  # Default to 2 hours if not provided
-
     bid_data = ai_service.calculate_bid_range(
         booking_data.service, hourly_rate, estimated_hours
     )
-
+    # LLM range is the customer-facing estimate; retain existing labor/material breakdown for compatibility.
+    range_min = Decimal(str(analysis["range_min"]))
+    range_max = Decimal(str(analysis["range_max"]))
+    estimated_cost = Decimal(
+        str(booking_data.estimated_cost or analysis["estimated_cost"])
+    )
     pitch = ai_service.generate_smart_pitch(
         booking_data.service,
         bid_data["material_cost"],
         bid_data["labor_cost"],
-        bid_data["total_estimated"],
+        estimated_cost,
         estimated_hours,
     )
 
-    # Create the booking model instance with status = PENDING
     new_booking = Booking(
         client_id=client.id,
         artisan_id=booking_data.artisan_id,
         service=booking_data.service,
+        job_specialties=json.dumps(analysis["specialties"]),
         estimated_hours=estimated_hours,
-        estimated_cost=bid_data["total_estimated"],
+        estimated_cost=estimated_cost,
         labor_cost=bid_data["labor_cost"],
         material_cost=bid_data["material_cost"],
-        range_min=bid_data["range_min"],
-        range_max=bid_data["range_max"],
+        range_min=range_min,
+        range_max=range_max,
         artisan_pitch=pitch,
         status=BookingStatus.PENDING,
         date=booking_data.date,
         location=booking_data.location,
         notes=booking_data.notes,
     )
-
-    # Add the booking to the session and commit
     db.add(new_booking)
     db.commit()
     db.refresh(new_booking)
 
-    # Dispatch smart pitches to matched artisans (async operation)
+    coordinates = (
+        await geolocation_service.geocode_address(booking_data.location)
+        if booking_data.location
+        else None
+    )
     try:
-        # Run async dispatch in background (fire and forget)
-        asyncio.create_task(
-            notification_service.dispatch_to_matched_artisans(db, new_booking)
+        await notification_service.dispatch_to_matched_artisans(
+            db,
+            new_booking,
+            float(coordinates.latitude) if coordinates else None,
+            float(coordinates.longitude) if coordinates else None,
+            limit=5,
         )
-    except ImportError:
-        # Notification service not available, continue without dispatch
-        pass
-    except Exception as e:
-        # Log error but don't fail booking creations
-        print(f"Failed to dispatch notifications: {e}")
-
+    except Exception as exc:
+        logger.warning("Failed to dispatch matched artisan notifications: %s", exc)
     return new_booking
 
 

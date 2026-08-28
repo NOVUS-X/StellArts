@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../../../components/ui/card";
-import { api, type ArtisanProfileResponse, type BookingCreate } from "../../../lib/api";
+import { api, type ArtisanProfileResponse, type BookingCreate, type JobEstimateResponse } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
 import { Wrench, MapPin, Star, CheckCircle } from "lucide-react";
 
@@ -27,6 +27,8 @@ export default function BookArtisanPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [successBookingId, setSuccessBookingId] = useState<string | null>(null);
+  const [estimate, setEstimate] = useState<JobEstimateResponse | null>(null);
+  const [estimating, setEstimating] = useState(false);
 
   const [service, setService] = useState("");
   const [date, setDate] = useState("");
@@ -53,6 +55,32 @@ export default function BookArtisanPage() {
       )
       .finally(() => setLoading(false));
   }, [artisanId, isAuthenticated, router]);
+
+  // Ask the backend AI service for specialties and a location-aware range as the client types.
+  useEffect(() => {
+    if (!token || service.trim().length < 8 || !location.trim()) {
+      setEstimate(null);
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      setEstimating(true);
+      try {
+        const result = await api.bookings.estimate({
+          artisan_id: artisanId,
+          service: service.trim(),
+          date: new Date().toISOString(),
+          estimated_hours: estimatedHours ? parseFloat(estimatedHours) : undefined,
+          location: location.trim(),
+        }, token);
+        setEstimate(result);
+      } catch {
+        setEstimate(null);
+      } finally {
+        setEstimating(false);
+      }
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [artisanId, estimatedHours, location, service, token]);
 
   // Auto-calculate expected cost based on artisan's hourly rate
   useEffect(() => {
@@ -84,8 +112,8 @@ export default function BookArtisanPage() {
         artisan_id: artisanId,
         service: service.trim() || "Service request",
         date: selectedDate.toISOString(),
-        estimated_cost: parseFloat(estimatedCost) || 0,
-        estimated_hours: estimatedHours ? parseFloat(estimatedHours) : undefined,
+        estimated_cost: estimate?.estimated_cost ?? (parseFloat(estimatedCost) || undefined),
+        estimated_hours: estimatedHours ? parseFloat(estimatedHours) : estimate?.estimated_hours,
         location: location.trim() || undefined,
         notes: notes.trim() || undefined,
       };
@@ -283,6 +311,13 @@ export default function BookArtisanPage() {
                 </div>
               </div>
               
+              {estimate && (
+                <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-blue-950" aria-live="polite">
+                  <p className="text-sm font-semibold">Estimated Range: ${estimate.range_min.toFixed(0)}-${estimate.range_max.toFixed(0)}</p>
+                  <p className="mt-1 text-xs text-blue-800">Suggested specialties: {estimate.specialties.join(", ")}{estimating ? " · Updating…" : ""}</p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                   Location <span className="text-red-500">*</span>

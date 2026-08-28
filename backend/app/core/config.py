@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     REQUIRE_EMAIL_VERIFICATION: bool = True
 
     # External APIs (for future use)
+    # OpenAI-compatible endpoint used for job tagging and cost estimation.
+    # Set AI_API_KEY to an OpenAI or Gemini-compatible key in production.
+    AI_API_URL: str | None = None
+    AI_API_KEY: str | None = None
+    AI_MODEL: str = "gpt-5-mini"
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_PUBLISHABLE_KEY: str | None = None
 

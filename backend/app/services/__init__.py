@@ -1,4 +1,8 @@
 # Service exports for easy importing
+from app.services.notification_service import (
+    create_notification,
+    dispatch_to_matched_artisans,
+)
 
 
 class NotificationService:
@@ -12,18 +16,24 @@ class NotificationService:
         }
 
     @staticmethod
-    async def dispatch_to_matched_artisans(db, booking, limit=5):
-        return []
+    async def dispatch_to_matched_artisans(
+        db, booking, latitude=None, longitude=None, limit=5
+    ):
+        return await dispatch_to_matched_artisans(
+            db, booking, latitude, longitude, limit
+        )
 
     @staticmethod
     def dispatch_push_notification(artisan_id: int, message: str):
-        # Mock push notification dispatch
         print(f"[PUSH NOTIFICATION] Artisan {artisan_id}: {message}")
-        return {
-            "artisan_id": artisan_id,
-            "message": message,
-            "status": "pushed",
-        }
+        return {"artisan_id": artisan_id, "message": message, "status": "pushed"}
 
 
 notification_service = NotificationService()
+
+__all__ = [
+    "NotificationService",
+    "notification_service",
+    "create_notification",
+    "dispatch_to_matched_artisans",
+]

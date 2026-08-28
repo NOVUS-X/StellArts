@@ -125,7 +125,7 @@ export interface BookingCreate {
   artisan_id: number;
   service: string;
   date: string;
-  estimated_cost: number;
+  estimated_cost?: number | null;
   estimated_hours?: number | null;
   location?: string | null;
   notes?: string | null;
@@ -138,6 +138,15 @@ export type BookingStatus =
   | "completed"
   | "cancelled"
   | "disputed";
+
+export interface JobEstimateResponse {
+  specialties: string[];
+  estimated_hours: number;
+  range_min: number;
+  range_max: number;
+  estimated_cost: number;
+  confidence: number;
+}
 
 export interface BookingResponse {
   id: string;
@@ -339,6 +348,13 @@ export const api = {
     myBookings: (token: string) =>
       request<BookingResponse[]>("/bookings/my-bookings", {
         method: "GET",
+        token,
+      }),
+
+    estimate: (body: BookingCreate, token: string) =>
+      request<JobEstimateResponse>("/bookings/estimate", {
+        method: "POST",
+        body: JSON.stringify(body),
         token,
       }),
 
