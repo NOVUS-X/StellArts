@@ -158,6 +158,7 @@ class ArtisanOut(BaseModel):
         if isinstance(v, str):
             try:
                 import json
+
                 return json.loads(v)
             except json.JSONDecodeError:
                 return []

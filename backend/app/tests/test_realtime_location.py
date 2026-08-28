@@ -69,23 +69,31 @@ def test_client(db_session):
 # ---------------------------------------------------------------------------
 
 
-def _register_and_login(test_client: TestClient, role: str, suffix: str) -> str:
+def _register_and_login(test_client: TestClient, role: str, suffix: str, db_session=None) -> str:
+    """Create a user directly in the DB and return a valid access token.
+
+    Bypasses the HTTP register/login endpoints to avoid rate-limiting
+    and background-task (email) side-effects in tests.
+    """
+    from app.core.security import create_access_token, get_password_hash
+
+    if db_session is None:
+        raise ValueError("db_session is required for _register_and_login")
+
     email = f"{role}_{suffix}@loc.test"
     password = "StrongPass1!"
-    test_client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": email,
-            "password": password,
-            "role": role,
-            "full_name": f"{role.title()} {suffix}",
-        },
+    user = User(
+        email=email,
+        hashed_password=get_password_hash(password),
+        role=role,
+        full_name=f"{role.title()} {suffix}",
+        is_active=True,
     )
-    resp = test_client.post(
-        "/api/v1/auth/login",
-        json={"email": email, "password": password},
-    )
-    return resp.json()["access_token"]
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    return create_access_token(subject=user.id)
 
 
 # ---------------------------------------------------------------------------
@@ -110,9 +118,9 @@ class TestLocationEndpointAuthGate:
         )
         assert resp.status_code == 401
 
-    def test_client_role_cannot_update_location(self, test_client):
+    def test_client_role_cannot_update_location(self, test_client, db_session):
         """A user with role=client must receive 403."""
-        token = _register_and_login(test_client, "client", "loc1")
+        token = _register_and_login(test_client, "client", "loc1", db_session)
         resp = test_client.put(
             ENDPOINT,
             json=VALID_PAYLOAD,
@@ -120,12 +128,12 @@ class TestLocationEndpointAuthGate:
         )
         assert resp.status_code == 403
 
-    def test_artisan_without_profile_returns_404(self, test_client):
+    def test_artisan_without_profile_returns_404(self, test_client, db_session):
         """
         An artisan-role user with no Artisan profile row gets 404,
         confirming auth passed but the profile lookup failed gracefully.
         """
-        token = _register_and_login(test_client, "artisan", "noprofile")
+        token = _register_and_login(test_client, "artisan", "noprofile", db_session)
         resp = test_client.put(
             ENDPOINT,
             json=VALID_PAYLOAD,
