@@ -86,13 +86,13 @@ impl Ctx {
         }
     }
 
-    /// Seed an artisan's on-chain reputation (total stars / review count).
-    fn seed_artisan(&self, artisan: &Address, total_stars: u64, review_count: u64) {
+    /// Seed an artisan's on-chain reputation (EMA scaled × 10_000 / review count).
+    fn seed_artisan(&self, artisan: &Address, ema_scaled: u64, review_count: u64) {
         self.rep_client.set_reputation(
             &self.admin,
             artisan,
             &reputation::ReputationData {
-                total_stars,
+                ema_scaled,
                 review_count,
             },
         );
@@ -101,7 +101,7 @@ impl Ctx {
     /// Seed a 5.0-star rated artisan.
     fn seed_rated_artisan(&self) -> Address {
         let artisan = Address::generate(&self.env);
-        self.seed_artisan(&artisan, 5, 1);
+        self.seed_artisan(&artisan, 50_000, 1);
         artisan
     }
 
@@ -322,7 +322,7 @@ fn test_rating_exactly_4_5_rejected() {
     let (id, client, _) = ctx.setup_dispute(1_000);
 
     let exactly_4_5 = Address::generate(&ctx.env);
-    ctx.seed_artisan(&exactly_4_5, 9, 2); // 4.5 average
+    ctx.seed_artisan(&exactly_4_5, 45_000, 2); // exactly 4.5 EMA
 
     let a = ctx.seed_rated_artisan();
     let b = ctx.seed_rated_artisan();
@@ -344,7 +344,7 @@ fn test_rating_below_4_5_rejected() {
     let (id, client, _) = ctx.setup_dispute(1_000);
 
     let below = Address::generate(&ctx.env);
-    ctx.seed_artisan(&below, 4, 1); // 4.0 average
+    ctx.seed_artisan(&below, 40_000, 1); // 4.0 EMA
     let unrated = Address::generate(&ctx.env); // no reviews at all
 
     let a = ctx.seed_rated_artisan();
@@ -368,7 +368,7 @@ fn test_rating_above_4_5_eligible() {
     let (id, client, _) = ctx.setup_dispute(1_000);
 
     let above = Address::generate(&ctx.env);
-    ctx.seed_artisan(&above, 14, 3); // 4.666… average
+    ctx.seed_artisan(&above, 47_000, 3); // above 4.5 EMA
 
     let a = ctx.seed_rated_artisan();
     let b = ctx.seed_rated_artisan();
@@ -459,7 +459,7 @@ fn test_select_jury_not_enough_eligible_fails() {
     let a = ctx.seed_rated_artisan();
     let b = ctx.seed_rated_artisan();
     let low = Address::generate(&ctx.env);
-    ctx.seed_artisan(&low, 4, 1);
+    ctx.seed_artisan(&low, 40_000, 1);
     ctx.select_jury(id, &vec![&ctx.env, a, b, low], &client);
 }
 

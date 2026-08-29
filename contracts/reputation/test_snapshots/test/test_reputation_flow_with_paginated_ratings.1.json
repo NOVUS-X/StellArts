@@ -1615,18 +1615,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 7
+                        "u64": 34265
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 24
+                        "u64": 7
                       }
                     }
                   ]
