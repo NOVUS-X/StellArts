@@ -174,18 +174,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 2
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 10
+                        "u64": 2
                       }
                     }
                   ]
@@ -316,18 +316,18 @@
                       "map": [
                         {
                           "key": {
-                            "symbol": "review_count"
+                            "symbol": "ema_scaled"
                           },
                           "val": {
-                            "u64": 2
+                            "u64": 50000
                           }
                         },
                         {
                           "key": {
-                            "symbol": "total_stars"
+                            "symbol": "review_count"
                           },
                           "val": {
-                            "u64": 10
+                            "u64": 2
                           }
                         }
                       ]

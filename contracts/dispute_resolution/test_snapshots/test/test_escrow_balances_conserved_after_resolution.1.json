@@ -175,18 +175,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -333,18 +333,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -375,18 +375,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -417,18 +417,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -1463,18 +1463,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -1525,18 +1525,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -1587,18 +1587,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -1649,18 +1649,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -3629,18 +3629,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -4548,18 +4548,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -4622,18 +4622,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -4696,18 +4696,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "review_count"
+                        "symbol": "ema_scaled"
                       },
                       "val": {
-                        "u64": 1
+                        "u64": 50000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "total_stars"
+                        "symbol": "review_count"
                       },
                       "val": {
-                        "u64": 5
+                        "u64": 1
                       }
                     }
                   ]
@@ -4831,18 +4831,18 @@
               "map": [
                 {
                   "key": {
-                    "symbol": "review_count"
+                    "symbol": "ema_scaled"
                   },
                   "val": {
-                    "u64": 1
+                    "u64": 50000
                   }
                 },
                 {
                   "key": {
-                    "symbol": "total_stars"
+                    "symbol": "review_count"
                   },
                   "val": {
-                    "u64": 5
+                    "u64": 1
                   }
                 }
               ]
@@ -4897,18 +4897,18 @@
               "map": [
                 {
                   "key": {
-                    "symbol": "review_count"
+                    "symbol": "ema_scaled"
                   },
                   "val": {
-                    "u64": 1
+                    "u64": 50000
                   }
                 },
                 {
                   "key": {
-                    "symbol": "total_stars"
+                    "symbol": "review_count"
                   },
                   "val": {
-                    "u64": 5
+                    "u64": 1
                   }
                 }
               ]
@@ -4963,18 +4963,18 @@
               "map": [
                 {
                   "key": {
-                    "symbol": "review_count"
+                    "symbol": "ema_scaled"
                   },
                   "val": {
-                    "u64": 1
+                    "u64": 50000
                   }
                 },
                 {
                   "key": {
-                    "symbol": "total_stars"
+                    "symbol": "review_count"
                   },
                   "val": {
-                    "u64": 5
+                    "u64": 1
                   }
                 }
               ]

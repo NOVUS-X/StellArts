@@ -13,7 +13,7 @@
 //! the caller (dispute party or admin). Every candidate is verified on-chain:
 //!
 //! * rating must be strictly greater than 4.5 (queried from the registered
-//!   `reputation` contract; `total_stars * 2 > review_count * 9`),
+//!   `reputation` contract; `ema_scaled > 45_000`, i.e. EMA strictly above 4.5 stars),
 //! * the artisan must not be a party to the dispute (client or artisan),
 //! * no duplicate addresses.
 //!
@@ -190,7 +190,7 @@ pub struct EscrowEngagement {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReputationData {
-    pub total_stars: u64,
+    pub ema_scaled: u64,
     pub review_count: u64,
 }
 
@@ -254,10 +254,10 @@ impl DisputeResolutionContract {
     }
 
     /// Whether `artisan` is eligible for jury duty for this dispute:
-    /// strictly more than 4.5 average rating and not a party to the dispute.
+    /// strictly more than 4.5 EMA rating and not a party to the dispute.
     ///
-    /// Average rating is compared with integer math only:
-    /// `average > 4.5`  ⇔  `total_stars * 2 > review_count * 9`.
+    /// EMA is compared with integer math only:
+    /// `average > 4.5`  ⇔  `ema_scaled > 45_000` (scale × 10_000).
     fn is_eligible(env: &Env, artisan: &Address, dispute: &Dispute) -> bool {
         if artisan == &dispute.client || artisan == &dispute.artisan {
             return false;
@@ -267,11 +267,7 @@ impl DisputeResolutionContract {
         if reputation.review_count == 0 {
             return false;
         }
-        reputation
-            .total_stars
-            .checked_mul(2)
-            .and_then(|n| reputation.review_count.checked_mul(9).map(|d| n > d))
-            .unwrap_or(false)
+        reputation.ema_scaled > 45_000
     }
 
     /// Set the contract admin. Can only be called once.

@@ -74,10 +74,11 @@ fn test_reputation_flow_integration() {
     client.rate_artisan(&client_b, &artisan, &3, &escrow_contract_id, &2);
 
     let stats = client.get_stats(&artisan);
-    assert_eq!(stats, (400, 2));
+    // EMA: 5 then 3 → (50000 * 0.8) + (30000 * 0.2) = 46000 → 460 scaled
+    assert_eq!(stats, (460, 2));
 
     let reputation = client.get_reputation(&artisan);
-    assert_eq!(reputation.total_stars, 8);
+    assert_eq!(reputation.ema_scaled, 46_000);
     assert_eq!(reputation.review_count, 2);
 }
 
@@ -112,11 +113,12 @@ fn test_reputation_robustness_multiple_reviews() {
 
     let stats = client.get_stats(&artisan);
     assert_eq!(stats.1, 10);
-    assert_eq!(stats.0, 430);
+    // EMA over [5,4,5,3,5,4,5,5,4,3] — recency-weighted, not simple 430 mean
+    assert_eq!(stats.0, 421);
 
     let reputation = client.get_reputation(&artisan);
-    assert_eq!(reputation.total_stars, 43);
     assert_eq!(reputation.review_count, 10);
+    assert!(reputation.ema_scaled > 0);
 }
 
 #[test]
@@ -161,14 +163,15 @@ fn test_reputation_isolation_between_artisans() {
     client.rate_artisan(&client_1b, &artisan1, &3, &escrow_contract_id, &2);
     client.rate_artisan(&client_2a, &artisan2, &4, &escrow_contract_id, &3);
 
-    assert_eq!(client.get_stats(&artisan1), (400, 2));
+    // artisan1: 5 then 3 → EMA 460; artisan2: single 4 → 400
+    assert_eq!(client.get_stats(&artisan1), (460, 2));
     assert_eq!(client.get_stats(&artisan2), (400, 1));
 
     let rep1 = client.get_reputation(&artisan1);
     let rep2 = client.get_reputation(&artisan2);
-    assert_eq!(rep1.total_stars, 8);
+    assert_eq!(rep1.ema_scaled, 46_000);
     assert_eq!(rep1.review_count, 2);
-    assert_eq!(rep2.total_stars, 4);
+    assert_eq!(rep2.ema_scaled, 40_000);
     assert_eq!(rep2.review_count, 1);
 }
 
