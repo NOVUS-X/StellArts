@@ -1,4 +1,5 @@
 """Tests for Open Requests CRUD endpoints."""
+
 from app.tests.conftest import TestingSessionLocal
 
 

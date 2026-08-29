@@ -6,6 +6,7 @@ from app.api.v1.endpoints import (
     auth,
     booking,
     calendar,
+    chat,
     health,
     jobs,
     notifications,
@@ -34,3 +35,4 @@ api_router.include_router(
 )
 api_router.include_router(tracking.router, tags=["tracking"])
 api_router.include_router(notifications.router, tags=["notifications"])
+api_router.include_router(chat.router, prefix="/chat", tags=["chat"])

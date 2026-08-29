@@ -7,6 +7,7 @@ import {
   CreditCard,
   LayoutDashboard,
   Menu,
+  MessageSquare,
   User,
   X,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import { useState } from "react";
 const navItems = [
   { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/dashboard/payments", label: "Payments", icon: CreditCard },
+  { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/profile", label: "Profile", icon: User },
 ];
 

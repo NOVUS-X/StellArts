@@ -1,4 +1,5 @@
 """Tests for WebSocket tracking endpoint."""
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
