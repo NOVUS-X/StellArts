@@ -126,14 +126,24 @@ jobs:
           -e POSTGRES_USER=stellarts \
           -e POSTGRES_PASSWORD=stellarts_test \
           -e POSTGRES_DB=stellarts_test_db \
-          -e POSTGRES_DB=stellarts_test_db \
           postgres:15-alpine
+
+        for attempt in {1..30}; do
+          if docker exec test-db pg_isready -U stellarts -d stellarts_test_db; then
+            break
+          fi
+          if [ "$attempt" -eq 30 ]; then
+            docker logs test-db
+            exit 1
+          fi
+          sleep 2
+        done
 
         docker run -d --name test-redis --network test-network \
           -p 6379:6379 \
           redis:7-alpine
         
-        sleep 10
+        sleep 5
 
         docker run --rm --network test-network \
           -e DATABASE_URL=postgresql://stellarts:stellarts_test@test-db:5432/stellarts_test_db \
