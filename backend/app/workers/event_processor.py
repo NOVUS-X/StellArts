@@ -30,12 +30,14 @@ def process_event(db: Session, event: dict) -> bool:
         return False
 
     result = db.execute(
-        text("""
+        text(
+            """
             UPDATE bookings
             SET status = :status, processed_event_id = :event_id
             WHERE booking_id = :booking_id
               AND (processed_event_id IS NULL OR processed_event_id != :event_id)
-        """),
+        """
+        ),
         {"status": new_status, "booking_id": booking_id, "event_id": event_id},
     )
     if result.rowcount == 0:
