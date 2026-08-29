@@ -35,6 +35,9 @@ class Booking(Base):
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
     artisan_id = Column(Integer, ForeignKey("artisans.id"), nullable=False)
     service = Column(Text, nullable=False)
+    job_specialties = Column(
+        Text, nullable=True
+    )  # JSON array of normalized specialty tags
     estimated_hours = Column(DECIMAL(5, 2))
     estimated_cost = Column(DECIMAL(10, 2))
     labor_cost = Column(DECIMAL(10, 2))

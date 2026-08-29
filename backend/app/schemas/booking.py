@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class BookingCreate(BaseModel):
@@ -26,8 +27,10 @@ class BookingCreate(BaseModel):
     artisan_id: int = Field(..., description="ID of the artisan to book")
     service: str = Field(..., min_length=1, description="Description of the service")
     date: datetime = Field(..., description="Scheduled date and time for the service")
-    estimated_cost: float = Field(
-        ..., gt=0, description="Estimated cost of the service"
+    estimated_cost: float | None = Field(
+        None,
+        gt=0,
+        description="Optional client-provided estimate; the server calculates the range",
     )
     estimated_hours: float | None = Field(
         None, gt=0, description="Estimated hours for the job"
@@ -36,6 +39,15 @@ class BookingCreate(BaseModel):
         None, max_length=500, description="Location for the service"
     )
     notes: str | None = Field(None, description="Additional notes")
+
+
+class JobEstimateResponse(BaseModel):
+    specialties: list[str]
+    estimated_hours: float
+    range_min: float
+    range_max: float
+    estimated_cost: float
+    confidence: float
 
 
 class BookingStatusUpdate(BaseModel):
@@ -124,6 +136,7 @@ class BookingResponse(BaseModel):
     client_id: int
     artisan_id: int
     service: str
+    job_specialties: list[str] = Field(default_factory=list)
     date: datetime | None
     estimated_cost: float | None
     estimated_hours: float | None
@@ -138,6 +151,16 @@ class BookingResponse(BaseModel):
     client_supplies_override: bool = False
     created_at: datetime
     updated_at: datetime | None
+
+    @field_validator("job_specialties", mode="before")
+    @classmethod
+    def parse_job_specialties(cls, value):
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return [item.strip() for item in value.split(",") if item.strip()]
+        return value or []
 
 
 class ProposeSlotsRequest(BaseModel):
